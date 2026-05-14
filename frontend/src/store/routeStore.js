@@ -1,0 +1,23 @@
+import { create } from 'zustand'
+
+export const useRouteStore = create((set) => ({
+  isOpen:      false,
+  mode:        'foot',
+  origin:      null,      // { lat, lng, label }
+  destination: null,      // { lat, lng, label }
+  picking:     null,      // 'origin' | 'destination' | null
+  route:       null,      // { geometry, distance, duration }
+  isLoading:   false,
+  error:       null,
+
+  togglePanel:    () => set(s => ({ isOpen: !s.isOpen, picking: null, error: null })),
+  closePanel:     () => set({ isOpen: false, picking: null, origin: null, destination: null, route: null, error: null }),
+  setMode:        (mode) => set({ mode, route: null }),
+  setOrigin:      (pt)   => set({ origin: pt, route: null }),
+  setDestination: (pt)   => set({ destination: pt, route: null }),
+  setPicking:     (p)    => set({ picking: p }),
+  setRoute:       (r)    => set({ route: r, error: null }),
+  setLoading:     (b)    => set({ isLoading: b }),
+  setError:       (e)    => set({ error: e, isLoading: false }),
+  clearRoute:     ()     => set({ origin: null, destination: null, route: null, picking: null, error: null }),
+}))

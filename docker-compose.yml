@@ -1,0 +1,153 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:8000
+      - VITE_REVERB_APP_KEY=bcnlive_key
+      - VITE_REVERB_HOST=localhost
+      - VITE_REVERB_PORT=8080
+      - VITE_REVERB_SCHEME=http
+    depends_on:
+      - backend
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/var/www/html
+      - backend_vendor:/var/www/html/vendor
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      - APP_ENV=local
+      - APP_DEBUG=true
+      - DB_CONNECTION=pgsql
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_DATABASE=bcnlive
+      - DB_USERNAME=bcnlive
+      - DB_PASSWORD=bcnlive
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY}
+      - AQICN_API_KEY=${AQICN_API_KEY}
+      - TMB_APP_ID=6fedcdb0
+      - TMB_APP_KEY=030821a40ec558ee757ef5b33bb845df
+      - BROADCAST_CONNECTION=reverb
+      - REVERB_APP_ID=bcnlive
+      - REVERB_APP_KEY=bcnlive_key
+      - REVERB_APP_SECRET=bcnlive_secret
+      - REVERB_HOST=reverb
+      - REVERB_PORT=8080
+      - REVERB_SCHEME=http
+
+  reverb:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: php artisan reverb:start --host=0.0.0.0 --port=8080
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./backend:/var/www/html
+      - backend_vendor:/var/www/html/vendor
+    depends_on:
+      backend:
+        condition: service_started
+      redis:
+        condition: service_started
+    environment:
+      - APP_ENV=local
+      - DB_CONNECTION=pgsql
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_DATABASE=bcnlive
+      - DB_USERNAME=bcnlive
+      - DB_PASSWORD=bcnlive
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - BROADCAST_CONNECTION=reverb
+      - REVERB_APP_ID=bcnlive
+      - REVERB_APP_KEY=bcnlive_key
+      - REVERB_APP_SECRET=bcnlive_secret
+      - REVERB_HOST=0.0.0.0
+      - REVERB_PORT=8080
+      - REVERB_SCHEME=http
+
+  scheduler:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: php artisan schedule:work
+    volumes:
+      - ./backend:/var/www/html
+      - backend_vendor:/var/www/html/vendor
+    depends_on:
+      - backend
+      - reverb
+    environment:
+      - APP_ENV=local
+      - DB_CONNECTION=pgsql
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_DATABASE=bcnlive
+      - DB_USERNAME=bcnlive
+      - DB_PASSWORD=bcnlive
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY}
+      - AQICN_API_KEY=${AQICN_API_KEY}
+      - TMB_APP_ID=6fedcdb0
+      - TMB_APP_KEY=030821a40ec558ee757ef5b33bb845df
+      - BROADCAST_CONNECTION=reverb
+      - REVERB_APP_ID=bcnlive
+      - REVERB_APP_KEY=bcnlive_key
+      - REVERB_APP_SECRET=bcnlive_secret
+      - REVERB_HOST=reverb
+      - REVERB_PORT=8080
+      - REVERB_SCHEME=http
+
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: bcnlive
+      POSTGRES_USER: bcnlive
+      POSTGRES_PASSWORD: bcnlive
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bcnlive"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+volumes:
+  postgres_data:
+  redis_data:
+  backend_vendor:
