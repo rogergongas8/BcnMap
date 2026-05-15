@@ -1,4 +1,5 @@
 const BCN_VIEWBOX = '2.05,41.26,2.33,41.50'
+const BCN_BOUNDS  = { minLat: 41.26, maxLat: 41.50, minLng: 2.05, maxLng: 2.33 }
 
 function getCategory(cls, type) {
   if (cls === 'amenity') {
@@ -16,17 +17,28 @@ function getCategory(cls, type) {
   return 'address'
 }
 
-function buildLabel(r) {
+// Returns { main, sub } so the UI can show two distinct lines.
+function buildLabelParts(r) {
   const a = r.address ?? {}
-  const mainName = r.namedetails?.name || r.display_name?.split(',')[0]?.trim()
-  const parts = [mainName]
-  if (a.road && mainName !== a.road) parts.push(a.road)
-  const area = a.neighbourhood || a.suburb || a.city_district || a.quarter
-  if (area && !parts.some(p => p?.includes(area))) parts.push(area)
-  return parts.filter(Boolean).join(', ')
+  const area = a.neighbourhood || a.suburb || a.city_district || a.quarter || ''
+
+  // Street address with house number: "Carrer de la Pau, 12 · Gràcia"
+  if (a.house_number && a.road) {
+    return { main: `${a.road}, ${a.house_number}`, sub: area }
+  }
+
+  const rawName = r.namedetails?.name || r.display_name?.split(',')[0]?.trim() || ''
+
+  // Named place (restaurant, park, station…): "Parc de la Ciutadella · Sant Pere"
+  if (rawName && a.road && rawName !== a.road) {
+    return { main: rawName, sub: [a.road, area].filter(Boolean).join(', ') }
+  }
+
+  // Street without number: "Carrer de Balmes · Eixample"
+  return { main: rawName, sub: area }
 }
 
-export async function geocodeSearch(q, limit = 5) {
+export async function geocodeSearch(q, limit = 8) {
   if (!q || q.length < 2) return []
   try {
     const params = new URLSearchParams({
@@ -38,12 +50,31 @@ export async function geocodeSearch(q, limit = 5) {
       headers: { 'Accept-Language': 'ca,es' },
     })
     const data = await res.json()
-    return data.map(r => ({
-      label:    buildLabel(r),
-      lat:      parseFloat(r.lat),
-      lng:      parseFloat(r.lon),
-      category: getCategory(r.class, r.type),
-    }))
+
+    const seen = new Set()
+    return data
+      .filter(r => {
+        const lat = parseFloat(r.lat)
+        const lng = parseFloat(r.lon)
+        return lat >= BCN_BOUNDS.minLat && lat <= BCN_BOUNDS.maxLat
+            && lng >= BCN_BOUNDS.minLng && lng <= BCN_BOUNDS.maxLng
+      })
+      .map(r => {
+        const { main, sub } = buildLabelParts(r)
+        return {
+          label:    sub ? `${main} · ${sub}` : main,
+          main,
+          sub,
+          lat:      parseFloat(r.lat),
+          lng:      parseFloat(r.lon),
+          category: getCategory(r.class, r.type),
+        }
+      })
+      .filter(r => {
+        if (seen.has(r.label)) return false
+        seen.add(r.label)
+        return true
+      })
   } catch { return [] }
 }
 

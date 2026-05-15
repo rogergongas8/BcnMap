@@ -6,9 +6,13 @@ export const useRouteStore = create((set) => ({
   origin:      null,      // { lat, lng, label }
   destination: null,      // { lat, lng, label }
   picking:     null,      // 'origin' | 'destination' | null
-  route:       null,      // { geometry, distance, duration }
+  route:       null,      // { segments, distance, duration }
   isLoading:   false,
   error:       null,
+
+  // Signal set by the chat to open the SearchBar with pre-filled data.
+  // SearchBar consumes and clears it.
+  chatRequest:  null,     // { origin, destination, mode, route } | null
 
   togglePanel:    () => set(s => ({ isOpen: !s.isOpen, picking: null, error: null })),
   closePanel:     () => set({ isOpen: false, picking: null, origin: null, destination: null, route: null, error: null }),
@@ -20,4 +24,8 @@ export const useRouteStore = create((set) => ({
   setLoading:     (b)    => set({ isLoading: b }),
   setError:       (e)    => set({ error: e, isLoading: false }),
   clearRoute:     ()     => set({ origin: null, destination: null, route: null, picking: null, error: null }),
+
+  // Chat-triggered route: sets everything and signals the SearchBar to open.
+  setChatRequest: (req)  => set({ chatRequest: req }),
+  clearChatRequest: ()   => set({ chatRequest: null }),
 }))

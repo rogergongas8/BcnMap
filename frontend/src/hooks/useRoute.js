@@ -1,17 +1,13 @@
 import { useEffect } from 'react'
 import { useMapStore } from '../store/mapStore'
 import { useRouteStore } from '../store/routeStore'
-import { fetchRoute } from '../services/api'
 import { reverseGeocode } from '../utils/geocode'
 
+// Handles only map-click picking mode. Route fetching is owned by SearchBar
+// (which reuses preview data to avoid duplicate OSRM calls).
 export function useRoute() {
   const { mapInstance } = useMapStore()
-  const {
-    picking, setPicking,
-    setOrigin, setDestination,
-    origin, destination, mode,
-    setRoute, setLoading, setError,
-  } = useRouteStore()
+  const { picking, setPicking, setOrigin, setDestination } = useRouteStore()
 
   useEffect(() => {
     if (!mapInstance || !picking) return
@@ -22,7 +18,6 @@ export function useRoute() {
     const handler = async (e) => {
       const { lat, lng } = e.lngLat
       const label = await reverseGeocode(lat, lng)
-
       if (picking === 'origin') {
         setOrigin({ lat, lng, label })
         setPicking('destination')
@@ -38,23 +33,4 @@ export function useRoute() {
       canvas.style.cursor = ''
     }
   }, [mapInstance, picking])
-
-  useEffect(() => {
-    if (!origin || !destination) return
-
-    const calculate = async () => {
-      setLoading(true)
-      try {
-        const result = await fetchRoute(origin.lat, origin.lng, destination.lat, destination.lng, mode)
-        if (result.error) setError(result.error)
-        else setRoute(result)
-      } catch {
-        setError('No se pudo calcular la ruta')
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    calculate()
-  }, [origin, destination, mode])
 }

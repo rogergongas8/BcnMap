@@ -1,7 +1,7 @@
 import { useChatStore } from '../store/chatStore'
 import { useMapStore } from '../store/mapStore'
 import { useRouteStore } from '../store/routeStore'
-import { sendChat } from '../services/api'
+import { sendChat, fetchRoute } from '../services/api'
 import { geocodeLabel } from '../utils/geocode'
 
 const BCN_HOME = { lat: 41.3851, lng: 2.1734, zoom: 13 }
@@ -18,7 +18,6 @@ async function executeMapActions(actions) {
       flyTo(BCN_HOME)
 
     } else if (action.type === 'calculate_route') {
-      const { setOrigin, setDestination, setMode, isOpen, togglePanel } = useRouteStore.getState()
       const userLoc = useMapStore.getState().userLocation
 
       let origin = null
@@ -30,6 +29,8 @@ async function executeMapActions(actions) {
           ? { ...userLoc, label: 'Mi ubicación' }
           : await geocodeLabel(action.origin_label + ' Barcelona')
       }
+      // Fallback to GPS location
+      if (!origin && userLoc) origin = { ...userLoc, label: 'Mi ubicación' }
 
       let dest = null
       if (action.dest_lat != null && action.dest_lng != null) {
@@ -38,19 +39,29 @@ async function executeMapActions(actions) {
         dest = await geocodeLabel(action.dest_label + ' Barcelona')
       }
 
-      if (origin) setOrigin(origin)
-      if (dest)   setDestination(dest)
-      setMode(action.mode === 'bike' ? 'bicing' : (action.mode ?? 'foot'))
-      if (!isOpen) togglePanel()
+      if (!origin || !dest) return
 
-      // Fly the map to destination so user can see it while route calculates
-      if (dest) {
-        useMapStore.getState().mapInstance?.flyTo({
-          center: [dest.lng, dest.lat],
-          zoom: 14,
-          duration: 1400,
-          pitch: 40,
-        })
+      const mode = action.mode === 'bike' ? 'bicing' : (action.mode ?? 'foot')
+
+      // Fly to destination immediately
+      useMapStore.getState().flyTo({ lat: dest.lat, lng: dest.lng, zoom: 14 })
+
+      // Fetch the route then signal SearchBar to open with the data
+      try {
+        const route = await fetchRoute(origin.lat, origin.lng, dest.lat, dest.lng, mode)
+        const { setOrigin, setDestination, setMode, setRoute, setChatRequest } = useRouteStore.getState()
+        setMode(mode)
+        setOrigin(origin)
+        setDestination(dest)
+        if (!route.error) setRoute(route)
+        setChatRequest({ origin, destination: dest, mode, route: route.error ? null : route })
+      } catch {
+        // Best-effort: open SearchBar without a route so user can still interact
+        const { setOrigin, setDestination, setMode, setChatRequest } = useRouteStore.getState()
+        setMode(mode)
+        setOrigin(origin)
+        setDestination(dest)
+        setChatRequest({ origin, destination: dest, mode, route: null })
       }
     }
   }

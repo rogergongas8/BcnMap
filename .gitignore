@@ -1,7 +1,53 @@
+# ── Environment ──────────────────────────────────────────────
 .env
+.env.*
+!.env.example
 backend/.env
+backend/.env.*
+!backend/.env.example
+
+# ── Laravel backend ───────────────────────────────────────────
 backend/vendor/
 backend/storage/logs/*.log
+backend/storage/*.key
+backend/storage/pail/
+backend/bootstrap/cache/*.php
+backend/public/storage
+backend/public/hot
+backend/public/build/
+backend/_ide_helper.php
+backend/_ide_helper_models.php
+backend/.phpstorm.meta.php
+backend/.phpunit.result.cache
+backend/.phpunit.cache/
+backend/auth.json
+
+# ── React / Vite frontend ─────────────────────────────────────
 frontend/node_modules/
 frontend/dist/
-*.DS_Store
+frontend/.vite/
+
+# ── Docker ────────────────────────────────────────────────────
+docker/data/
+docker/logs/
+
+# ── OS ────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ── IDEs ──────────────────────────────────────────────────────
+.idea/
+.vscode/
+.nova/
+.zed/
+*.swp
+*.swo
+
+# ── AI / MCP ──────────────────────────────────────────────────
+.mcp.json
+.kiro/
+.claude/
+.cursor/
+.codex/
+.ai/
