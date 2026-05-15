@@ -16,6 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->api(prepend: [
             \Illuminate\Http\Middleware\HandleCors::class,
         ]);
+        $middleware->throttleApi('120,1');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

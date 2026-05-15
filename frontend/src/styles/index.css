@@ -23,10 +23,31 @@
     @apply bg-black/85 border border-white/10 backdrop-blur-md;
   }
 
+  .panel-glass-premium {
+    background: linear-gradient(180deg, rgba(15, 18, 24, 0.78), rgba(0, 0, 0, 0.88));
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(20px) saturate(140%);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.04) inset,
+      0 20px 60px -20px rgba(0, 0, 0, 0.6),
+      0 0 0 1px rgba(0, 0, 0, 0.4);
+  }
+
+  .neon-edge::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 12px; right: 12px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(34, 211, 238, 0.45), transparent);
+    pointer-events: none;
+  }
+
   .text-neon-green { color: #00ff88; }
   .text-neon-blue  { color: #00aaff; }
   .text-neon-yellow { color: #ffcc00; }
   .text-neon-red   { color: #ff3333; }
+  .text-neon-cyan  { color: #22d3ee; }
 }
 
 /* Ensure MapLibre controls are always clickable above React overlays */
@@ -36,4 +57,130 @@
 .maplibregl-ctrl-top-left {
   z-index: 20;
   pointer-events: auto;
+}
+
+/* Map cursor */
+.maplibregl-canvas {
+  cursor: crosshair;
+}
+.maplibregl-canvas:active {
+  cursor: grabbing;
+}
+
+/* Pin marker (single-click on map) */
+.bcn-pin {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  pointer-events: none;
+}
+.bcn-pin-pulse {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(34, 211, 238, 0.25);
+  animation: bcn-pin-pulse 1.6s ease-out infinite;
+}
+.bcn-pin-dot {
+  position: absolute;
+  inset: 8px;
+  border-radius: 50%;
+  background: #22d3ee;
+  box-shadow:
+    0 0 0 2px rgba(0, 0, 0, 0.7),
+    0 0 12px rgba(34, 211, 238, 0.8);
+}
+@keyframes bcn-pin-pulse {
+  0%   { transform: scale(0.6); opacity: 0.8; }
+  100% { transform: scale(2.2);  opacity: 0; }
+}
+
+/* Scanline overlay (subtle cyberpunk vibe — disabled by default; add `.bcn-scan` to body to activate) */
+.bcn-scan::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(
+      0deg,
+      transparent 0,
+      transparent 2px,
+      rgba(255, 255, 255, 0.012) 3px,
+      transparent 4px
+    );
+  z-index: 9998;
+  mix-blend-mode: overlay;
+}
+
+/* Scrollbar (cyberpunk) */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(34, 211, 238, 0.25);
+}
+
+/* Beach marker */
+.bcn-beach {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  pointer-events: auto;
+  cursor: pointer;
+  transition: transform 0.18s ease-out;
+}
+.bcn-beach:hover { transform: scale(1.15); z-index: 10; }
+.bcn-beach-dot {
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  filter: drop-shadow(0 0 8px currentColor);
+}
+.bcn-beach-low    { background: linear-gradient(135deg, #00ff88, #00aa66); color: #00ff88; }
+.bcn-beach-medium { background: linear-gradient(135deg, #ffcc00, #cc8800); color: #ffcc00; }
+.bcn-beach-high   { background: linear-gradient(135deg, #ff5566, #aa3344); color: #ff5566; }
+.bcn-beach-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1.5px solid rgba(34, 211, 238, 0.55);
+  animation: bcn-beach-ring 2s ease-out infinite;
+  pointer-events: none;
+}
+@keyframes bcn-beach-ring {
+  0%   { transform: scale(0.85); opacity: 1; }
+  100% { transform: scale(1.6);  opacity: 0; }
+}
+
+/* POI marker (Nearby) */
+.bcn-poi {
+  position: relative;
+  width: 26px;
+  height: 26px;
+  pointer-events: auto;
+  cursor: pointer;
+  transition: transform 0.18s ease-out;
+}
+.bcn-poi:hover { transform: scale(1.18); z-index: 10; }
+.bcn-poi-dot {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(8, 12, 18, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
 }

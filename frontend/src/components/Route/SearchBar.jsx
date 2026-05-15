@@ -318,6 +318,10 @@ function ModeCard({ mode, state, isActive, onClick, metroLines }) {
     }
   }
 
+  const trafficNote = mode.id === 'car' ? (data?.traffic?.note ?? data?.segments?.[0]?.meta?.traffic_note) : null
+  const congestion  = mode.id === 'car' ? (data?.traffic?.congestion ?? data?.segments?.[0]?.meta?.congestion) : null
+  const trafficColor = congestion >= 80 ? '#ff3333' : congestion >= 60 ? '#ffcc00' : '#00ff88'
+
   return (
     <motion.button
       layout
@@ -369,7 +373,12 @@ function ModeCard({ mode, state, isActive, onClick, metroLines }) {
           {data && (
             <div className="mt-1 flex items-center gap-2 text-[10px] font-mono text-white/35">
               {data.distance != null && <span>{fmtDist(data.distance)}</span>}
-              {metaLine && <span className="truncate">· {metaLine}</span>}
+              {trafficNote && (
+                <span className="font-mono text-[9px] px-1.5 py-0.5 rounded" style={{ color: trafficColor, background: trafficColor + '18' }}>
+                  {trafficNote}
+                </span>
+              )}
+              {!trafficNote && metaLine && <span className="truncate">· {metaLine}</span>}
             </div>
           )}
         </div>

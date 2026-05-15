@@ -1,6 +1,7 @@
 import React from 'react'
 import { motion } from 'framer-motion'
 import { useMapStore } from '../../store/mapStore'
+import { useLeisureStore } from '../../store/leisureStore'
 
 const THEMES = [
   { id: 'voyager', icon: '◐', title: 'Estàndard' },
@@ -23,6 +24,8 @@ const DATA_LAYERS = [
 
 export default function LayerToggle() {
   const { mapTheme, setMapTheme, activeLayers, toggleLayer, trafficMode, setTrafficMode } = useMapStore()
+  const showBeaches    = useLeisureStore(s => s.showBeaches)
+  const toggleBeaches  = useLeisureStore(s => s.toggleBeaches)
 
   return (
     <motion.div
@@ -90,6 +93,24 @@ export default function LayerToggle() {
           </button>
         )
       })}
+
+      <button
+        onClick={toggleBeaches}
+        className="panel-glass rounded-lg px-3 py-2 flex items-center gap-2 text-sm transition-all"
+        style={{ borderColor: showBeaches ? '#22d3ee40' : 'transparent' }}
+      >
+        <span
+          className="w-3 h-3 rounded-full transition-opacity"
+          style={{
+            backgroundColor: '#22d3ee',
+            opacity: showBeaches ? 1 : 0.25,
+            boxShadow: showBeaches ? '0 0 6px #22d3ee' : 'none',
+          }}
+        />
+        <span className={showBeaches ? 'text-white' : 'text-white/30'}>
+          Platges
+        </span>
+      </button>
     </motion.div>
   )
 }

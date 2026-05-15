@@ -10,3 +10,5 @@ Artisan::command('inspire', function () {
 
 Schedule::command('city:fetch')->everyTwoMinutes();
 Schedule::command('bus:refresh')->everyMinute();
+Schedule::command('pois:refresh')->daily();
+Schedule::command('beaches:refresh')->everyThirtyMinutes();

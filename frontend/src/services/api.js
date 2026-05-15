@@ -24,3 +24,17 @@ export const sendChat = (message, history, userLocation = null) =>
 
 export const fetchRoute = (fromLat, fromLng, toLat, toLng, mode) =>
   api.get('/route', { params: { from_lat: fromLat, from_lng: fromLng, to_lat: toLat, to_lng: toLng, mode } }).then(r => r.data)
+
+export const fetchBeaches = () => api.get('/beaches').then(r => r.data)
+
+export const fetchPoisNearby = (lat, lng, radius = 800, categories = []) =>
+  api.get('/pois/nearby', {
+    params: { lat, lng, radius, categories: categories.join(',') || undefined },
+  }).then(r => r.data)
+
+export const fetchEventsToday  = () => api.get('/events/today').then(r => r.data)
+export const fetchEventsNearby = (lat, lng, radius = 2) =>
+  api.get('/events/nearby', { params: { lat, lng, radius } }).then(r => r.data)
+
+export const fetchHistoryTimeline = (hours = 24, step = 5) =>
+  api.get('/history/timeline', { params: { hours, step } }).then(r => r.data)

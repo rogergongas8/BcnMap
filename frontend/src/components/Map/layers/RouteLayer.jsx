@@ -134,76 +134,84 @@ export default function RouteLayer() {
       if (!seg.geometry?.coordinates?.length) continue
 
       const srcId = `${SRC_PREFIX}-${i}`
-      segIds.current.push(srcId)
 
-      mapInstance.addSource(srcId, {
-        type: 'geojson',
-        data: { type: 'Feature', geometry: seg.geometry, properties: {} },
-      })
+      // Defensively ensure no stale source/layer with this ID exists
+      try { mapInstance.removeLayer(srcId + '-glow') } catch (_) {}
+      try { mapInstance.removeLayer(srcId + '-line') } catch (_) {}
+      try { mapInstance.removeSource(srcId) } catch (_) {}
 
-      const color   = segmentColor(seg)
-      const isWalk  = seg.type === 'walk'
-      const isBike  = seg.type === 'bike'
-      const isMetro = seg.type === 'metro'
-      const isBus   = seg.type === 'bus'
-      const isCar   = seg.type === 'drive'
+      try {
+        segIds.current.push(srcId)
 
-      // ── Glow (halo exterior difuminado) ──
-      let glowWidth   = 14
-      let glowOpacity = 0.18
-      let glowBlur    = 6
-      if (isWalk)            { glowWidth = 10; glowOpacity = 0.14; glowBlur = 5 }
-      if (isBike)            { glowWidth = 18; glowOpacity = 0.30; glowBlur = 8 }
-      if (isMetro || isBus)  { glowWidth = 18; glowOpacity = 0.28; glowBlur = 7 }
-      if (isCar)             { glowWidth = 16; glowOpacity = 0.22; glowBlur = 6 }
+        mapInstance.addSource(srcId, {
+          type: 'geojson',
+          data: { type: 'Feature', geometry: seg.geometry, properties: {} },
+        })
 
-      mapInstance.addLayer({
-        id: srcId + '-glow',
-        type: 'line',
-        source: srcId,
-        layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: {
-          'line-color':   color,
-          'line-width':   glowWidth,
-          'line-opacity': glowOpacity,
-          'line-blur':    glowBlur,
-        },
-      })
+        const color   = segmentColor(seg)
+        const isWalk  = seg.type === 'walk'
+        const isBike  = seg.type === 'bike'
+        const isMetro = seg.type === 'metro'
+        const isBus   = seg.type === 'bus'
+        const isCar   = seg.type === 'drive'
 
-      // ── Línea principal ──
-      let width     = 4
-      let opacity   = 0.95
-      let dasharray = null
+        // ── Glow (halo exterior difuminado) ──
+        let glowWidth   = 14
+        let glowOpacity = 0.18
+        let glowBlur    = 6
+        if (isWalk)            { glowWidth = 10; glowOpacity = 0.14; glowBlur = 5 }
+        if (isBike)            { glowWidth = 18; glowOpacity = 0.30; glowBlur = 8 }
+        if (isMetro || isBus)  { glowWidth = 18; glowOpacity = 0.28; glowBlur = 7 }
+        if (isCar)             { glowWidth = 16; glowOpacity = 0.22; glowBlur = 6 }
 
-      if (isWalk) {
-        // Dashed blanca: visual de "andar a pie"
-        width     = 3
-        opacity   = 0.90
-        dasharray = [2, 2.5]
-      } else if (isBike) {
-        width   = 4.5
-        opacity = 0.98
-      } else if (isMetro || isBus) {
-        // Sólido con el color real de la línea
-        width   = 5.5
-        opacity = 0.97
-      } else if (isCar) {
-        width   = 4.5
-        opacity = 0.95
+        mapInstance.addLayer({
+          id: srcId + '-glow',
+          type: 'line',
+          source: srcId,
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: {
+            'line-color':   color,
+            'line-width':   glowWidth,
+            'line-opacity': glowOpacity,
+            'line-blur':    glowBlur,
+          },
+        })
+
+        // ── Línea principal ──
+        let width     = 4
+        let opacity   = 0.95
+        let dasharray = null
+
+        if (isWalk) {
+          width     = 3.5
+          opacity   = 0.92
+          dasharray = [3, 3]
+        } else if (isBike) {
+          width   = 4.5
+          opacity = 0.98
+        } else if (isMetro || isBus) {
+          width   = 5.5
+          opacity = 0.97
+        } else if (isCar) {
+          width   = 4.5
+          opacity = 0.95
+        }
+
+        mapInstance.addLayer({
+          id: srcId + '-line',
+          type: 'line',
+          source: srcId,
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: {
+            'line-color':   color,
+            'line-width':   width,
+            'line-opacity': opacity,
+            ...(dasharray ? { 'line-dasharray': dasharray } : {}),
+          },
+        })
+      } catch (err) {
+        console.warn('[RouteLayer] failed to add segment', i, err)
       }
-
-      mapInstance.addLayer({
-        id: srcId + '-line',
-        type: 'line',
-        source: srcId,
-        layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: {
-          'line-color':   color,
-          'line-width':   width,
-          'line-opacity': opacity,
-          ...(dasharray ? { 'line-dasharray': dasharray } : {}),
-        },
-      })
     }
 
     // ───────────── Marcadores origen / destino ─────────────

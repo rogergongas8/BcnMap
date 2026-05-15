@@ -16,11 +16,20 @@ class RouteService
         'bus'   => '#00b4ff',
     ];
 
+    // Real-world average speeds for urban Barcelona (km/h).
+    // The public OSRM demo server returns identical durations for all profiles,
+    // so we override duration using road distance + these speeds.
+    private const SPEEDS_KMH = [
+        'walk'  => 4.8,   // typical pedestrian in city
+        'bike'  => 17.0,  // city cycling with traffic lights
+        'drive' => 28.0,  // urban driving BCN (congestion factored)
+    ];
+
     public function calculate(float $fromLat, float $fromLng, float $toLat, float $toLng, string $mode): array
     {
         return match ($mode) {
             'foot'   => $this->singleSegment('foot',    $fromLat, $fromLng, $toLat, $toLng, 'walk'),
-            'car'    => $this->singleSegment('driving', $fromLat, $fromLng, $toLat, $toLng, 'drive'),
+            'car'    => $this->carRoute($fromLat, $fromLng, $toLat, $toLng),
             'bike'   => $this->singleSegment('bike',    $fromLat, $fromLng, $toLat, $toLng, 'bike'),
             'bicing' => $this->bicingRoute($fromLat, $fromLng, $toLat, $toLng),
             'bus'    => $this->transitRoute($fromLat, $fromLng, $toLat, $toLng),
@@ -28,9 +37,70 @@ class RouteService
         };
     }
 
+    /**
+     * Car route: fetches up to 3 OSRM alternatives, applies real-time traffic
+     * congestion penalty, and returns the fastest after adjustment.
+     */
+    private function carRoute(float $fromLat, float $fromLng, float $toLat, float $toLng): array
+    {
+        try {
+            $r = Http::timeout(12)->get(
+                self::OSRM_BASE . "/driving/{$fromLng},{$fromLat};{$toLng},{$toLat}",
+                ['overview' => 'full', 'geometries' => 'geojson', 'alternatives' => 'true']
+            );
+            if (!$r->successful()) return $this->singleSegment('driving', $fromLat, $fromLng, $toLat, $toLng, 'drive');
+
+            $data   = $r->json();
+            $routes = $data['routes'] ?? [];
+            if (empty($routes)) return ['error' => 'No se encontró ruta'];
+
+            // Traffic congestion level (0-100) derived from live traffic data
+            $congestion = $this->currentCongestion();
+
+            // Penalty factor: +1% per congestion point above 20, capped at +80%
+            $penalty = 1.0 + max(0, min(0.8, ($congestion - 20) / 100));
+
+            // For each alternative: use OSRM geometry (real road distance) + our duration formula + traffic
+            $candidates = array_map(function ($route) use ($penalty) {
+                $dist = (float) $route['distance'];
+                $dur  = $this->realisticDuration($dist, 'drive') * $penalty;
+                return ['geometry' => $route['geometry'], 'distance' => $dist, 'duration' => $dur];
+            }, $routes);
+
+            // Pick route with shortest traffic-adjusted duration
+            usort($candidates, fn($a, $b) => $a['duration'] <=> $b['duration']);
+            $best = $candidates[0];
+
+            $trafficNote = $congestion >= 60
+                ? ($congestion >= 80 ? 'Tráfico muy denso' : 'Tráfico denso')
+                : ($congestion >= 40 ? 'Tráfico moderado' : null);
+
+            return [
+                'segments' => [[
+                    'type'     => 'drive',
+                    'geometry' => $best['geometry'],
+                    'distance' => $best['distance'],
+                    'duration' => $best['duration'],
+                    'color'    => self::COLORS['drive'],
+                    'label'    => 'En coche',
+                    'meta'     => [
+                        'congestion'   => $congestion,
+                        'traffic_note' => $trafficNote,
+                        'alternatives' => count($candidates),
+                    ],
+                ]],
+                'distance' => $best['distance'],
+                'duration' => $best['duration'],
+                'traffic'  => ['congestion' => $congestion, 'note' => $trafficNote],
+            ];
+        } catch (\Throwable) {
+            return $this->singleSegment('driving', $fromLat, $fromLng, $toLat, $toLng, 'drive');
+        }
+    }
+
     private function singleSegment(string $profile, float $fromLat, float $fromLng, float $toLat, float $toLng, string $type): array
     {
-        $seg = $this->osrmRoute($profile, $fromLat, $fromLng, $toLat, $toLng);
+        $seg = $this->osrmRoute($profile, $fromLat, $fromLng, $toLat, $toLng, $type);
         if (!$seg) return ['error' => 'No se encontró ruta'];
         return [
             'segments' => [[
@@ -70,9 +140,9 @@ class RouteService
             $pool->as('walk2')->timeout(12)->get(self::OSRM_BASE . "/foot/{$dLng},{$dLat};{$toLng},{$toLat}",   ['overview' => 'full', 'geometries' => 'geojson']),
         ]);
 
-        $walk1 = $this->parseOsrm($responses['walk1']);
-        $bike  = $this->parseOsrm($responses['bike']);
-        $walk2 = $this->parseOsrm($responses['walk2']);
+        $walk1 = $this->parseOsrm($responses['walk1'], 'walk');
+        $bike  = $this->parseOsrm($responses['bike'],  'bike');
+        $walk2 = $this->parseOsrm($responses['walk2'], 'walk');
 
         if (!$bike) {
             return $this->singleSegment('bike', $fromLat, $fromLng, $toLat, $toLng, 'bike');
@@ -178,8 +248,8 @@ class RouteService
             $pool->as('walk2')->timeout(12)->get(self::OSRM_BASE . "/foot/{$dLng},{$dLat};{$toLng},{$toLat}",   ['overview' => 'full', 'geometries' => 'geojson']),
         ]);
 
-        $walk1 = $this->parseOsrm($responses['walk1']);
-        $walk2 = $this->parseOsrm($responses['walk2']);
+        $walk1 = $this->parseOsrm($responses['walk1'], 'walk');
+        $walk2 = $this->parseOsrm($responses['walk2'], 'walk');
 
         $segments = [];
 
@@ -247,26 +317,46 @@ class RouteService
         ];
     }
 
-    private function osrmRoute(string $profile, float $fromLat, float $fromLng, float $toLat, float $toLng): ?array
+    private function osrmRoute(string $profile, float $fromLat, float $fromLng, float $toLat, float $toLng, string $type = 'walk'): ?array
     {
         try {
             $r = Http::timeout(12)->get(
                 self::OSRM_BASE . "/{$profile}/{$fromLng},{$fromLat};{$toLng},{$toLat}",
                 ['overview' => 'full', 'geometries' => 'geojson']
             );
-            return $this->parseOsrm($r);
+            return $this->parseOsrm($r, $type);
         } catch (\Throwable) { return null; }
     }
 
-    private function parseOsrm(mixed $response): ?array
+    private function parseOsrm(mixed $response, string $type = 'walk'): ?array
     {
         try {
             if (!$response || !$response->successful()) return null;
             $data = $response->json();
             if (($data['code'] ?? '') !== 'Ok' || empty($data['routes'])) return null;
-            $r = $data['routes'][0];
-            return ['geometry' => $r['geometry'], 'distance' => $r['distance'], 'duration' => $r['duration']];
+            $r    = $data['routes'][0];
+            $dist = (float) $r['distance'];
+            // The public OSRM demo server returns the same (wrong) duration for all profiles.
+            // We override it with a realistic estimate based on road distance.
+            $dur  = $this->realisticDuration($dist, $type);
+            return ['geometry' => $r['geometry'], 'distance' => $dist, 'duration' => $dur];
         } catch (\Throwable) { return null; }
+    }
+
+    private function realisticDuration(float $distM, string $type): float
+    {
+        $kmh = self::SPEEDS_KMH[$type] ?? 4.8;
+        return ($distM / ($kmh / 3.6)); // seconds = meters / (m/s)
+    }
+
+    /** Compute current traffic congestion % (0-100) from cached live data. */
+    private function currentCongestion(): int
+    {
+        $data = Cache::get('traffic_current', []);
+        if (empty($data)) return 30; // default mid-level when no data
+        $total  = count($data);
+        $jammed = count(array_filter($data, fn($t) => in_array($t['estado'] ?? '', ['congestionado', 'cortado'])));
+        return (int) round(($jammed / $total) * 100);
     }
 
     private function nearestStation(array $stations, float $lat, float $lng, string $prefer): ?array

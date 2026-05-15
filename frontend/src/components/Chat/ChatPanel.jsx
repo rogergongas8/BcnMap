@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useChatStore } from '../../store/chatStore'
 import { useRouteStore } from '../../store/routeStore'
@@ -18,6 +18,12 @@ export default function ChatPanel() {
   const { messages, isLoading, sendMessage } = useChat()
   const { route, isOpen: routeOpen } = useRouteStore()
   const bottomRef = useRef(null)
+  const hasEverOpened = useRef(false)
+
+  // Track first open so the entrance delay only applies on initial page load.
+  useEffect(() => {
+    if (isOpen) hasEverOpened.current = true
+  }, [isOpen])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -33,7 +39,7 @@ export default function ChatPanel() {
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.8 }}
-            transition={{ delay: 4.4, duration: 0.25 }}
+            transition={{ delay: hasEverOpened.current ? 0 : 4.4, duration: 0.25 }}
             onClick={toggleChat}
             title="Chat IA"
             className="absolute top-[108px] right-4 z-40 w-10 h-10

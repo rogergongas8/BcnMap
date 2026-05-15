@@ -44,7 +44,15 @@ REGLAS PARA calculate_route:
 - Para origen: si hay POSICIÓN USUARIO en el contexto, úsala (origin_lat/origin_lng con esas coordenadas, origin_label: "Mi ubicación"). Si no, pon null en ambas coordenadas.
 - Para destinos conocidos usa coordenadas precisas: Sagrada Família(41.4036,2.1744), Parc Güell(41.4145,2.1527), Camp Nou(41.3809,2.1228), Barceloneta(41.3793,2.1892), Born(41.3854,2.1834), Gràcia(41.4036,2.1564), Tibidabo(41.4218,2.1189), Montjuïc(41.3637,2.1588), Arc de Triomf(41.3912,2.1804), Hospital Sant Pau(41.4120,2.1741).
 - Para destinos de dirección específica (ej: "Sant Antoni Maria Claret 57"): usa dest_label con la dirección tal cual, deja dest_lat/dest_lng en null, el sistema la geocodificará.
-- Elige el modo inteligentemente: tráfico alto → bus; lluvia → foot o bus; distancia corta (<1km) → foot; bici disponible y clima bueno → bike; usuario menciona prisa → bus o car.
+
+ELECCIÓN DE MODO (muy importante, sé conservador):
+- Estima la distancia aproximada: |Δlat| × 111 + |Δlng| × 85 (km). Eso es la distancia en línea recta; la real por calles es ~1.3× más.
+- Si distancia estimada > 2km → usa "bus" (metro) como primera opción, NO "foot".
+- Si distancia estimada > 1km Y llueve (weather_desc contiene "rain", "lluvioso", "lluvia") → usa "bus", NUNCA "foot" ni "bike".
+- Si distancia ≤ 1km y no llueve → "foot" es razonable.
+- Si Bicing disponible (bicing_availability_global > 30) y no llueve y distancia 1-4km → "bike".
+- Si usuario menciona prisa o el destino está muy lejos (>5km) → "car" o "bus".
+- Si el usuario menciona explícitamente el modo, respétalo salvo que sea peligroso (ej: bici con lluvia intensa).
 PROMPT;
 
         $messages = [['role' => 'system', 'content' => $systemPrompt]];
