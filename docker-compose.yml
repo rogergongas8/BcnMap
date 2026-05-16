@@ -55,6 +55,7 @@ services:
       - REVERB_HOST=reverb
       - REVERB_PORT=8080
       - REVERB_SCHEME=http
+      - VALHALLA_URL=http://valhalla:8002
 
   reverb:
     build:
@@ -146,7 +147,23 @@ services:
     volumes:
       - redis_data:/data
 
+  valhalla:
+    image: ghcr.io/gis-ops/docker-valhalla/valhalla:latest
+    ports:
+      - "8002:8002"
+    volumes:
+      - valhalla_tiles:/custom_files
+    environment:
+      # Downloads Catalonia OSM extract on first start (~200 MB), builds tiles (~5-10 min).
+      # Subsequent starts reuse built tiles and are instant.
+      - tile_urls=https://download.bbbike.org/osm/bbbike/Barcelona/Barcelona.osm.pbf
+      - force_rebuild=false
+      - build_tar=false
+      - server_threads=2
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   redis_data:
   backend_vendor:
+  valhalla_tiles:

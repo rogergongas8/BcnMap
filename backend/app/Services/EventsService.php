@@ -22,7 +22,7 @@ class EventsService
         try {
             $response = Http::timeout(15)->get(self::API_URL, [
                 'resource_id' => self::RESOURCE_ID,
-                'limit'       => 20,
+                'limit'       => 100,
             ]);
 
             if (!$response->successful()) {
@@ -69,6 +69,8 @@ class EventsService
             }
 
             Cache::put(self::CACHE_KEY, $events, self::CACHE_TTL);
+            // Invalidate enriched cache so EventsEnrichmentService rebuilds with fresh data
+            Cache::forget('events:enriched:current');
             return $events;
 
         } catch (\Throwable $e) {
@@ -88,12 +90,32 @@ class EventsService
         if (empty($events)) return '';
 
         $today = now()->format('Y-m-d');
-        $lines = [];
 
-        foreach (array_slice($events, 0, 6) as $e) {
+        // Separate today's events from upcoming, prioritise today's
+        $todayEvents    = [];
+        $upcomingEvents = [];
+        foreach ($events as $e) {
+            $start   = $e['start'] ?? null;
+            $end     = $e['end']   ?? null;
+            $isToday = $start === $today
+                || ($start && $start <= $today && $end && $end >= $today);
+            if ($isToday) {
+                $todayEvents[] = $e;
+            } else {
+                $upcomingEvents[] = $e;
+            }
+        }
+
+        // Up to 15 today + 5 upcoming = 20 total sent to the AI
+        $selected = array_merge(
+            array_slice($todayEvents, 0, 15),
+            array_slice($upcomingEvents, 0, 5),
+        );
+
+        $lines = [];
+        foreach ($selected as $e) {
             $line = $e['title'];
 
-            // Add temporal context so the AI can say "este fin de semana" vs "en junio"
             if ($e['start'] && $e['start'] > $today) {
                 $line .= ' (a partir del ' . $e['start'] . ')';
             } elseif ($e['end']) {

@@ -52,4 +52,8 @@ return [
         'app_key' => env('TMB_APP_KEY'),
     ],
 
+    'foursquare' => [
+        'key' => env('FOURSQUARE_API_KEY'),
+    ],
+
 ];

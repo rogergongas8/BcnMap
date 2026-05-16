@@ -1,6 +1,7 @@
 import React from 'react'
 import { motion } from 'framer-motion'
 import { useDataStore } from '../../store/dataStore'
+import { useChatStore } from '../../store/chatStore'
 
 function fmtTime(date) {
   if (!date) return '—'
@@ -22,6 +23,7 @@ export default function CityHud() {
   const traffic    = useDataStore(s => s.traffic)
   const bicing     = useDataStore(s => s.bicing)
   const lastUpdated = useDataStore(s => s.lastUpdated)
+  const chatOpen   = useChatStore(s => s.isOpen)
 
   const congested = traffic.filter(t => ['congestionado', 'cortado'].includes(t.estado)).length
   const congestionPct = traffic.length ? Math.round((congested / traffic.length) * 100) : null
@@ -42,8 +44,8 @@ export default function CityHud() {
   return (
     <motion.div
       initial={{ opacity: 0, y: -8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.4, duration: 0.35 }}
+      animate={{ opacity: 1, y: 0, x: chatOpen ? -356 : 0 }}
+      transition={{ delay: chatOpen ? 0 : 0.4, duration: 0.28, ease: [0.25, 0.46, 0.45, 0.94] }}
       className="absolute top-4 right-4 z-30 w-[260px] rounded-2xl
         bg-[#0a0c10]/85 backdrop-blur-2xl border border-white/[0.07]
         shadow-[0_0_40px_rgba(0,0,0,0.4)] overflow-hidden"

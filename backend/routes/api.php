@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\CityContextController;
 use App\Http\Controllers\Api\EventsController;
 use App\Http\Controllers\Api\HistoryController;
 use App\Http\Controllers\Api\MetroController;
+use App\Http\Controllers\Api\PlaceEnrichController;
 use App\Http\Controllers\Api\PoiController;
 use App\Http\Controllers\Api\RouteController;
 use App\Http\Controllers\Api\TrafficController;
@@ -42,6 +43,7 @@ Route::prefix('v1')->group(function () {
     Route::get('/pois/nearby',     [PoiController::class, 'nearby']);
     Route::get('/pois/search',     [PoiController::class, 'search']);
     Route::get('/pois/categories', [PoiController::class, 'categories']);
+    Route::get('/pois/enrich',     [PlaceEnrichController::class, 'enrich']);
 
     Route::get('/beaches',         [BeachController::class, 'index']);
 

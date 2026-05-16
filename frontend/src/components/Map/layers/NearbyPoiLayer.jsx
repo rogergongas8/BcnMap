@@ -1,75 +1,92 @@
-import React, { useEffect, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import maplibregl from 'maplibre-gl'
-import ReactDOMServer from 'react-dom/server'
 import { useMapStore } from '../../../store/mapStore'
-import { useNearbyStore, NEARBY_CATEGORIES } from '../../../store/nearbyStore'
+import { useNearbyStore } from '../../../store/nearbyStore'
 import { useDrawerStore } from '../../../store/drawerStore'
+import { iconHtml, POI_CATEGORY_COLORS } from '../../UI/icons'
 
-const ICON_BY_CATEGORY = Object.fromEntries(NEARBY_CATEGORIES.map(c => [c.id, c.icon]))
-
-function svgString(IconComp) {
-  if (!IconComp) return ''
-  return ReactDOMServer.renderToStaticMarkup(<IconComp size={13} />)
-}
-
-function buildElement(poi, onClick, onHover, isHovered) {
+function buildElement(poi, onHover) {
   const el = document.createElement('div')
-  el.className = `bcn-poi ${isHovered ? 'is-hovered' : ''}`
+  el.className = 'bcn-poi'
   el.title = poi.name
-
-  const Icon = ICON_BY_CATEGORY[poi.category]
-  el.innerHTML = `<span class="bcn-poi-dot">${svgString(Icon)}</span>`
-
-  el.addEventListener('click', (e) => {
-    e.stopPropagation()
-    onClick(poi)
-  })
+  const color = POI_CATEGORY_COLORS[poi.category] ?? 'rgba(255,255,255,0.85)'
+  const icon  = iconHtml(poi.category, { size: 13, stroke: color, strokeWidth: 1.8 })
+  el.innerHTML = `<span class="bcn-poi-dot">${icon}</span>`
   el.addEventListener('mouseenter', () => onHover(poi.id))
   el.addEventListener('mouseleave', () => onHover(null))
   return el
 }
 
 export default function NearbyPoiLayer() {
-  const mapInstance  = useMapStore(s => s.mapInstance)
-  const isLoaded     = useMapStore(s => s.isLoaded)
-  const pois         = useNearbyStore(s => s.pois)
-  const hoveredId    = useNearbyStore(s => s.hoveredId)
-  const setHovered   = useNearbyStore(s => s.setHovered)
-  const openPlace    = useDrawerStore(s => s.openPlace)
-  const flyTo        = useMapStore(s => s.flyTo)
+  const mapInstance = useMapStore(s => s.mapInstance)
+  const isLoaded    = useMapStore(s => s.isLoaded)
+  const pois        = useNearbyStore(s => s.pois)
+  const hoveredId   = useNearbyStore(s => s.hoveredId)
+  const setHovered  = useNearbyStore(s => s.setHovered)
 
-  const markersRef = useRef([])
+  // Use refs for callbacks so markers never need rebuilding when they change
+  const openPlaceRef = useRef(useDrawerStore.getState().openPlace)
+  const flyToRef     = useRef(useMapStore.getState().flyTo)
+  const setHoveredRef = useRef(setHovered)
 
+  useEffect(() => { openPlaceRef.current = useDrawerStore.getState().openPlace })
+  useEffect(() => { flyToRef.current = useMapStore.getState().flyTo })
+  useEffect(() => { setHoveredRef.current = setHovered }, [setHovered])
+
+  // Map from poi.id → { marker, element }
+  const markersRef = useRef(new Map())
+
+  // Rebuild markers only when the POI list changes
   useEffect(() => {
     if (!mapInstance || !isLoaded) return
 
-    markersRef.current.forEach(m => m.remove())
-    markersRef.current = []
+    const prev    = markersRef.current
+    const nextIds = new Set(pois.map(p => p.id))
 
-    pois.forEach(poi => {
-      const el = buildElement(
-        poi,
-        (p) => {
-          flyTo({ lat: p.lat, lng: p.lng, zoom: 16 })
-          openPlace({
-            kind: 'poi', id: p.id, name: p.name, lat: p.lat, lng: p.lng,
-            address: p.address, meta: p,
-          })
-        },
-        setHovered,
-        hoveredId === poi.id,
-      )
-      const m = new maplibregl.Marker({ element: el, anchor: 'center' })
+    // Remove stale markers
+    for (const [id, { marker }] of prev) {
+      if (!nextIds.has(id)) {
+        marker.remove()
+        prev.delete(id)
+      }
+    }
+
+    // Add new markers
+    for (const poi of pois) {
+      if (prev.has(poi.id)) continue
+
+      const el = buildElement(poi, (id) => setHoveredRef.current(id))
+
+      el.addEventListener('click', (e) => {
+        e.stopPropagation()
+        flyToRef.current({ lat: poi.lat, lng: poi.lng, zoom: 16 })
+        openPlaceRef.current({
+          kind: 'poi', id: poi.id, name: poi.name,
+          lat: poi.lat, lng: poi.lng,
+          address: poi.address, meta: poi,
+        })
+      })
+
+      const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
         .setLngLat([poi.lng, poi.lat])
         .addTo(mapInstance)
-      markersRef.current.push(m)
-    })
 
-    return () => {
-      markersRef.current.forEach(m => m.remove())
-      markersRef.current = []
+      prev.set(poi.id, { marker, element: el })
     }
-  }, [mapInstance, isLoaded, pois, hoveredId, setHovered, openPlace, flyTo])
+
+    // Cleanup only on unmount
+    return () => {
+      for (const { marker } of markersRef.current.values()) marker.remove()
+      markersRef.current = new Map()
+    }
+  }, [mapInstance, isLoaded, pois]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Update hover class directly on DOM — no marker rebuild
+  useEffect(() => {
+    for (const [id, { element }] of markersRef.current) {
+      element.classList.toggle('is-hovered', id === hoveredId)
+    }
+  }, [hoveredId])
 
   return null
 }

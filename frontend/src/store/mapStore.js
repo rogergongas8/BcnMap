@@ -66,4 +66,11 @@ export const useMapStore = create((set) => ({
       state.mapInstance?.easeTo({ pitch: newPitch, duration: 400 })
       return { pitch: newPitch }
     }),
+
+  // Ajusta el padding del mapa para que la ruta/contenido no quede tapado por paneles laterales
+  setMapPadding: (padding) =>
+    set((state) => {
+      state.mapInstance?.easeTo({ padding, duration: 280 })
+      return {}
+    }),
 }))

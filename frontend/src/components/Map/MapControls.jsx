@@ -1,6 +1,7 @@
-import React from 'react'
+import React, { useRef } from 'react'
 import { motion } from 'framer-motion'
 import { useMapStore } from '../../store/mapStore'
+import { useChatStore } from '../../store/chatStore'
 
 const BCN_CENTER = { lat: 41.3851, lng: 2.1734, zoom: 13 }
 
@@ -19,6 +20,9 @@ function GeoIcon() {
 
 export default function MapControls() {
   const { flyTo, togglePitch, toggleBuildings, pitch, showBuildings3D, mapTheme, mapInstance } = useMapStore()
+  const chatOpen = useChatStore(s => s.isOpen)
+  // Track whether the component has already animated in — after that, no intro delay
+  const hasAnimatedIn = useRef(false)
   const is3D             = pitch > 10
   const canToggleBuildings = mapTheme !== 'minimal'
 
@@ -33,11 +37,15 @@ export default function MapControls() {
     )
   }
 
+  // Once the intro delay fires, mark as animated so subsequent transitions are instant
+  const introDelay = hasAnimatedIn.current ? 0 : 4.1
+
   return (
     <motion.div
       initial={{ opacity: 0, x: 20 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: 4.1, duration: 0.4 }}
+      animate={{ opacity: 1, x: chatOpen ? 356 : 0 }}
+      transition={{ delay: introDelay, duration: 0.28, ease: [0.25, 0.46, 0.45, 0.94] }}
+      onAnimationComplete={() => { hasAnimatedIn.current = true }}
       className="absolute right-4 bottom-8 select-none"
     >
       <div className="panel-glass rounded-xl flex flex-col gap-0 overflow-hidden w-[52px]">

@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useChatStore } from '../../store/chatStore'
 import { useRouteStore } from '../../store/routeStore'
+import { useMapStore } from '../../store/mapStore'
 import { useChat } from '../../hooks/useChat'
 import ChatMessage from './ChatMessage'
 import ChatInput from './ChatInput'
@@ -16,14 +17,19 @@ const SUGGESTIONS = [
 export default function ChatPanel() {
   const { isOpen, hasUnread, toggleChat, clearChat } = useChatStore()
   const { messages, isLoading, sendMessage } = useChat()
-  const { route, isOpen: routeOpen } = useRouteStore()
+  const { route } = useRouteStore()
+  const setMapPadding = useMapStore(s => s.setMapPadding)
   const bottomRef = useRef(null)
   const hasEverOpened = useRef(false)
 
-  // Track first open so the entrance delay only applies on initial page load.
   useEffect(() => {
     if (isOpen) hasEverOpened.current = true
   }, [isOpen])
+
+  // Ajusta el padding del mapa para que la ruta no quede tapada por el panel lateral
+  useEffect(() => {
+    setMapPadding(isOpen ? { right: 340 } : { right: 0 })
+  }, [isOpen, setMapPadding])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -31,7 +37,7 @@ export default function ChatPanel() {
 
   return (
     <>
-      {/* Toggle button — right side, below WeatherWidget */}
+      {/* Toggle button — bottom-right, above MapControls */}
       <AnimatePresence>
         {!isOpen && (
           <motion.button
@@ -42,7 +48,7 @@ export default function ChatPanel() {
             transition={{ delay: hasEverOpened.current ? 0 : 4.4, duration: 0.25 }}
             onClick={toggleChat}
             title="Chat IA"
-            className="absolute top-[108px] right-4 z-40 w-10 h-10
+            className="absolute bottom-[200px] right-4 z-40 w-10 h-10
               flex items-center justify-center rounded-xl
               panel-glass border border-cyan-500/25
               text-cyan-400/70 hover:text-cyan-300 hover:border-cyan-400/50
@@ -62,23 +68,21 @@ export default function ChatPanel() {
         )}
       </AnimatePresence>
 
-      {/* Panel — right side, below WeatherWidget, above map controls */}
+      {/* Side panel — slides in from the right edge */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
             key="chat-panel"
-            initial={{ opacity: 0, x: 16 }}
+            initial={{ opacity: 0, x: '100%' }}
             animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 16 }}
-            transition={{ duration: 0.22, ease: 'easeOut' }}
-            className="absolute top-[108px] right-4 z-40 w-[320px] flex flex-col
-              rounded-2xl overflow-hidden
-              bg-black/90 backdrop-blur-xl border border-white/[0.08]
-              shadow-2xl shadow-black/60"
-            style={{ maxHeight: 'calc(100vh - 195px)' }}
+            exit={{ opacity: 0, x: '100%' }}
+            transition={{ duration: 0.28, ease: [0.25, 0.46, 0.45, 0.94] }}
+            className="absolute top-0 right-0 bottom-0 z-40 w-[340px] flex flex-col
+              bg-[#0a0c10] border-l border-white/[0.07]
+              shadow-[-20px_0_60px_rgba(0,0,0,0.6)]"
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06] flex-shrink-0">
+            <div className="flex items-center justify-between px-4 py-3.5 border-b border-white/[0.06] flex-shrink-0 mt-0">
               <div className="flex items-center gap-2.5">
                 <span className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-pulse" />
                 <span className="text-white/80 text-sm font-mono tracking-wide">BCN Live AI</span>
@@ -101,7 +105,7 @@ export default function ChatPanel() {
               </div>
             </div>
 
-            {/* Route indicator — shown when a route is active */}
+            {/* Route indicator */}
             <AnimatePresence>
               {route && (
                 <motion.div

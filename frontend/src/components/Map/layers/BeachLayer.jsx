@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import maplibregl from 'maplibre-gl'
 import { useMapStore } from '../../../store/mapStore'
 import { useLeisureStore } from '../../../store/leisureStore'
@@ -11,8 +11,7 @@ const BEACH_SVG = `
   <line x1="6" y1="11" x2="6" y2="20"/>
   <line x1="3" y1="20" x2="21" y2="20"/>
   <path d="M11 18c1.5-1.5 3.5-1.5 5 0M11 14c1.5-1.5 3.5-1.5 5 0"/>
-</svg>
-`
+</svg>`
 
 function buildElement(beach, onClick) {
   const el = document.createElement('div')
@@ -32,26 +31,32 @@ function buildElement(beach, onClick) {
 export default function BeachLayer() {
   useLeisureData()
 
-  const mapInstance  = useMapStore(s => s.mapInstance)
-  const isLoaded     = useMapStore(s => s.isLoaded)
-  const showBeaches  = useLeisureStore(s => s.showBeaches)
-  const beaches      = useLeisureStore(s => s.beaches)
-  const openPlace    = useDrawerStore(s => s.openPlace)
-  const flyTo        = useMapStore(s => s.flyTo)
+  const mapInstance = useMapStore(s => s.mapInstance)
+  const isLoaded    = useMapStore(s => s.isLoaded)
+  const showBeaches = useLeisureStore(s => s.showBeaches)
+  const beaches     = useLeisureStore(s => s.beaches)
+
+  // Stable refs for callbacks — avoids marker rebuild when Zustand returns new fn refs
+  const openPlaceRef = useRef(useDrawerStore.getState().openPlace)
+  const flyToRef     = useRef(useMapStore.getState().flyTo)
+
+  useEffect(() => { openPlaceRef.current = useDrawerStore.getState().openPlace })
+  useEffect(() => { flyToRef.current = useMapStore.getState().flyTo })
 
   const markersRef = useRef([])
 
   useEffect(() => {
     if (!mapInstance || !isLoaded) return
 
+    // Remove existing markers
     markersRef.current.forEach(m => m.remove())
     markersRef.current = []
 
     if (!showBeaches || beaches.length === 0) return
 
     const handleClick = (beach) => {
-      flyTo({ lat: beach.lat, lng: beach.lng, zoom: 15 })
-      openPlace({
+      flyToRef.current({ lat: beach.lat, lng: beach.lng, zoom: 15 })
+      openPlaceRef.current({
         kind: 'beach',
         id:   `beach-${beach.id}`,
         name: beach.name,
@@ -62,7 +67,7 @@ export default function BeachLayer() {
     }
 
     beaches.forEach(beach => {
-      const el = buildElement(beach, handleClick)
+      const el     = buildElement(beach, handleClick)
       const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
         .setLngLat([beach.lng, beach.lat])
         .addTo(mapInstance)
@@ -73,7 +78,7 @@ export default function BeachLayer() {
       markersRef.current.forEach(m => m.remove())
       markersRef.current = []
     }
-  }, [mapInstance, isLoaded, showBeaches, beaches, openPlace, flyTo])
+  }, [mapInstance, isLoaded, showBeaches, beaches]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return null
 }

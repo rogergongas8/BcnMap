@@ -25,8 +25,10 @@ export default function UserLocationLayer() {
     if (!mapInstance || !isLoaded) return
 
     try {
+      const currentLocation = useMapStore.getState().userLocation
+
       if (!mapInstance.getSource(SRC)) {
-        mapInstance.addSource(SRC, { type: 'geojson', data: buildGeojson(null) })
+        mapInstance.addSource(SRC, { type: 'geojson', data: buildGeojson(currentLocation) })
 
         mapInstance.addLayer({
           id: LYR_PULSE,
@@ -51,6 +53,9 @@ export default function UserLocationLayer() {
             'circle-stroke-width': 2,
           },
         })
+      } else {
+        // Source already exists — just refresh the data with the current location
+        mapInstance.getSource(SRC).setData(buildGeojson(currentLocation))
       }
     } catch (err) {
       console.error('[UserLocationLayer]', err)

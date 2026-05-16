@@ -6,68 +6,74 @@ use Illuminate\Support\Facades\Http;
 
 class RouteService
 {
-    private const OSRM_BASE = 'https://router.project-osrm.org/route/v1';
+    private const VALHALLA_TIMEOUT = 15;
 
     private const COLORS = [
-        'walk'  => '#ffffff',
+        'walk'  => '#a78bfa',
         'bike'  => '#00ff88',
         'drive' => '#ffaa00',
         'metro' => '#ff6b35',
         'bus'   => '#00b4ff',
     ];
 
-    // Real-world average speeds for urban Barcelona (km/h).
-    // The public OSRM demo server returns identical durations for all profiles,
-    // so we override duration using road distance + these speeds.
-    private const SPEEDS_KMH = [
-        'walk'  => 4.8,   // typical pedestrian in city
-        'bike'  => 17.0,  // city cycling with traffic lights
-        'drive' => 28.0,  // urban driving BCN (congestion factored)
-    ];
+    private function valhallaBase(): string
+    {
+        return rtrim(env('VALHALLA_URL', 'http://valhalla:8002'), '/');
+    }
+
+    // ── Public API ────────────────────────────────────────────────────────────
 
     public function calculate(float $fromLat, float $fromLng, float $toLat, float $toLng, string $mode): array
     {
         return match ($mode) {
-            'foot'   => $this->singleSegment('foot',    $fromLat, $fromLng, $toLat, $toLng, 'walk'),
+            'foot'   => $this->singleSegment('pedestrian', $fromLat, $fromLng, $toLat, $toLng, 'walk'),
             'car'    => $this->carRoute($fromLat, $fromLng, $toLat, $toLng),
-            'bike'   => $this->singleSegment('bike',    $fromLat, $fromLng, $toLat, $toLng, 'bike'),
+            'bike'   => $this->singleSegment('bicycle',   $fromLat, $fromLng, $toLat, $toLng, 'bike'),
             'bicing' => $this->bicingRoute($fromLat, $fromLng, $toLat, $toLng),
             'bus'    => $this->transitRoute($fromLat, $fromLng, $toLat, $toLng),
             default  => ['error' => 'Modo de transporte no soportado'],
         };
     }
 
-    /**
-     * Car route: fetches up to 3 OSRM alternatives, applies real-time traffic
-     * congestion penalty, and returns the fastest after adjustment.
-     */
+    // ── Route builders ────────────────────────────────────────────────────────
+
     private function carRoute(float $fromLat, float $fromLng, float $toLat, float $toLng): array
     {
         try {
-            $r = Http::timeout(12)->get(
-                self::OSRM_BASE . "/driving/{$fromLng},{$fromLat};{$toLng},{$toLat}",
-                ['overview' => 'full', 'geometries' => 'geojson', 'alternatives' => 'true']
-            );
-            if (!$r->successful()) return $this->singleSegment('driving', $fromLat, $fromLng, $toLat, $toLng, 'drive');
+            $body = $this->autoBody($fromLat, $fromLng, $toLat, $toLng, alternates: 2);
+            $r    = Http::timeout(self::VALHALLA_TIMEOUT)
+                ->post($this->valhallaBase() . '/route', $body);
 
-            $data   = $r->json();
-            $routes = $data['routes'] ?? [];
-            if (empty($routes)) return ['error' => 'No se encontró ruta'];
+            if (!$r->successful()) {
+                return $this->singleSegment('pedestrian', $fromLat, $fromLng, $toLat, $toLng, 'drive');
+            }
 
-            // Traffic congestion level (0-100) derived from live traffic data
+            $data = $r->json();
             $congestion = $this->currentCongestion();
+            $penalty    = 1.0 + max(0, min(0.8, ($congestion - 20) / 100));
 
-            // Penalty factor: +1% per congestion point above 20, capped at +80%
-            $penalty = 1.0 + max(0, min(0.8, ($congestion - 20) / 100));
+            // Collect primary + alternates
+            $routes = [$data['trip'] ?? null];
+            foreach ($data['alternates'] ?? [] as $alt) {
+                $routes[] = $alt['trip'] ?? null;
+            }
+            $routes = array_filter($routes);
 
-            // For each alternative: use OSRM geometry (real road distance) + our duration formula + traffic
-            $candidates = array_map(function ($route) use ($penalty) {
-                $dist = (float) $route['distance'];
-                $dur  = $this->realisticDuration($dist, 'drive') * $penalty;
-                return ['geometry' => $route['geometry'], 'distance' => $dist, 'duration' => $dur];
-            }, $routes);
+            $candidates = [];
+            foreach ($routes as $trip) {
+                $seg = $this->parseTripSummary($trip);
+                if (!$seg) continue;
+                $candidates[] = [
+                    'geometry' => $seg['geometry'],
+                    'distance' => $seg['distance'],
+                    'duration' => $seg['duration'] * $penalty,
+                ];
+            }
 
-            // Pick route with shortest traffic-adjusted duration
+            if (empty($candidates)) {
+                return $this->singleSegment('pedestrian', $fromLat, $fromLng, $toLat, $toLng, 'drive');
+            }
+
             usort($candidates, fn($a, $b) => $a['duration'] <=> $b['duration']);
             $best = $candidates[0];
 
@@ -94,13 +100,13 @@ class RouteService
                 'traffic'  => ['congestion' => $congestion, 'note' => $trafficNote],
             ];
         } catch (\Throwable) {
-            return $this->singleSegment('driving', $fromLat, $fromLng, $toLat, $toLng, 'drive');
+            return $this->singleSegment('pedestrian', $fromLat, $fromLng, $toLat, $toLng, 'drive');
         }
     }
 
-    private function singleSegment(string $profile, float $fromLat, float $fromLng, float $toLat, float $toLng, string $type): array
+    private function singleSegment(string $costing, float $fromLat, float $fromLng, float $toLat, float $toLng, string $type): array
     {
-        $seg = $this->osrmRoute($profile, $fromLat, $fromLng, $toLat, $toLng, $type);
+        $seg = $this->valhallaRoute($fromLat, $fromLng, $toLat, $toLng, $costing);
         if (!$seg) return ['error' => 'No se encontró ruta'];
         return [
             'segments' => [[
@@ -108,8 +114,13 @@ class RouteService
                 'geometry' => $seg['geometry'],
                 'distance' => $seg['distance'],
                 'duration' => $seg['duration'],
-                'color'    => self::COLORS[$type],
-                'label'    => match($type) { 'walk' => 'A pie', 'drive' => 'En coche', 'bike' => 'En bici', default => ucfirst($type) },
+                'color'    => self::COLORS[$type] ?? self::COLORS['walk'],
+                'label'    => match($type) {
+                    'walk'  => 'A pie',
+                    'drive' => 'En coche',
+                    'bike'  => 'En bici',
+                    default => ucfirst($type)
+                },
             ]],
             'distance' => $seg['distance'],
             'duration' => $seg['duration'],
@@ -120,32 +131,31 @@ class RouteService
     {
         $stations = Cache::get('bicing_current', []);
         if (empty($stations)) {
-            return $this->singleSegment('bike', $fromLat, $fromLng, $toLat, $toLng, 'bike');
+            return $this->singleSegment('pedestrian', $fromLat, $fromLng, $toLat, $toLng, 'bike');
         }
 
         $originStation = $this->nearestStation($stations, $fromLat, $fromLng, 'bikes');
         $destStation   = $this->nearestStation($stations, $toLat, $toLng, 'docks');
 
         if (!$originStation || !$destStation || $originStation['station_id'] === $destStation['station_id']) {
-            return $this->singleSegment('foot', $fromLat, $fromLng, $toLat, $toLng, 'walk');
+            return $this->singleSegment('pedestrian', $fromLat, $fromLng, $toLat, $toLng, 'walk');
         }
 
-        // Parallel OSRM requests
-        $oLng = $originStation['lng']; $oLat = $originStation['lat'];
-        $dLng = $destStation['lng'];   $dLat = $destStation['lat'];
+        $oLat = (float)$originStation['lat']; $oLng = (float)$originStation['lng'];
+        $dLat = (float)$destStation['lat'];   $dLng = (float)$destStation['lng'];
 
         $responses = Http::pool(fn($pool) => [
-            $pool->as('walk1')->timeout(12)->get(self::OSRM_BASE . "/foot/{$fromLng},{$fromLat};{$oLng},{$oLat}", ['overview' => 'full', 'geometries' => 'geojson']),
-            $pool->as('bike') ->timeout(12)->get(self::OSRM_BASE . "/bike/{$oLng},{$oLat};{$dLng},{$dLat}",       ['overview' => 'full', 'geometries' => 'geojson']),
-            $pool->as('walk2')->timeout(12)->get(self::OSRM_BASE . "/foot/{$dLng},{$dLat};{$toLng},{$toLat}",   ['overview' => 'full', 'geometries' => 'geojson']),
+            $pool->as('walk1')->timeout(self::VALHALLA_TIMEOUT)->post($this->valhallaBase() . '/route', $this->walkBody($fromLat, $fromLng, $oLat, $oLng)),
+            $pool->as('bike') ->timeout(self::VALHALLA_TIMEOUT)->post($this->valhallaBase() . '/route', $this->bikeBody($oLat, $oLng, $dLat, $dLng)),
+            $pool->as('walk2')->timeout(self::VALHALLA_TIMEOUT)->post($this->valhallaBase() . '/route', $this->walkBody($dLat, $dLng, $toLat, $toLng)),
         ]);
 
-        $walk1 = $this->parseOsrm($responses['walk1'], 'walk');
-        $bike  = $this->parseOsrm($responses['bike'],  'bike');
-        $walk2 = $this->parseOsrm($responses['walk2'], 'walk');
+        $walk1 = $this->parseValhalla($responses['walk1'], 'walk');
+        $bike  = $this->parseValhalla($responses['bike'],  'bike');
+        $walk2 = $this->parseValhalla($responses['walk2'], 'walk');
 
         if (!$bike) {
-            return $this->singleSegment('bike', $fromLat, $fromLng, $toLat, $toLng, 'bike');
+            return $this->singleSegment('bicycle', $fromLat, $fromLng, $toLat, $toLng, 'bike');
         }
 
         $segments = [];
@@ -158,8 +168,8 @@ class RouteService
                 'meta' => [
                     'station_id'       => $originStation['station_id'],
                     'station_name'     => $originStation['station_name'],
-                    'station_lat'      => (float)$originStation['lat'],
-                    'station_lng'      => (float)$originStation['lng'],
+                    'station_lat'      => $oLat,
+                    'station_lng'      => $oLng,
                     'bikes_available'  => $originStation['bikes_available'],
                     'ebikes_available' => $originStation['ebikes_available'],
                 ],
@@ -173,12 +183,10 @@ class RouteService
             'meta' => [
                 'from_station_id'   => $originStation['station_id'],
                 'from_station'      => $originStation['station_name'],
-                'from_lat'          => (float)$originStation['lat'],
-                'from_lng'          => (float)$originStation['lng'],
+                'from_lat'          => $oLat, 'from_lng' => $oLng,
                 'to_station_id'     => $destStation['station_id'],
                 'to_station'        => $destStation['station_name'],
-                'to_lat'            => (float)$destStation['lat'],
-                'to_lng'            => (float)$destStation['lng'],
+                'to_lat'            => $dLat, 'to_lng' => $dLng,
                 'bikes_available'   => $originStation['bikes_available'],
                 'ebikes_available'  => $originStation['ebikes_available'],
                 'docks_available'   => $destStation['docks_available'],
@@ -193,8 +201,7 @@ class RouteService
                 'meta' => [
                     'station_id'      => $destStation['station_id'],
                     'station_name'    => $destStation['station_name'],
-                    'station_lat'     => (float)$destStation['lat'],
-                    'station_lng'     => (float)$destStation['lng'],
+                    'station_lat'     => $dLat, 'station_lng' => $dLng,
                     'docks_available' => $destStation['docks_available'],
                 ],
             ];
@@ -214,7 +221,7 @@ class RouteService
         $metroStations = array_values(array_filter($allStations, fn($s) => ($s['type'] ?? '') === 'metro'));
 
         if (empty($metroStations)) {
-            return $this->singleSegment('foot', $fromLat, $fromLng, $toLat, $toLng, 'walk');
+            return $this->singleSegment('pedestrian', $fromLat, $fromLng, $toLat, $toLng, 'walk');
         }
 
         $originStation  = $this->nearestPoint($metroStations, $fromLat, $fromLng);
@@ -222,14 +229,12 @@ class RouteService
         $destStation    = $this->nearestPoint($destCandidates ?: $metroStations, $toLat, $toLng);
 
         if (!$originStation || !$destStation) {
-            return $this->singleSegment('foot', $fromLat, $fromLng, $toLat, $toLng, 'walk');
+            return $this->singleSegment('pedestrian', $fromLat, $fromLng, $toLat, $toLng, 'walk');
         }
 
-        // BFS route through metro graph
         $router = new MetroRouter();
         $legs   = $router->route($originStation, $destStation);
 
-        // Fallback: single straight leg if graph gives no path
         if (!$legs) {
             $legs = [[
                 'line'         => ($originStation['lines'][0]['name'] ?? 'M'),
@@ -240,16 +245,16 @@ class RouteService
 
         $firstFrom = $legs[0]['from_station'];
         $lastTo    = $legs[count($legs) - 1]['to_station'];
-        $oLng = (float)$firstFrom['lng']; $oLat = (float)$firstFrom['lat'];
-        $dLng = (float)$lastTo['lng'];    $dLat = (float)$lastTo['lat'];
+        $oLat = (float)$firstFrom['lat']; $oLng = (float)$firstFrom['lng'];
+        $dLat = (float)$lastTo['lat'];    $dLng = (float)$lastTo['lng'];
 
         $responses = Http::pool(fn($pool) => [
-            $pool->as('walk1')->timeout(12)->get(self::OSRM_BASE . "/foot/{$fromLng},{$fromLat};{$oLng},{$oLat}", ['overview' => 'full', 'geometries' => 'geojson']),
-            $pool->as('walk2')->timeout(12)->get(self::OSRM_BASE . "/foot/{$dLng},{$dLat};{$toLng},{$toLat}",   ['overview' => 'full', 'geometries' => 'geojson']),
+            $pool->as('walk1')->timeout(self::VALHALLA_TIMEOUT)->post($this->valhallaBase() . '/route', $this->walkBody($fromLat, $fromLng, $oLat, $oLng)),
+            $pool->as('walk2')->timeout(self::VALHALLA_TIMEOUT)->post($this->valhallaBase() . '/route', $this->walkBody($dLat, $dLng, $toLat, $toLng)),
         ]);
 
-        $walk1 = $this->parseOsrm($responses['walk1'], 'walk');
-        $walk2 = $this->parseOsrm($responses['walk2'], 'walk');
+        $walk1 = $this->parseValhalla($responses['walk1'], 'walk');
+        $walk2 = $this->parseValhalla($responses['walk2'], 'walk');
 
         $segments = [];
 
@@ -262,22 +267,20 @@ class RouteService
                 'meta'  => [
                     'station_id'   => $firstFrom['station_id'],
                     'station_name' => $firstFrom['station_name'],
-                    'station_lat'  => (float)$firstFrom['lat'],
-                    'station_lng'  => (float)$firstFrom['lng'],
+                    'station_lat'  => $oLat, 'station_lng' => $oLng,
                 ],
             ];
         }
 
         foreach ($legs as $leg) {
-            $lineName  = $leg['line'];
-            $from      = $leg['from_station'];
-            $to        = $leg['to_station'];
-            $geometry  = $router->legGeometry($lineName, $from, $to);
-            $color     = $router->lineColor($lineName);
-            $dist      = $this->haversine((float)$from['lat'], (float)$from['lng'], (float)$to['lat'], (float)$to['lng']);
-            $dur       = ($dist / 25000) * 3600 + 120;
-            // Transfer time (2 min) added for every leg after the first
-            $isFirst   = ($leg === $legs[0]);
+            $lineName = $leg['line'];
+            $from     = $leg['from_station'];
+            $to       = $leg['to_station'];
+            $geometry = $router->legGeometry($lineName, $from, $to);
+            $color    = $router->lineColor($lineName);
+            $dist     = $this->haversine((float)$from['lat'], (float)$from['lng'], (float)$to['lat'], (float)$to['lng']);
+            $dur      = ($dist / 25000) * 3600 + 120;
+            $isFirst  = ($leg === $legs[0]);
 
             $segments[] = [
                 'type'     => 'metro',
@@ -289,12 +292,10 @@ class RouteService
                 'meta'     => [
                     'from_station_id' => $from['station_id'],
                     'from_station'    => $from['station_name'],
-                    'from_lat'        => (float)$from['lat'],
-                    'from_lng'        => (float)$from['lng'],
+                    'from_lat'        => (float)$from['lat'], 'from_lng' => (float)$from['lng'],
                     'to_station_id'   => $to['station_id'],
                     'to_station'      => $to['station_name'],
-                    'to_lat'          => (float)$to['lat'],
-                    'to_lng'          => (float)$to['lng'],
+                    'to_lat'          => (float)$to['lat'], 'to_lng' => (float)$to['lng'],
                     'lines'           => [$lineName],
                     'line_colors'     => [$lineName => $color],
                 ],
@@ -317,43 +318,163 @@ class RouteService
         ];
     }
 
-    private function osrmRoute(string $profile, float $fromLat, float $fromLng, float $toLat, float $toLng, string $type = 'walk'): ?array
+    // ── Valhalla request bodies ───────────────────────────────────────────────
+
+    private function walkBody(float $fromLat, float $fromLng, float $toLat, float $toLng): array
+    {
+        return [
+            'locations' => [
+                ['lon' => $fromLng, 'lat' => $fromLat, 'type' => 'break'],
+                ['lon' => $toLng,   'lat' => $toLat,   'type' => 'break'],
+            ],
+            'costing' => 'pedestrian',
+            'costing_options' => [
+                'pedestrian' => [
+                    'walking_speed'  => 4.8,
+                    'walkway_factor' => 0.9,  // slightly prefer walkways over roads
+                    'sidewalk_factor'=> 1.0,
+                    'alley_factor'   => 1.0,
+                    'driveway_factor'=> 5.0,  // avoid driveways
+                    'step_penalty'   => 30,
+                ],
+            ],
+            'directions_options' => ['units' => 'kilometers'],
+        ];
+    }
+
+    private function bikeBody(float $fromLat, float $fromLng, float $toLat, float $toLng): array
+    {
+        return [
+            'locations' => [
+                ['lon' => $fromLng, 'lat' => $fromLat, 'type' => 'break'],
+                ['lon' => $toLng,   'lat' => $toLat,   'type' => 'break'],
+            ],
+            'costing' => 'bicycle',
+            'costing_options' => [
+                'bicycle' => [
+                    'bicycle_type'        => 'Hybrid',
+                    'cycling_speed'       => 17.0,
+                    'use_roads'           => 0.5,
+                    'use_hills'           => 0.3,
+                    'avoid_bad_surfaces'  => 0.25,
+                ],
+            ],
+            'directions_options' => ['units' => 'kilometers'],
+        ];
+    }
+
+    private function autoBody(float $fromLat, float $fromLng, float $toLat, float $toLng, int $alternates = 0): array
+    {
+        $body = [
+            'locations' => [
+                ['lon' => $fromLng, 'lat' => $fromLat, 'type' => 'break'],
+                ['lon' => $toLng,   'lat' => $toLat,   'type' => 'break'],
+            ],
+            'costing' => 'auto',
+            'costing_options' => [
+                'auto' => [
+                    'use_highways' => 0.5,
+                    'use_tolls'    => 0.0,
+                ],
+            ],
+            'directions_options' => ['units' => 'kilometers'],
+        ];
+        if ($alternates > 0) $body['alternates'] = $alternates;
+        return $body;
+    }
+
+    // ── Valhalla response parsing ─────────────────────────────────────────────
+
+    private function valhallaRoute(float $fromLat, float $fromLng, float $toLat, float $toLng, string $costing): ?array
     {
         try {
-            $r = Http::timeout(12)->get(
-                self::OSRM_BASE . "/{$profile}/{$fromLng},{$fromLat};{$toLng},{$toLat}",
-                ['overview' => 'full', 'geometries' => 'geojson']
-            );
-            return $this->parseOsrm($r, $type);
+            $body = match ($costing) {
+                'pedestrian' => $this->walkBody($fromLat, $fromLng, $toLat, $toLng),
+                'bicycle'    => $this->bikeBody($fromLat, $fromLng, $toLat, $toLng),
+                default      => $this->autoBody($fromLat, $fromLng, $toLat, $toLng),
+            };
+            $r = Http::timeout(self::VALHALLA_TIMEOUT)
+                ->post($this->valhallaBase() . '/route', $body);
+            return $this->parseValhalla($r, $costing === 'bicycle' ? 'bike' : 'walk');
         } catch (\Throwable) { return null; }
     }
 
-    private function parseOsrm(mixed $response, string $type = 'walk'): ?array
+    private function parseValhalla(mixed $response, string $type = 'walk'): ?array
     {
         try {
             if (!$response || !$response->successful()) return null;
             $data = $response->json();
-            if (($data['code'] ?? '') !== 'Ok' || empty($data['routes'])) return null;
-            $r    = $data['routes'][0];
-            $dist = (float) $r['distance'];
-            // The public OSRM demo server returns the same (wrong) duration for all profiles.
-            // We override it with a realistic estimate based on road distance.
-            $dur  = $this->realisticDuration($dist, $type);
-            return ['geometry' => $r['geometry'], 'distance' => $dist, 'duration' => $dur];
+            return $this->parseTripSummary($data['trip'] ?? null);
         } catch (\Throwable) { return null; }
     }
 
-    private function realisticDuration(float $distM, string $type): float
+    private function parseTripSummary(?array $trip): ?array
     {
-        $kmh = self::SPEEDS_KMH[$type] ?? 4.8;
-        return ($distM / ($kmh / 3.6)); // seconds = meters / (m/s)
+        if (!$trip || empty($trip['legs'])) return null;
+
+        $summary = $trip['summary'] ?? $trip['legs'][0]['summary'] ?? null;
+        if (!$summary) return null;
+
+        // Merge all leg shapes into one coordinate array
+        $coords = [];
+        foreach ($trip['legs'] as $leg) {
+            $shape = $leg['shape'] ?? '';
+            if ($shape === '') continue;
+            $decoded = $this->decodePolyline6($shape);
+            // Skip first coord of subsequent legs to avoid duplicates at junctions
+            if (!empty($coords) && !empty($decoded)) array_shift($decoded);
+            array_push($coords, ...$decoded);
+        }
+
+        if (empty($coords)) return null;
+
+        return [
+            'geometry' => ['type' => 'LineString', 'coordinates' => $coords],
+            'distance' => (float)($summary['length'] ?? 0) * 1000, // km → m
+            'duration' => (float)($summary['time']   ?? 0),        // seconds
+        ];
     }
 
-    /** Compute current traffic congestion % (0-100) from cached live data. */
+    /**
+     * Decode Valhalla's encoded polyline (precision 6) to [[lng, lat], ...].
+     */
+    private function decodePolyline6(string $encoded): array
+    {
+        $coords = [];
+        $len    = strlen($encoded);
+        $index  = 0;
+        $lat    = 0;
+        $lng    = 0;
+
+        while ($index < $len) {
+            $b = 0; $shift = 0; $result = 0;
+            do {
+                $b      = ord($encoded[$index++]) - 63;
+                $result |= ($b & 0x1f) << $shift;
+                $shift  += 5;
+            } while ($b >= 0x20 && $index < $len);
+            $lat += ($result & 1) ? ~($result >> 1) : ($result >> 1);
+
+            $result = 0; $shift = 0;
+            do {
+                $b      = ord($encoded[$index++]) - 63;
+                $result |= ($b & 0x1f) << $shift;
+                $shift  += 5;
+            } while ($b >= 0x20 && $index < $len);
+            $lng += ($result & 1) ? ~($result >> 1) : ($result >> 1);
+
+            $coords[] = [round($lng / 1e6, 6), round($lat / 1e6, 6)]; // [lng, lat]
+        }
+
+        return $coords;
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
     private function currentCongestion(): int
     {
         $data = Cache::get('traffic_current', []);
-        if (empty($data)) return 30; // default mid-level when no data
+        if (empty($data)) return 30;
         $total  = count($data);
         $jammed = count(array_filter($data, fn($t) => in_array($t['estado'] ?? '', ['congestionado', 'cortado'])));
         return (int) round(($jammed / $total) * 100);
@@ -382,10 +503,10 @@ class RouteService
 
     private function haversine(float $lat1, float $lng1, float $lat2, float $lng2): float
     {
-        $R = 6371000;
+        $R  = 6371000;
         $φ1 = deg2rad($lat1); $φ2 = deg2rad($lat2);
         $Δφ = deg2rad($lat2 - $lat1); $Δλ = deg2rad($lng2 - $lng1);
-        $a  = sin($Δφ/2)**2 + cos($φ1) * cos($φ2) * sin($Δλ/2)**2;
+        $a  = sin($Δφ / 2) ** 2 + cos($φ1) * cos($φ2) * sin($Δλ / 2) ** 2;
         return $R * 2 * atan2(sqrt($a), sqrt(1 - $a));
     }
 }

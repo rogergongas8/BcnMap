@@ -33,47 +33,47 @@ class BeachService
      */
     private const BEACHES = [
         [
-            'id' => 'sant-sebastia',  'name' => 'Sant Sebastià',   'lat' => 41.3756, 'lng' => 2.1881,
+            'id' => 'sant-sebastia',  'name' => 'Sant Sebastià',   'lat' => 41.3756, 'lng' => 2.1841,
             'district' => 'Ciutat Vella', 'length_m' => 1100, 'popularity' => 0.95,
             'amenities' => ['lifeguard', 'showers', 'accessible', 'wifi'],
         ],
         [
-            'id' => 'sant-miquel',    'name' => 'Sant Miquel',     'lat' => 41.3781, 'lng' => 2.1922,
+            'id' => 'sant-miquel',    'name' => 'Sant Miquel',     'lat' => 41.3781, 'lng' => 2.1882,
             'district' => 'Ciutat Vella', 'length_m' => 400,  'popularity' => 0.90,
             'amenities' => ['lifeguard', 'showers', 'accessible'],
         ],
         [
-            'id' => 'barceloneta',    'name' => 'Barceloneta',     'lat' => 41.3795, 'lng' => 2.1962,
+            'id' => 'barceloneta',    'name' => 'Barceloneta',     'lat' => 41.3795, 'lng' => 2.1922,
             'district' => 'Ciutat Vella', 'length_m' => 422,  'popularity' => 1.00,
             'amenities' => ['lifeguard', 'showers', 'accessible', 'wifi'],
         ],
         [
-            'id' => 'somorrostro',    'name' => 'Somorrostro',     'lat' => 41.3837, 'lng' => 2.2017,
+            'id' => 'somorrostro',    'name' => 'Somorrostro',     'lat' => 41.3837, 'lng' => 2.1977,
             'district' => 'Ciutat Vella', 'length_m' => 522,  'popularity' => 0.85,
             'amenities' => ['lifeguard', 'showers'],
         ],
         [
-            'id' => 'nova-icaria',    'name' => 'Nova Icària',     'lat' => 41.3893, 'lng' => 2.2065,
+            'id' => 'nova-icaria',    'name' => 'Nova Icària',     'lat' => 41.3893, 'lng' => 2.2025,
             'district' => 'Sant Martí',  'length_m' => 415,  'popularity' => 0.80,
             'amenities' => ['lifeguard', 'showers', 'accessible'],
         ],
         [
-            'id' => 'bogatell',       'name' => 'Bogatell',        'lat' => 41.3937, 'lng' => 2.2110,
+            'id' => 'bogatell',       'name' => 'Bogatell',        'lat' => 41.3937, 'lng' => 2.2070,
             'district' => 'Sant Martí',  'length_m' => 640,  'popularity' => 0.85,
             'amenities' => ['lifeguard', 'showers', 'accessible', 'wifi'],
         ],
         [
-            'id' => 'mar-bella',      'name' => 'Mar Bella',       'lat' => 41.3985, 'lng' => 2.2178,
+            'id' => 'mar-bella',      'name' => 'Mar Bella',       'lat' => 41.3985, 'lng' => 2.2138,
             'district' => 'Sant Martí',  'length_m' => 512,  'popularity' => 0.75,
             'amenities' => ['lifeguard', 'showers', 'accessible'],
         ],
         [
-            'id' => 'nova-mar-bella', 'name' => 'Nova Mar Bella',  'lat' => 41.4030, 'lng' => 2.2238,
+            'id' => 'nova-mar-bella', 'name' => 'Nova Mar Bella',  'lat' => 41.4030, 'lng' => 2.2198,
             'district' => 'Sant Martí',  'length_m' => 420,  'popularity' => 0.70,
             'amenities' => ['lifeguard', 'showers'],
         ],
         [
-            'id' => 'llevant',        'name' => 'Llevant',         'lat' => 41.4076, 'lng' => 2.2296,
+            'id' => 'llevant',        'name' => 'Llevant',         'lat' => 41.4076, 'lng' => 2.2256,
             'district' => 'Sant Martí',  'length_m' => 380,  'popularity' => 0.65,
             'amenities' => ['lifeguard', 'showers', 'accessible'],
         ],
