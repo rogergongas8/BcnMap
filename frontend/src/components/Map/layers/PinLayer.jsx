@@ -1,16 +1,20 @@
 import { useEffect, useRef } from 'react'
 import maplibregl from 'maplibre-gl'
 import { useMapStore } from '../../../store/mapStore'
-import { usePinStore } from '../../../store/pinStore'
+import { useDrawerStore } from '../../../store/drawerStore'
 
 export default function PinLayer() {
   const mapInstance = useMapStore(s => s.mapInstance)
-  const pin = usePinStore(s => s.pin)
-  const markerRef = useRef(null)
+  const place       = useDrawerStore(s => s.place)
+  const view        = useDrawerStore(s => s.view)
+  const markerRef   = useRef(null)
 
   useEffect(() => {
     if (!mapInstance) return
-    if (!pin) {
+
+    const visible = view === 'place' && place && place.kind === 'pin'
+
+    if (!visible) {
       if (markerRef.current) {
         markerRef.current.remove()
         markerRef.current = null
@@ -21,17 +25,14 @@ export default function PinLayer() {
     if (!markerRef.current) {
       const el = document.createElement('div')
       el.className = 'bcn-pin'
-      el.innerHTML = `
-        <div class="bcn-pin-pulse"></div>
-        <div class="bcn-pin-dot"></div>
-      `
+      el.innerHTML = '<div class="bcn-pin-pulse"></div><div class="bcn-pin-dot"></div>'
       markerRef.current = new maplibregl.Marker({ element: el, anchor: 'center' })
-        .setLngLat([pin.lng, pin.lat])
+        .setLngLat([place.lng, place.lat])
         .addTo(mapInstance)
     } else {
-      markerRef.current.setLngLat([pin.lng, pin.lat])
+      markerRef.current.setLngLat([place.lng, place.lat])
     }
-  }, [mapInstance, pin])
+  }, [mapInstance, place, view])
 
   useEffect(() => () => {
     if (markerRef.current) markerRef.current.remove()

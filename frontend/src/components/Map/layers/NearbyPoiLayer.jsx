@@ -1,22 +1,31 @@
 import React, { useEffect, useRef } from 'react'
 import maplibregl from 'maplibre-gl'
+import ReactDOMServer from 'react-dom/server'
 import { useMapStore } from '../../../store/mapStore'
 import { useNearbyStore, NEARBY_CATEGORIES } from '../../../store/nearbyStore'
+import { useDrawerStore } from '../../../store/drawerStore'
 
-const EMOJI_BY_CATEGORY = Object.fromEntries(NEARBY_CATEGORIES.map(c => [c.id, c.emoji]))
+const ICON_BY_CATEGORY = Object.fromEntries(NEARBY_CATEGORIES.map(c => [c.id, c.icon]))
 
-function buildElement(poi, onClick) {
+function svgString(IconComp) {
+  if (!IconComp) return ''
+  return ReactDOMServer.renderToStaticMarkup(<IconComp size={13} />)
+}
+
+function buildElement(poi, onClick, onHover, isHovered) {
   const el = document.createElement('div')
-  el.className = 'bcn-poi'
+  el.className = `bcn-poi ${isHovered ? 'is-hovered' : ''}`
   el.title = poi.name
 
-  const icon = EMOJI_BY_CATEGORY[poi.category] ?? '•'
-  el.innerHTML = `<div class="bcn-poi-dot">${icon}</div>`
+  const Icon = ICON_BY_CATEGORY[poi.category]
+  el.innerHTML = `<span class="bcn-poi-dot">${svgString(Icon)}</span>`
 
   el.addEventListener('click', (e) => {
     e.stopPropagation()
     onClick(poi)
   })
+  el.addEventListener('mouseenter', () => onHover(poi.id))
+  el.addEventListener('mouseleave', () => onHover(null))
   return el
 }
 
@@ -24,8 +33,9 @@ export default function NearbyPoiLayer() {
   const mapInstance  = useMapStore(s => s.mapInstance)
   const isLoaded     = useMapStore(s => s.isLoaded)
   const pois         = useNearbyStore(s => s.pois)
-  const selectedPoi  = useNearbyStore(s => s.selectedPoi)
-  const selectPoi    = useNearbyStore(s => s.selectPoi)
+  const hoveredId    = useNearbyStore(s => s.hoveredId)
+  const setHovered   = useNearbyStore(s => s.setHovered)
+  const openPlace    = useDrawerStore(s => s.openPlace)
   const flyTo        = useMapStore(s => s.flyTo)
 
   const markersRef = useRef([])
@@ -37,15 +47,18 @@ export default function NearbyPoiLayer() {
     markersRef.current = []
 
     pois.forEach(poi => {
-      const el = buildElement(poi, (p) => {
-        selectPoi(p)
-        flyTo({ lat: p.lat, lng: p.lng, zoom: 16 })
-      })
-      if (selectedPoi?.id === poi.id) {
-        el.style.zIndex = '20'
-        el.querySelector('.bcn-poi-dot').style.borderColor = 'rgba(34, 211, 238, 0.8)'
-        el.querySelector('.bcn-poi-dot').style.boxShadow = '0 0 16px rgba(34, 211, 238, 0.6)'
-      }
+      const el = buildElement(
+        poi,
+        (p) => {
+          flyTo({ lat: p.lat, lng: p.lng, zoom: 16 })
+          openPlace({
+            kind: 'poi', id: p.id, name: p.name, lat: p.lat, lng: p.lng,
+            address: p.address, meta: p,
+          })
+        },
+        setHovered,
+        hoveredId === poi.id,
+      )
       const m = new maplibregl.Marker({ element: el, anchor: 'center' })
         .setLngLat([poi.lng, poi.lat])
         .addTo(mapInstance)
@@ -56,7 +69,7 @@ export default function NearbyPoiLayer() {
       markersRef.current.forEach(m => m.remove())
       markersRef.current = []
     }
-  }, [mapInstance, isLoaded, pois, selectedPoi, selectPoi, flyTo])
+  }, [mapInstance, isLoaded, pois, hoveredId, setHovered, openPlace, flyTo])
 
   return null
 }

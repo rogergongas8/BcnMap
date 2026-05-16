@@ -124,63 +124,73 @@
   background: rgba(34, 211, 238, 0.25);
 }
 
-/* Beach marker */
+/* Beach marker (professional, monochrome SVG) */
 .bcn-beach {
   position: relative;
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   pointer-events: auto;
   cursor: pointer;
   transition: transform 0.18s ease-out;
-}
-.bcn-beach:hover { transform: scale(1.15); z-index: 10; }
-.bcn-beach-dot {
-  position: absolute;
-  inset: 4px;
-  border-radius: 50%;
-  border: 1.5px solid rgba(0,0,0,0.6);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
-  filter: drop-shadow(0 0 8px currentColor);
 }
-.bcn-beach-low    { background: linear-gradient(135deg, #00ff88, #00aa66); color: #00ff88; }
-.bcn-beach-medium { background: linear-gradient(135deg, #ffcc00, #cc8800); color: #ffcc00; }
-.bcn-beach-high   { background: linear-gradient(135deg, #ff5566, #aa3344); color: #ff5566; }
+.bcn-beach:hover { transform: scale(1.12); z-index: 10; }
+.bcn-beach-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(12, 14, 18, 0.92);
+  border: 1.5px solid currentColor;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+}
+.bcn-beach-low    { color: rgb(52, 211, 153); }   /* emerald-400 */
+.bcn-beach-medium { color: rgb(251, 191, 36); }   /* amber-400 */
+.bcn-beach-high   { color: rgb(244, 114, 132); }  /* rose-400 */
 .bcn-beach-ring {
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  border: 1.5px solid rgba(34, 211, 238, 0.55);
-  animation: bcn-beach-ring 2s ease-out infinite;
+  border: 1px solid rgba(56, 189, 248, 0.5);
+  animation: bcn-beach-ring 2.4s ease-out infinite;
   pointer-events: none;
 }
 @keyframes bcn-beach-ring {
-  0%   { transform: scale(0.85); opacity: 1; }
-  100% { transform: scale(1.6);  opacity: 0; }
+  0%   { transform: scale(0.82); opacity: 1; }
+  100% { transform: scale(1.55); opacity: 0; }
 }
 
-/* POI marker (Nearby) */
+/* POI marker (Nearby) — minimal monochrome */
 .bcn-poi {
   position: relative;
   width: 26px;
   height: 26px;
   pointer-events: auto;
   cursor: pointer;
-  transition: transform 0.18s ease-out;
+  transition: transform 0.16s ease-out;
 }
-.bcn-poi:hover { transform: scale(1.18); z-index: 10; }
+.bcn-poi:hover, .bcn-poi.is-hovered { transform: scale(1.18); z-index: 10; }
 .bcn-poi-dot {
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  background: rgba(8, 12, 18, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(12, 14, 18, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.85);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
   backdrop-filter: blur(8px);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
+  transition: border-color 0.16s ease-out, color 0.16s ease-out, box-shadow 0.16s ease-out;
+}
+.bcn-poi:hover .bcn-poi-dot, .bcn-poi.is-hovered .bcn-poi-dot {
+  border-color: rgba(56, 189, 248, 0.8);
+  color: rgb(125, 211, 252);
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.12), 0 4px 14px rgba(0, 0, 0, 0.55);
 }

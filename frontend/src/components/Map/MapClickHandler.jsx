@@ -1,21 +1,15 @@
 import { useEffect, useRef } from 'react'
 import { useMapStore } from '../../store/mapStore'
-import { usePinStore } from '../../store/pinStore'
+import { useDrawerStore } from '../../store/drawerStore'
 import { reverseGeocode } from '../../utils/reverseGeocode'
 
 const INTERACTIVE_LAYER_PATTERNS = [
-  /^bicing/,
-  /^metro/,
-  /^bus/,
-  /^route/,
-  /^user-location/,
-  /^poi/,
-  /^beach/,
+  /^bicing/, /^metro/, /^bus/, /^route/, /^user-location/,
 ]
 
 export default function MapClickHandler() {
   const mapInstance = useMapStore(s => s.mapInstance)
-  const setPin = usePinStore(s => s.setPin)
+  const openPlace   = useDrawerStore(s => s.openPlace)
   const tokenRef = useRef(0)
 
   useEffect(() => {
@@ -31,19 +25,30 @@ export default function MapClickHandler() {
       const { lng, lat } = e.lngLat
       const token = ++tokenRef.current
 
-      setPin({ lat, lng, main: 'Cargando dirección…', sub: '', loading: true })
+      openPlace({
+        kind: 'pin',
+        id:   `pin-${lat.toFixed(5)}-${lng.toFixed(5)}`,
+        name: 'Buscando dirección…',
+        lat, lng,
+        loading: true,
+      })
 
       const result = await reverseGeocode(lat, lng)
       if (token !== tokenRef.current) return
 
-      setPin({ ...result, loading: false })
+      openPlace({
+        kind:    'pin',
+        id:      `pin-${lat.toFixed(5)}-${lng.toFixed(5)}`,
+        name:    result.main || 'Ubicación',
+        address: result.sub || null,
+        lat, lng,
+        loading: false,
+      })
     }
 
     mapInstance.on('click', handler)
-    return () => {
-      mapInstance.off('click', handler)
-    }
-  }, [mapInstance, setPin])
+    return () => { mapInstance.off('click', handler) }
+  }, [mapInstance, openPlace])
 
   return null
 }

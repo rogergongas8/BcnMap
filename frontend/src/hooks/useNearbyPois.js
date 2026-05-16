@@ -6,7 +6,6 @@ import { fetchPoisNearby } from '../services/api'
 const BCN_CENTER = { lat: 41.3851, lng: 2.1734 }
 
 export function useNearbyPois() {
-  const isOpen         = useNearbyStore(s => s.isOpen)
   const activeCategory = useNearbyStore(s => s.activeCategory)
   const setPois        = useNearbyStore(s => s.setPois)
   const setLoading     = useNearbyStore(s => s.setLoading)
@@ -15,7 +14,7 @@ export function useNearbyPois() {
   const tokenRef = useRef(0)
 
   useEffect(() => {
-    if (!isOpen || !activeCategory) { setPois([]); return }
+    if (!activeCategory) { setPois([]); return }
 
     const token = ++tokenRef.current
     setLoading(true)
@@ -23,10 +22,10 @@ export function useNearbyPois() {
     const center = userLocation
       ?? (mapInstance ? { lat: mapInstance.getCenter().lat, lng: mapInstance.getCenter().lng } : BCN_CENTER)
 
-    fetchPoisNearby(center.lat, center.lng, 1200, [activeCategory])
+    fetchPoisNearby(center.lat, center.lng, 1500, [activeCategory])
       .then(res => {
         if (token !== tokenRef.current) return
-        setPois((res?.data ?? []).slice(0, 30))
+        setPois((res?.data ?? []).slice(0, 40))
       })
       .catch(() => {
         if (token !== tokenRef.current) return
@@ -36,5 +35,5 @@ export function useNearbyPois() {
         if (token !== tokenRef.current) return
         setLoading(false)
       })
-  }, [isOpen, activeCategory, userLocation, mapInstance, setPois, setLoading])
+  }, [activeCategory, userLocation, mapInstance, setPois, setLoading])
 }
