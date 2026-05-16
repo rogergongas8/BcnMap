@@ -217,7 +217,7 @@ function PoiBody({ place, fsq, fsqLoading }) {
         </div>
       )}
 
-      {fsq && !fsqLoading && (
+      {fsq && !fsqLoading && (fsq.rating != null || fsq.is_open_now != null || fsq.description || fsq.price) && (
         <motion.div
           initial={{ opacity: 0, y: 4 }}
           animate={{ opacity: 1, y: 0 }}
@@ -240,6 +240,21 @@ function PoiBody({ place, fsq, fsqLoading }) {
             <p className="text-white/45 text-[11px] leading-relaxed mt-2 line-clamp-2">{fsq.description}</p>
           )}
         </motion.div>
+      )}
+
+      {/* Foursquare link — shows when we have a FSQ record but limited data */}
+      {fsq && !fsqLoading && fsq.foursquare_url && (
+        <div className="mx-4 mb-2">
+          <a
+            href={fsq.foursquare_url}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 text-[10px] text-white/30 hover:text-white/60 transition-colors"
+          >
+            <Icons.external size={10} />
+            <span>Ver reseñas en Foursquare</span>
+          </a>
+        </div>
       )}
 
       {/* OSM info */}

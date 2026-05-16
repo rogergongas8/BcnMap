@@ -322,7 +322,7 @@ class RouteService
 
     private function walkBody(float $fromLat, float $fromLng, float $toLat, float $toLng): array
     {
-        return [
+        $body = [
             'locations' => [
                 ['lon' => $fromLng, 'lat' => $fromLat, 'type' => 'break'],
                 ['lon' => $toLng,   'lat' => $toLat,   'type' => 'break'],
@@ -331,20 +331,28 @@ class RouteService
             'costing_options' => [
                 'pedestrian' => [
                     'walking_speed'  => 4.8,
-                    'walkway_factor' => 0.9,  // slightly prefer walkways over roads
+                    'walkway_factor' => 0.9,
                     'sidewalk_factor'=> 1.0,
                     'alley_factor'   => 1.0,
-                    'driveway_factor'=> 5.0,  // avoid driveways
+                    'driveway_factor'=> 5.0,
                     'step_penalty'   => 30,
                 ],
             ],
             'directions_options' => ['units' => 'kilometers'],
         ];
+
+        // Cortado segments also block pedestrians (construction, accidents).
+        $closures = $this->closedSegmentMidpoints();
+        if (!empty($closures)) {
+            $body['exclude_locations'] = $closures;
+        }
+
+        return $body;
     }
 
     private function bikeBody(float $fromLat, float $fromLng, float $toLat, float $toLng): array
     {
-        return [
+        $body = [
             'locations' => [
                 ['lon' => $fromLng, 'lat' => $fromLat, 'type' => 'break'],
                 ['lon' => $toLng,   'lat' => $toLat,   'type' => 'break'],
@@ -361,6 +369,13 @@ class RouteService
             ],
             'directions_options' => ['units' => 'kilometers'],
         ];
+
+        $closures = $this->closedSegmentMidpoints();
+        if (!empty($closures)) {
+            $body['exclude_locations'] = $closures;
+        }
+
+        return $body;
     }
 
     private function autoBody(float $fromLat, float $fromLng, float $toLat, float $toLng, int $alternates = 0): array
@@ -379,8 +394,50 @@ class RouteService
             ],
             'directions_options' => ['units' => 'kilometers'],
         ];
+
+        // Always exclude cortado (closed streets).
+        $exclude = $this->closedSegmentMidpoints(['cortado']);
+
+        // When global congestion is high, also route around congested segments.
+        $congestion = $this->currentCongestion();
+        if ($congestion >= 50) {
+            $extra = $this->closedSegmentMidpoints(['congestionado']);
+            $exclude = array_merge($exclude, $extra);
+        }
+
+        if (!empty($exclude)) {
+            $body['exclude_locations'] = $exclude;
+        }
+
         if ($alternates > 0) $body['alternates'] = $alternates;
         return $body;
+    }
+
+    /**
+     * Midpoints (+ endpoints) of all segments in the given estados.
+     * Passed to Valhalla as exclude_locations to avoid those road edges.
+     */
+    private function closedSegmentMidpoints(array $estados = ['cortado']): array
+    {
+        $traffic = Cache::get('traffic_current', []);
+        $result  = [];
+
+        foreach ($traffic as $t) {
+            if (!in_array($t['estado'] ?? '', $estados, true)) continue;
+
+            $latS = (float)($t['lat_start'] ?? 0);
+            $lngS = (float)($t['lng_start'] ?? 0);
+            $latE = (float)($t['lat_end']   ?? 0);
+            $lngE = (float)($t['lng_end']   ?? 0);
+
+            if ($latS === 0.0 || $lngS === 0.0) continue;
+
+            $result[] = ['lon' => ($lngS + $lngE) / 2, 'lat' => ($latS + $latE) / 2];
+            $result[] = ['lon' => $lngS, 'lat' => $latS];
+            $result[] = ['lon' => $lngE, 'lat' => $latE];
+        }
+
+        return $result;
     }
 
     // ── Valhalla response parsing ─────────────────────────────────────────────

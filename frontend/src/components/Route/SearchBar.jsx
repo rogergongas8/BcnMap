@@ -927,9 +927,8 @@ export default function SearchBar() {
     const point = { lat: s.lat, lng: s.lng, label: s.label }
     setDestPoint(point)
     setDestQuery(s.label)
-    // Vuela al destino
+    setDestination(point)  // show pin on map immediately
     flyTo({ lat: point.lat, lng: point.lng, zoom: 15 })
-    // Pasa a fase opciones
     setPhase('options')
   }
 
