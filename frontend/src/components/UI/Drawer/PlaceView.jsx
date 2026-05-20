@@ -51,19 +51,6 @@ const StarFull  = () => <svg width="12" height="12" viewBox="0 0 12 12" fill="#f
 const StarHalf  = () => <svg width="12" height="12" viewBox="0 0 12 12"><path d="M6 1l1.4 2.8 3.1.45-2.25 2.2.53 3.1L6 8.1V1z" fill="#fbbf24"/><path d="M6 1L4.6 3.8l-3.1.45 2.25 2.2-.53 3.1L6 8.1V1z" fill="rgba(255,255,255,0.15)"/></svg>
 const StarEmpty = () => <svg width="12" height="12" viewBox="0 0 12 12" fill="rgba(255,255,255,0.15)"><path d="M6 1l1.4 2.8 3.1.45-2.25 2.2.53 3.1L6 8.1 3.22 9.55l.53-3.1L1.5 4.25l3.1-.45z"/></svg>
 
-function OpenBadge({ isOpen }) {
-  if (isOpen == null) return null
-  return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium
-      ${isOpen
-        ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25'
-        : 'bg-rose-500/15 text-rose-400 border border-rose-500/25'
-      }`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${isOpen ? 'bg-emerald-400' : 'bg-rose-400'}`} />
-      {isOpen ? 'Abierto ahora' : 'Cerrado'}
-    </span>
-  )
-}
 
 /* ── Photo carousel ─────────────────────────────────────────────────────── */
 
@@ -113,16 +100,16 @@ function PhotoCarousel({ photos }) {
         </div>
       )}
 
-      {/* Foursquare attribution */}
-      <span className="absolute top-2 right-2 text-[9px] text-white/30 font-mono">Foursquare</span>
+      {/* Attribution */}
+      <span className="absolute top-2 right-2 text-[9px] text-white/30 font-mono">OpenTripMap · Wikimedia</span>
     </div>
   )
 }
 
 /* ── Foursquare enrichment hook ─────────────────────────────────────────── */
 
-function useFoursquareEnrich(place) {
-  const [data, setData]     = useState(null)
+function usePlaceEnrich(place) {
+  const [data, setData]       = useState(null)
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
@@ -132,7 +119,7 @@ function useFoursquareEnrich(place) {
     setData(null)
     setLoading(true)
 
-    fetchPlaceEnrich(place.name, place.lat, place.lng)
+    fetchPlaceEnrich(place.name, place.lat, place.lng, place.category?.id ?? '')
       .then(res => {
         if (cancelled) return
         setData(res?.data ?? null)
@@ -196,7 +183,7 @@ function ActionBar({ onRoute, onCopy, copied }) {
 function PoiBody({ place, fsq, fsqLoading }) {
   const m = place.meta ?? {}
 
-  // Prefer Foursquare data, fall back to OSM
+  // Prefer enriched data, fall back to OSM
   const website      = fsq?.website      ?? m.website
   const phone        = fsq?.phone        ?? m.phone
   const hours        = fsq?.hours        ?? m.opening_hours
@@ -205,7 +192,7 @@ function PoiBody({ place, fsq, fsqLoading }) {
 
   return (
     <div className="flex-1 overflow-y-auto min-h-0">
-      {/* Foursquare enrichment card */}
+      {/* Enrichment loading */}
       {fsqLoading && (
         <div className="mx-4 my-3 px-3 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.05] flex items-center gap-2">
           <div className="flex gap-1">
@@ -213,51 +200,45 @@ function PoiBody({ place, fsq, fsqLoading }) {
               <span key={d} className="w-1 h-1 bg-white/25 rounded-full animate-bounce" style={{ animationDelay: `${d}ms` }} />
             ))}
           </div>
-          <span className="text-white/30 text-[11px]">Cargando valoraciones…</span>
+          <span className="text-white/30 text-[11px]">Buscando información…</span>
         </div>
       )}
 
-      {fsq && !fsqLoading && (fsq.rating != null || fsq.is_open_now != null || fsq.description || fsq.price) && (
+      {/* Enrichment card — description + rating */}
+      {fsq && !fsqLoading && (fsq.rating != null || fsq.description) && (
         <motion.div
           initial={{ opacity: 0, y: 4 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.2 }}
           className="mx-4 my-3 px-3 py-3 rounded-xl bg-white/[0.03] border border-white/[0.05]"
         >
-          <div className="flex items-start justify-between gap-2 mb-2">
-            <StarRating rating={fsq.rating} total={fsq.total_ratings} />
-            {fsq.price && (
-              <span className="text-amber-400/80 text-[12px] font-mono flex-shrink-0">{fsq.price}</span>
-            )}
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <OpenBadge isOpen={fsq.is_open_now} />
-            {fsq.category && (
-              <span className="text-white/35 text-[10px]">{fsq.category}</span>
-            )}
-          </div>
+          {fsq.rating != null && (
+            <div className="mb-2">
+              <StarRating rating={fsq.rating} />
+            </div>
+          )}
           {fsq.description && (
-            <p className="text-white/45 text-[11px] leading-relaxed mt-2 line-clamp-2">{fsq.description}</p>
+            <p className="text-white/55 text-[11px] leading-relaxed line-clamp-3">{fsq.description}</p>
           )}
         </motion.div>
       )}
 
-      {/* Foursquare link — shows when we have a FSQ record but limited data */}
-      {fsq && !fsqLoading && fsq.foursquare_url && (
+      {/* Wikipedia / source links */}
+      {fsq && !fsqLoading && fsq.wiki_url && (
         <div className="mx-4 mb-2">
           <a
-            href={fsq.foursquare_url}
+            href={fsq.wiki_url}
             target="_blank"
             rel="noreferrer"
             className="inline-flex items-center gap-1.5 text-[10px] text-white/30 hover:text-white/60 transition-colors"
           >
             <Icons.external size={10} />
-            <span>Ver reseñas en Foursquare</span>
+            <span>Ver en Wikipedia</span>
           </a>
         </div>
       )}
 
-      {/* OSM info */}
+      {/* OSM + enriched info */}
       <div className="px-4 py-2 border-t border-white/[0.05]">
         <p className="text-white/25 text-[10px] uppercase tracking-[0.15em] mb-1">Información</p>
         <div className="flex flex-col">
@@ -285,6 +266,13 @@ function PoiBody({ place, fsq, fsqLoading }) {
           )}
         </div>
       </div>
+
+      {/* Data sources attribution */}
+      {fsq?.sources?.length > 0 && (
+        <div className="px-4 pb-3">
+          <p className="text-white/15 text-[9px]">Datos: {fsq.sources.join(' · ')}</p>
+        </div>
+      )}
     </div>
   )
 }
@@ -373,7 +361,7 @@ export default function PlaceView() {
   const userLocation = useMapStore(s => s.userLocation)
   const [copied, setCopied] = React.useState(false)
 
-  const { data: fsq, loading: fsqLoading } = useFoursquareEnrich(place)
+  const { data: fsq, loading: fsqLoading } = usePlaceEnrich(place)
 
   if (!place) return null
 

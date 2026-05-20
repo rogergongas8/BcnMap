@@ -56,4 +56,8 @@ return [
         'key' => env('FOURSQUARE_API_KEY'),
     ],
 
+    'opentripmap' => [
+        'key' => env('OPENTRIPMAP_API_KEY', 'opentripmap'),
+    ],
+
 ];

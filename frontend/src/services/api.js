@@ -32,8 +32,8 @@ export const fetchPoisNearby = (lat, lng, radius = 800, categories = []) =>
     params: { lat, lng, radius, categories: categories.join(',') || undefined },
   }).then(r => r.data)
 
-export const fetchPlaceEnrich = (name, lat, lng) =>
-  api.get('/pois/enrich', { params: { name, lat, lng } }).then(r => r.data)
+export const fetchPlaceEnrich = (name, lat, lng, category = '') =>
+  api.get('/pois/enrich', { params: { name, lat, lng, category } }).then(r => r.data)
 
 export const fetchEventsToday  = () => api.get('/events/today').then(r => r.data)
 export const fetchEventsNearby = (lat, lng, radius = 2) =>
