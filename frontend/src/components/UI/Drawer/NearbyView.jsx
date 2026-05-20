@@ -3,6 +3,7 @@ import { Icons } from '../icons'
 import { useNearbyStore, NEARBY_CATEGORIES } from '../../../store/nearbyStore'
 import { useDrawerStore } from '../../../store/drawerStore'
 import { useMapStore } from '../../../store/mapStore'
+import { useChatStore } from '../../../store/chatStore'
 import { useNearbyPois } from '../../../hooks/useNearbyPois'
 
 function formatDistance(m) {
@@ -86,8 +87,9 @@ function PoiRow({ poi, categoryIcon, onSelect, onHover, isHovered }) {
 export default function NearbyView() {
   useNearbyPois()
   const { activeCategory, pois, isLoading, hoveredId, setHovered } = useNearbyStore()
-  const openPlace = useDrawerStore(s => s.openPlace)
-  const flyTo     = useMapStore(s => s.flyTo)
+  const openPlace          = useDrawerStore(s => s.openPlace)
+  const flyTo              = useMapStore(s => s.flyTo)
+  const openChatWithPrompt = useChatStore(s => s.openChatWithPrompt)
 
   const activeMeta = NEARBY_CATEGORIES.find(c => c.id === activeCategory)
 
@@ -146,18 +148,40 @@ export default function NearbyView() {
         )}
 
         {activeCategory && !isLoading && pois.length > 0 && (
-          <ul>
-            {pois.map(poi => (
-              <PoiRow
-                key={poi.id}
-                poi={poi}
-                categoryIcon={activeMeta?.icon ?? Icons.pin}
-                onSelect={handleSelect}
-                onHover={setHovered}
-                isHovered={hoveredId === poi.id}
-              />
-            ))}
-          </ul>
+          <>
+            <ul>
+              {pois.map(poi => (
+                <PoiRow
+                  key={poi.id}
+                  poi={poi}
+                  categoryIcon={activeMeta?.icon ?? Icons.pin}
+                  onSelect={handleSelect}
+                  onHover={setHovered}
+                  isHovered={hoveredId === poi.id}
+                />
+              ))}
+            </ul>
+            <div className="px-4 py-3 border-t border-white/[0.05]">
+              <button
+                onClick={() => openChatWithPrompt(
+                  `¿Cuál de estas ${activeMeta?.label.toLowerCase() ?? 'lugares'} me recomiendas? Tengo ${pois.length} opciones cerca.`
+                )}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl
+                  bg-cyan-500/[0.07] border border-cyan-500/20 text-cyan-400/80
+                  hover:bg-cyan-500/[0.12] hover:text-cyan-300 hover:border-cyan-400/35
+                  text-[12px] font-mono transition-all duration-150"
+              >
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+                  <path d="M8 1.5C4.41 1.5 1.5 4.02 1.5 7.12c0 1.64.73 3.11 1.9 4.14L3 14.5l3.88-1.94c.35.07.72.1 1.12.1 3.59 0 6.5-2.52 6.5-5.54S11.59 1.5 8 1.5Z"
+                    stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" fill="none"/>
+                  <circle cx="5.5" cy="7.5" r="0.8" fill="currentColor"/>
+                  <circle cx="8" cy="7.5" r="0.8" fill="currentColor"/>
+                  <circle cx="10.5" cy="7.5" r="0.8" fill="currentColor"/>
+                </svg>
+                Preguntar al asistente
+              </button>
+            </div>
+          </>
         )}
       </div>
     </>

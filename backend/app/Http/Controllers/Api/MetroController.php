@@ -29,6 +29,11 @@ class MetroController extends Controller
         return response()->json(['station_id' => $stationId, 'trains' => $trains]);
     }
 
+    public function disruptions(): JsonResponse
+    {
+        return response()->json($this->service->getDisruptions());
+    }
+
     public function fetch(): JsonResponse
     {
         $stations = $this->service->fetch();

@@ -2,6 +2,7 @@ import { useChatStore } from '../store/chatStore'
 import { useMapStore } from '../store/mapStore'
 import { useNearbyStore } from '../store/nearbyStore'
 import { useRouteStore } from '../store/routeStore'
+import { useDrawerStore } from '../store/drawerStore'
 import { sendChat, fetchRoute } from '../services/api'
 import { geocodeLabel } from '../utils/geocode'
 
@@ -17,6 +18,29 @@ async function executeMapActions(actions) {
 
     } else if (action.type === 'reset_view') {
       flyTo(BCN_HOME)
+
+    } else if (action.type === 'open_place') {
+      const pois = useNearbyStore.getState().pois
+      const nearby = pois.find(p =>
+        (action.lat != null && action.lng != null &&
+          Math.abs(p.lat - action.lat) < 0.0008 && Math.abs(p.lng - action.lng) < 0.0008) ||
+        p.name === action.name
+      )
+      const target = nearby ?? (action.lat != null ? { lat: action.lat, lng: action.lng, name: action.name } : null)
+      if (!target) continue
+      flyTo({ lat: target.lat, lng: target.lng, zoom: 17 })
+      if (nearby) {
+        useDrawerStore.getState().openPlace({
+          kind:     'poi',
+          id:       nearby.id,
+          name:     nearby.name,
+          lat:      nearby.lat,
+          lng:      nearby.lng,
+          address:  nearby.address,
+          meta:     nearby,
+          category: action.category ? { label: action.category } : null,
+        })
+      }
 
     } else if (action.type === 'calculate_route') {
       const userLoc = useMapStore.getState().userLocation

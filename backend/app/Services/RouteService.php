@@ -121,6 +121,7 @@ class RouteService
                     'bike'  => 'En bici',
                     default => ucfirst($type)
                 },
+                'steps'    => $seg['steps'] ?? [],
             ]],
             'distance' => $seg['distance'],
             'duration' => $seg['duration'],
@@ -361,7 +362,7 @@ class RouteService
                     'step_penalty'   => 30,
                 ],
             ],
-            'directions_options' => ['units' => 'kilometers'],
+            'directions_options' => ['units' => 'kilometers', 'language' => 'es'],
         ];
 
         // Cortado segments also block pedestrians (construction, accidents).
@@ -390,7 +391,7 @@ class RouteService
                     'avoid_bad_surfaces'  => 0.25,
                 ],
             ],
-            'directions_options' => ['units' => 'kilometers'],
+            'directions_options' => ['units' => 'kilometers', 'language' => 'es'],
         ];
 
         $closures = $this->closedSegmentMidpoints();
@@ -415,7 +416,7 @@ class RouteService
                     'use_tolls'    => 0.0,
                 ],
             ],
-            'directions_options' => ['units' => 'kilometers'],
+            'directions_options' => ['units' => 'kilometers', 'language' => 'es'],
         ];
 
         // Always exclude cortado (closed streets).
@@ -495,23 +496,39 @@ class RouteService
         $summary = $trip['summary'] ?? $trip['legs'][0]['summary'] ?? null;
         if (!$summary) return null;
 
-        // Merge all leg shapes into one coordinate array
         $coords = [];
+        $steps  = [];
+
         foreach ($trip['legs'] as $leg) {
             $shape = $leg['shape'] ?? '';
             if ($shape === '') continue;
-            $decoded = $this->decodePolyline6($shape);
+            $decoded    = $this->decodePolyline6($shape);
+            $baseOffset = count($coords);
             // Skip first coord of subsequent legs to avoid duplicates at junctions
             if (!empty($coords) && !empty($decoded)) array_shift($decoded);
             array_push($coords, ...$decoded);
+
+            foreach ($leg['maneuvers'] ?? [] as $maneuver) {
+                $type = (int)($maneuver['type'] ?? 0);
+                // Skip arrive maneuver — we show it as the destination node
+                if ($type === 4 || $type === 5 || $type === 6) continue;
+                $steps[] = [
+                    'instruction' => $maneuver['instruction'] ?? '',
+                    'type'        => $type,
+                    'distance'    => (int) round((float)($maneuver['length'] ?? 0) * 1000),
+                    'duration'    => (int)($maneuver['time'] ?? 0),
+                    'shape_index' => $baseOffset + (int)($maneuver['begin_shape_index'] ?? 0),
+                ];
+            }
         }
 
         if (empty($coords)) return null;
 
         return [
             'geometry' => ['type' => 'LineString', 'coordinates' => $coords],
-            'distance' => (float)($summary['length'] ?? 0) * 1000, // km → m
-            'duration' => (float)($summary['time']   ?? 0),        // seconds
+            'distance' => (float)($summary['length'] ?? 0) * 1000,
+            'duration' => (float)($summary['time']   ?? 0),
+            'steps'    => $steps,
         ];
     }
 

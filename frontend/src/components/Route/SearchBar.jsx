@@ -639,7 +639,10 @@ function StepSegment({ seg }) {
   )
 }
 
-function RouteStepPanel({ segments, origin, destination }) {
+function RouteStepPanel({ segments, origin, destination, mode }) {
+  const { isNavigating, startNavigation, stopNavigation } = useRouteStore()
+  const canNavigate = (mode === 'foot' || mode === 'bike') && segments?.[0]?.steps?.length > 0
+
   if (!segments?.length) return null
 
   /* Construye la secuencia de nodos intercalados con segmentos. */
@@ -712,9 +715,20 @@ function RouteStepPanel({ segments, origin, destination }) {
 
   return (
     <div className="mx-3 mb-3 mt-1 rounded-xl bg-white/[0.02] border border-white/[0.05] p-3 max-h-[280px] overflow-y-auto">
-      <p className="text-[9px] font-mono uppercase tracking-wider text-white/35 mb-2.5">
-        Paso a paso
-      </p>
+      <div className="flex items-center justify-between mb-2.5">
+        <p className="text-[9px] font-mono uppercase tracking-wider text-white/35">Paso a paso</p>
+        {canNavigate && (
+          <button
+            onClick={isNavigating ? stopNavigation : startNavigation}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-mono transition-all
+              ${isNavigating
+                ? 'bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20'
+                : 'bg-cyan-500/10 border border-cyan-500/25 text-cyan-400 hover:bg-cyan-500/20'}`}
+          >
+            {isNavigating ? '⏹ Parar' : '▶ Navegar'}
+          </button>
+        )}
+      </div>
       <div className="flex flex-col">
         {nodes.map((node, idx) => {
           if (node.kind === 'origin')  return <StepNodeOrigin  key={idx} label={node.label} />
@@ -1220,6 +1234,7 @@ export default function SearchBar() {
                       segments={route.segments}
                       origin={originPoint}
                       destination={destPoint}
+                      mode={mode}
                     />
                   </motion.div>
                 )}

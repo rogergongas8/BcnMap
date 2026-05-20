@@ -19,6 +19,9 @@ class MetroService
     // BCN bbox para Overpass
     private const BBOX = '41.30,1.95,41.50,2.30';
 
+    private const CACHE_DISRUPTIONS = 'metro:disruptions';
+    private const CACHE_DISRUPTIONS_TTL = 300; // 5 min
+
     private const LINE_COLORS = [
         'L1'   => 'CE1126',
         'L2'   => '93248F',
@@ -446,6 +449,39 @@ class MetroService
         $a    = sin($dLat / 2) ** 2
               + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLng / 2) ** 2;
         return 6371 * 2 * asin(sqrt($a));
+    }
+
+    // ── Disruptions ───────────────────────────────────────────────────────────
+
+    public function getDisruptions(): array
+    {
+        return Cache::remember(self::CACHE_DISRUPTIONS, self::CACHE_DISRUPTIONS_TTL, fn() => $this->fetchDisruptions());
+    }
+
+    private function fetchDisruptions(): array
+    {
+        try {
+            $response = Http::timeout(10)->get(self::BASE . '/transit/linies/metro', $this->auth());
+            if (!$response->successful()) return [];
+
+            $features = $response->json('features') ?? [];
+            $disruptions = [];
+
+            foreach ($features as $f) {
+                $props = $f['properties'] ?? [];
+                if (!empty($props['disrupted']) || !empty($props['DISRUPTED'])) {
+                    $line = $props['NOM_LINIA'] ?? $props['nom_linia'] ?? '';
+                    $desc = $props['disruption_desc'] ?? $props['DESCRIPCIO_DISRUPCIO'] ?? 'Incidencia en la línea';
+                    if ($line) {
+                        $disruptions[] = ['line' => $line, 'description' => $desc];
+                    }
+                }
+            }
+
+            return $disruptions;
+        } catch (\Throwable) {
+            return [];
+        }
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

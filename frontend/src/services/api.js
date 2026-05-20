@@ -1,8 +1,15 @@
 import axios from 'axios'
+import { useAuthStore } from '../store/authStore'
 
 const api = axios.create({
   baseURL: (import.meta.env.VITE_API_URL ?? '') + '/api/v1',
   timeout: 10000,
+})
+
+api.interceptors.request.use((config) => {
+  const token = useAuthStore.getState().token
+  if (token) config.headers.Authorization = `Bearer ${token}`
+  return config
 })
 
 export const fetchTraffic    = () => api.get('/traffic').then(r => r.data)
@@ -49,3 +56,23 @@ export const fetchEventsNearby = (lat, lng, radius = 2) =>
 
 export const fetchHistoryTimeline = (hours = 24, step = 5) =>
   api.get('/history/timeline', { params: { hours, step } }).then(r => r.data)
+
+// Auth
+export const authRegister = (name, email, password) =>
+  api.post('/auth/register', { name, email, password }).then(r => r.data)
+export const authLogin = (email, password) =>
+  api.post('/auth/login', { email, password }).then(r => r.data)
+export const authLogout = () =>
+  api.post('/auth/logout').then(r => r.data)
+export const authMe = () =>
+  api.get('/auth/me').then(r => r.data)
+
+// Favorites
+export const fetchFavorites  = () => api.get('/favorites').then(r => r.data)
+export const addFavorite     = (data) => api.post('/favorites', data).then(r => r.data)
+export const deleteFavorite  = (id) => api.delete(`/favorites/${id}`).then(r => r.data)
+
+// Saved routes
+export const fetchSavedRoutes  = () => api.get('/saved-routes').then(r => r.data)
+export const addSavedRoute     = (data) => api.post('/saved-routes', data).then(r => r.data)
+export const deleteSavedRoute  = (id) => api.delete(`/saved-routes/${id}`).then(r => r.data)

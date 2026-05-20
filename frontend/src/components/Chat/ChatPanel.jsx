@@ -15,7 +15,7 @@ const SUGGESTIONS = [
 ]
 
 export default function ChatPanel() {
-  const { isOpen, hasUnread, toggleChat, clearChat } = useChatStore()
+  const { isOpen, hasUnread, toggleChat, clearChat, pendingPrompt, clearPendingPrompt } = useChatStore()
   const { messages, isLoading, sendMessage } = useChat()
   const { route } = useRouteStore()
   const setMapPadding = useMapStore(s => s.setMapPadding)
@@ -25,6 +25,13 @@ export default function ChatPanel() {
   useEffect(() => {
     if (isOpen) hasEverOpened.current = true
   }, [isOpen])
+
+  useEffect(() => {
+    if (pendingPrompt && !isLoading) {
+      sendMessage(pendingPrompt)
+      clearPendingPrompt()
+    }
+  }, [pendingPrompt])
 
   // Ajusta el padding del mapa para que la ruta no quede tapada por el panel lateral
   useEffect(() => {
@@ -86,7 +93,7 @@ export default function ChatPanel() {
               <div className="flex items-center gap-2.5">
                 <span className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-pulse" />
                 <span className="text-white/80 text-sm font-mono tracking-wide">BCN Live AI</span>
-                <span className="text-white/20 text-[10px] font-mono">llama-3.3</span>
+                <span className="text-white/20 text-[10px] font-mono">gemma2-9b</span>
               </div>
               <div className="flex items-center gap-1">
                 {messages.length > 0 && (

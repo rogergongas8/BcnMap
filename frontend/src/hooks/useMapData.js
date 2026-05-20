@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useDataStore } from '../store/dataStore'
+import { useTimeStore } from '../store/timeStore'
 import { fetchTraffic, fetchBicing, fetchBus, fetchMetro, fetchMetroLines, fetchWeather, fetchAirQuality } from '../services/api'
 
 const POLL_INTERVAL = 120_000 // 2 min
@@ -8,6 +9,8 @@ export function useMapData() {
   const { setTraffic, setBicing, setBus, setMetro, setMetroLines, setWeather, setAirQuality } = useDataStore()
 
   async function loadAll() {
+    if (useTimeStore.getState().isHistorical) return
+
     const [traffic, bicing, bus, metro, weather, air] = await Promise.allSettled([
       fetchTraffic(),
       fetchBicing(),
@@ -16,6 +19,8 @@ export function useMapData() {
       fetchWeather(),
       fetchAirQuality(),
     ])
+
+    if (useTimeStore.getState().isHistorical) return
 
     if (traffic.status === 'fulfilled')  setTraffic(traffic.value)
     if (bicing.status === 'fulfilled')   setBicing(bicing.value)

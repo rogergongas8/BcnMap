@@ -9,9 +9,13 @@ use App\Services\CityContextService;
 use App\Services\GroqService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class ChatController extends Controller
 {
+    // Matches the scheduler interval so context is never stale by more than one cycle.
+    private const CONTEXT_TTL = 120;
+
     public function __construct(
         private GroqService        $groq,
         private CityContextService $context,
@@ -27,10 +31,15 @@ class ChatController extends Controller
             'nearby_pois'          => 'nullable|array|max:12',
         ]);
 
-        $userLat     = $request->input('user_lat') !== null ? (float) $request->input('user_lat') : null;
-        $userLng     = $request->input('user_lng') !== null ? (float) $request->input('user_lng') : null;
-        $nearbyPois  = $request->input('nearby_pois', []);
-        $cityContext = $this->context->buildContext($userLat, $userLng, $nearbyPois);
+        $userLat    = $request->input('user_lat') !== null ? (float) $request->input('user_lat') : null;
+        $userLng    = $request->input('user_lng') !== null ? (float) $request->input('user_lng') : null;
+        $nearbyPois = $request->input('nearby_pois', []);
+
+        $baseContext = Cache::remember('chat:city_base_context', self::CONTEXT_TTL, fn () =>
+            $this->context->buildBaseContext()
+        );
+
+        $cityContext = $this->context->appendUserData($baseContext, $userLat, $userLng, $nearbyPois);
 
         $result = $this->groq->chat(
             userMessage: $request->input('message'),

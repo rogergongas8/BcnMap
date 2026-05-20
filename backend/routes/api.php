@@ -1,17 +1,20 @@
 <?php
 
 use App\Http\Controllers\Api\AirQualityController;
+use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BeachController;
 use App\Http\Controllers\Api\BicingController;
 use App\Http\Controllers\Api\BusController;
 use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\CityContextController;
 use App\Http\Controllers\Api\EventsController;
+use App\Http\Controllers\Api\FavoriteController;
 use App\Http\Controllers\Api\HistoryController;
 use App\Http\Controllers\Api\MetroController;
 use App\Http\Controllers\Api\PlaceEnrichController;
 use App\Http\Controllers\Api\PoiController;
 use App\Http\Controllers\Api\RouteController;
+use App\Http\Controllers\Api\SavedRouteController;
 use App\Http\Controllers\Api\TrafficController;
 use App\Http\Controllers\Api\WeatherController;
 use Illuminate\Http\Request;
@@ -30,6 +33,7 @@ Route::prefix('v1')->group(function () {
 
     Route::get('/metro',                        [MetroController::class, 'current']);
     Route::get('/metro/lines',                  [MetroController::class, 'lines']);
+    Route::get('/metro/disruptions',            [MetroController::class, 'disruptions']);
     Route::get('/metro/{stationId}/arrivals',   [MetroController::class, 'arrivals']);
     Route::post('/metro/refresh',               [MetroController::class, 'fetch']);
 
@@ -37,8 +41,8 @@ Route::prefix('v1')->group(function () {
     Route::get('/air-quality',     [AirQualityController::class, 'current']);
     Route::get('/city-context',    [CityContextController::class, 'index']);
 
-    Route::post('/chat',           [ChatController::class, 'send']);
-    Route::get('/route',           [RouteController::class, 'calculate']);
+    Route::post('/chat',           [ChatController::class, 'send'])->middleware('throttle:20,1');
+    Route::get('/route',           [RouteController::class, 'calculate'])->middleware('throttle:30,1');
 
     Route::get('/pois/nearby',     [PoiController::class, 'nearby']);
     Route::get('/pois/search',     [PoiController::class, 'search']);
@@ -54,6 +58,22 @@ Route::prefix('v1')->group(function () {
     Route::get('/history/timeline', [HistoryController::class, 'timeline']);
     Route::get('/history/snapshot', [HistoryController::class, 'snapshot']);
     Route::get('/history/range',    [HistoryController::class, 'range']);
+
+    // Auth
+    Route::post('/auth/register', [AuthController::class, 'register'])->middleware('throttle:10,1');
+    Route::post('/auth/login',    [AuthController::class, 'login'])->middleware('throttle:10,1');
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::post('/auth/logout', [AuthController::class, 'logout']);
+        Route::get('/auth/me',      [AuthController::class, 'me']);
+
+        Route::get('/favorites',             [FavoriteController::class, 'index']);
+        Route::post('/favorites',            [FavoriteController::class, 'store']);
+        Route::delete('/favorites/{favorite}', [FavoriteController::class, 'destroy']);
+
+        Route::get('/saved-routes',               [SavedRouteController::class, 'index']);
+        Route::post('/saved-routes',              [SavedRouteController::class, 'store']);
+        Route::delete('/saved-routes/{savedRoute}', [SavedRouteController::class, 'destroy']);
+    });
 
     Route::fallback(fn (Request $r) => response()->json([
         'error' => 'Endpoint not found',

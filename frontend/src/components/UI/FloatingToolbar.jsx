@@ -5,6 +5,9 @@ import { useDrawerStore } from '../../store/drawerStore'
 import { useNearbyStore } from '../../store/nearbyStore'
 import { useLeisureStore } from '../../store/leisureStore'
 import { useMapStore } from '../../store/mapStore'
+import { useAuthStore } from '../../store/authStore'
+import { useAuth } from '../../hooks/useAuth'
+import LoginModal from './LoginModal'
 
 const THEMES = [
   { id: 'voyager', label: 'Estàndard' },
@@ -129,6 +132,78 @@ function LayersPopover({ onClose }) {
   )
 }
 
+function ProfileButton() {
+  const { isLogged, user } = useAuthStore()
+  const { logout } = useAuth()
+  const [open, setOpen] = useState(false)
+  const [showLogin, setShowLogin] = useState(false)
+  const ref = useRef(null)
+
+  useEffect(() => {
+    if (!open) return
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    window.addEventListener('mousedown', handler)
+    return () => window.removeEventListener('mousedown', handler)
+  }, [open])
+
+  if (!isLogged) {
+    return (
+      <>
+        <button
+          onClick={() => setShowLogin(true)}
+          title="Iniciar sesión"
+          className="w-11 h-11 flex items-center justify-center rounded-xl border
+            bg-[#0a0c10]/85 backdrop-blur-xl text-white/50 border-white/[0.08]
+            hover:text-white hover:border-white/[0.18] transition-all"
+        >
+          <Icons.user size={16} />
+        </button>
+        {showLogin && <LoginModal onClose={() => setShowLogin(false)} />}
+      </>
+    )
+  }
+
+  const initials = (user?.name ?? 'U').slice(0, 2).toUpperCase()
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="w-11 h-11 flex items-center justify-center rounded-xl border
+          bg-cyan-500/10 border-cyan-500/30 text-cyan-300
+          hover:bg-cyan-500/20 transition-all text-[11px] font-mono font-bold"
+      >
+        {initials}
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, x: -8, scale: 0.96 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            exit={{ opacity: 0, x: -8, scale: 0.96 }}
+            transition={{ duration: 0.15 }}
+            className="absolute left-[60px] top-0 w-[180px] rounded-xl
+              bg-[#0a0c10]/95 backdrop-blur-2xl border border-white/[0.08]
+              shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden z-50"
+          >
+            <div className="px-3 py-2.5 border-b border-white/[0.06]">
+              <p className="text-white/80 text-[12px] font-medium truncate">{user?.name}</p>
+              <p className="text-white/35 text-[10px] font-mono truncate">{user?.email}</p>
+            </div>
+            <button
+              onClick={async () => { setOpen(false); await logout() }}
+              className="w-full text-left px-3 py-2.5 text-[12px] text-white/55
+                hover:text-white hover:bg-white/[0.05] transition-colors font-mono"
+            >
+              Cerrar sesión
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
 export default function FloatingToolbar() {
   const { view, openNearby, close } = useDrawerStore()
   const { activeCategory } = useNearbyStore()
@@ -187,6 +262,8 @@ export default function FloatingToolbar() {
           {layersOpen && <LayersPopover onClose={() => setLayersOpen(false)} />}
         </AnimatePresence>
       </div>
+
+      <ProfileButton />
     </motion.div>
   )
 }

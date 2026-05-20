@@ -23,6 +23,8 @@ import ErrorBoundary from './components/UI/ErrorBoundary'
 
 import ChatPanel from './components/Chat/ChatPanel'
 import SearchBar from './components/Route/SearchBar'
+import NavigationHUD from './components/Route/NavigationHUD'
+import HistorySlider from './components/UI/HistorySlider'
 
 import { useMapData } from './hooks/useMapData'
 import { useWebSocket } from './hooks/useWebSocket'
@@ -61,9 +63,13 @@ function AppContent() {
       <CameraControls />
       <MapControls />
 
-      {/* Chat + Search (existing) */}
+      {/* Chat + Search + Navigation */}
       <ChatPanel />
       <SearchBar />
+      <NavigationHUD />
+
+      {/* History time slider */}
+      <HistorySlider />
 
       {/* Hover tooltips for layers */}
       {hoverInfo && <Tooltip info={hoverInfo} />}

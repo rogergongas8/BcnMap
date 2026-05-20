@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Log;
 class GroqService
 {
     private const API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-    private const MODEL   = 'llama-3.3-70b-versatile';
+    private const MODEL   = 'gemma2-9b-it';
 
     public function chat(string $userMessage, string $cityContext, array $history = []): array
     {
@@ -37,14 +37,25 @@ map_actions disponibles (incluye solo los relevantes, sin explicarlos en el repl
 - { "type": "focus_layer", "layer": "bicing" }
 - { "type": "highlight_zone", "zone": "eixample" }
 - { "type": "reset_view" }
+- { "type": "open_place", "name": "string", "lat": float, "lng": float, "category": "string" }
 - { "type": "calculate_route", "origin_label": "string", "origin_lat": float_o_null, "origin_lng": float_o_null, "dest_label": "string", "dest_lat": float_o_null, "dest_lng": float_o_null, "mode": "foot|bike|car|bus" }
 
+REGLAS CRÍTICAS PARA open_place vs calculate_route:
+- Si el usuario PREGUNTA por un lugar (recomiéndame, cuál está más cerca, qué hay por aquí, cuál es mejor, etc.) → usa "open_place" + "fly_to". El usuario decide si ir o no. NUNCA uses calculate_route sin que el usuario lo pida explícitamente.
+- Si el usuario dice explícitamente que quiere ir (llévame, quiero ir, cómo llego, dame ruta, como puedo ir, etc.) → usa "calculate_route".
+- Nunca inicies una ruta por tu cuenta. El usuario debe pedirla.
+
+REGLAS PARA open_place:
+- Usa open_place cuando recomiendas un lugar concreto. Muestra el lugar en el mapa para que el usuario lo vea y decida si quiere ir.
+- Si el lugar aparece en POIS CERCANOS, usa sus coordenadas exactas y su nombre tal cual aparece.
+- Incluye siempre fly_to antes de open_place para centrar el mapa.
+
 REGLAS PARA calculate_route:
-- Si el usuario quiere ir a algún lugar, incluye SIEMPRE calculate_route.
+- Solo cuando el usuario pide explícitamente ir a algún sitio.
 - Para origen: si hay POSICIÓN USUARIO en el contexto, úsala (origin_lat/origin_lng con esas coordenadas, origin_label: "Mi ubicación"). Si no, pon null en ambas coordenadas.
 - Para destinos conocidos usa coordenadas precisas: Sagrada Família(41.4036,2.1744), Parc Güell(41.4145,2.1527), Camp Nou(41.3809,2.1228), Barceloneta(41.3793,2.1892), Born(41.3854,2.1834), Gràcia(41.4036,2.1564), Tibidabo(41.4218,2.1189), Montjuïc(41.3637,2.1588), Arc de Triomf(41.3912,2.1804), Hospital Sant Pau(41.4120,2.1741).
 - Para destinos de dirección específica (ej: "Sant Antoni Maria Claret 57"): usa dest_label con la dirección tal cual, deja dest_lat/dest_lng en null, el sistema la geocodificará.
-- Si el usuario pregunta por un lugar que aparece en POIS CERCANOS del contexto, usa sus coordenadas exactas (dest_lat/dest_lng) y su nombre como dest_label. No geocodifiques si ya tienes las coordenadas.
+- Si el lugar aparece en POIS CERCANOS del contexto, usa sus coordenadas exactas (dest_lat/dest_lng) y su nombre como dest_label. No geocodifiques si ya tienes las coordenadas.
 
 ELECCIÓN DE MODO (muy importante, sé conservador):
 - Estima la distancia aproximada: |Δlat| × 111 + |Δlng| × 85 (km). Eso es la distancia en línea recta; la real por calles es ~1.3× más.
