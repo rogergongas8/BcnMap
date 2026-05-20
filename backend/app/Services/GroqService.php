@@ -44,6 +44,7 @@ REGLAS PARA calculate_route:
 - Para origen: si hay POSICIÓN USUARIO en el contexto, úsala (origin_lat/origin_lng con esas coordenadas, origin_label: "Mi ubicación"). Si no, pon null en ambas coordenadas.
 - Para destinos conocidos usa coordenadas precisas: Sagrada Família(41.4036,2.1744), Parc Güell(41.4145,2.1527), Camp Nou(41.3809,2.1228), Barceloneta(41.3793,2.1892), Born(41.3854,2.1834), Gràcia(41.4036,2.1564), Tibidabo(41.4218,2.1189), Montjuïc(41.3637,2.1588), Arc de Triomf(41.3912,2.1804), Hospital Sant Pau(41.4120,2.1741).
 - Para destinos de dirección específica (ej: "Sant Antoni Maria Claret 57"): usa dest_label con la dirección tal cual, deja dest_lat/dest_lng en null, el sistema la geocodificará.
+- Si el usuario pregunta por un lugar que aparece en POIS CERCANOS del contexto, usa sus coordenadas exactas (dest_lat/dest_lng) y su nombre como dest_label. No geocodifiques si ya tienes las coordenadas.
 
 ELECCIÓN DE MODO (muy importante, sé conservador):
 - Estima la distancia aproximada: |Δlat| × 111 + |Δlng| × 85 (km). Eso es la distancia en línea recta; la real por calles es ~1.3× más.

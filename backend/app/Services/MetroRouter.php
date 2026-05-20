@@ -10,6 +10,9 @@ class MetroRouter
     private array $adjacency  = [];   // station_id => [neighbor_id => line_name]
     private array $lineData   = [];   // line_name  => {color, geometry}
 
+    private const TRANSFER_PENALTY_S = 240; // 4 min per line change
+    private const METRO_SPEED_MS     = 6.5; // ~23 km/h average including stops
+
     public function __construct()
     {
         $this->build();
@@ -50,8 +53,9 @@ class MetroRouter
             for ($i = 0; $i < count($stns) - 1; $i++) {
                 $aId = $stns[$i]['station_id'];
                 $bId = $stns[$i + 1]['station_id'];
-                $this->adjacency[$aId][$bId] ??= $lineName;
-                $this->adjacency[$bId][$aId] ??= $lineName;
+                // Keep all lines connecting a pair — don't overwrite with ??=
+                $this->adjacency[$aId][$bId][$lineName] = $lineName;
+                $this->adjacency[$bId][$aId][$lineName] = $lineName;
             }
         }
     }
@@ -91,8 +95,18 @@ class MetroRouter
         return $bestT;
     }
 
+    private function haversine(float $lat1, float $lng1, float $lat2, float $lng2): float
+    {
+        $R  = 6371000;
+        $φ1 = deg2rad($lat1); $φ2 = deg2rad($lat2);
+        $Δφ = deg2rad($lat2 - $lat1); $Δλ = deg2rad($lng2 - $lng1);
+        $a  = sin($Δφ / 2) ** 2 + cos($φ1) * cos($φ2) * sin($Δλ / 2) ** 2;
+        return $R * 2 * atan2(sqrt($a), sqrt(1 - $a));
+    }
+
     /**
-     * BFS from originStation to destStation on the metro graph.
+     * Dijkstra from originStation to destStation.
+     * Cost = travel time (distance / metro_speed) + transfer penalty per line change.
      * Returns array of legs [{line, from_station, to_station}] or null if unreachable.
      */
     public function route(array $originStation, array $destStation): ?array
@@ -103,33 +117,76 @@ class MetroRouter
         if ($srcId === $dstId) return null;
         if (!isset($this->stationMap[$srcId]) || !isset($this->stationMap[$dstId])) return null;
 
-        // visited[id] = [prev_id, line] or null for source
-        // Use array_key_exists (not isset) — isset returns false for null values
-        $visited = [$srcId => null];
-        $queue   = [$srcId];
+        // State: (station_id, current_line) — line=null means not yet on a train
+        // cost[id][line] = best cost to reach id arriving on line
+        $INF  = PHP_FLOAT_MAX;
+        $cost = [];   // [station_id][line] => float
+        $prev = [];   // [station_id][line] => [prev_id, prev_line, edge_line]
 
-        while (!empty($queue)) {
-            $cur = array_shift($queue);
-            if ($cur === $dstId) break;
-            foreach ($this->adjacency[$cur] ?? [] as $next => $line) {
-                if (!array_key_exists($next, $visited)) {
-                    $visited[$next] = [$cur, $line];
-                    $queue[] = $next;
+        // Priority queue: [cost, station_id, current_line]
+        // PHP has no built-in min-heap, simulate with sorted array (fine for ~100 stations)
+        $pq = [[0.0, $srcId, null]];
+
+        $cost[$srcId][null] = 0.0;
+
+        while (!empty($pq)) {
+            usort($pq, fn($a, $b) => $a[0] <=> $b[0]);
+            [$curCost, $curId, $curLine] = array_shift($pq);
+
+            if ($curId === $dstId) break;
+
+            $bestSoFar = $cost[$curId][$curLine] ?? $INF;
+            if ($curCost > $bestSoFar + 0.01) continue;
+
+            foreach ($this->adjacency[$curId] ?? [] as $nextId => $lines) {
+                $nextStation = $this->stationMap[$nextId] ?? null;
+                if (!$nextStation) continue;
+
+                $dist    = $this->haversine(
+                    (float)$this->stationMap[$curId]['lat'], (float)$this->stationMap[$curId]['lng'],
+                    (float)$nextStation['lat'], (float)$nextStation['lng']
+                );
+                $travelTime = $dist / self::METRO_SPEED_MS;
+
+                foreach ($lines as $edgeLine) {
+                    $transfer = ($curLine !== null && $curLine !== $edgeLine)
+                        ? self::TRANSFER_PENALTY_S
+                        : 0.0;
+                    $newCost = $curCost + $travelTime + $transfer;
+
+                    $prevBest = $cost[$nextId][$edgeLine] ?? $INF;
+                    if ($newCost < $prevBest) {
+                        $cost[$nextId][$edgeLine] = $newCost;
+                        $prev[$nextId][$edgeLine] = [$curId, $curLine, $edgeLine];
+                        $pq[] = [$newCost, $nextId, $edgeLine];
+                    }
                 }
             }
         }
 
-        if (!array_key_exists($dstId, $visited)) return null;
+        // Find best arrival line at destination
+        if (empty($cost[$dstId])) return null;
 
-        // Reconstruct raw path of [from_id, to_id, line]
+        $bestLine = null;
+        $bestCost = $INF;
+        foreach ($cost[$dstId] as $line => $c) {
+            if ($c < $bestCost) { $bestCost = $c; $bestLine = $line; }
+        }
+        if ($bestLine === null) return null;
+
+        // Reconstruct path
         $path = [];
-        $cur  = $dstId;
-        while ($visited[$cur] !== null) {
-            [$prev, $line] = $visited[$cur];
-            $path[] = [$prev, $cur, $line];
-            $cur    = $prev;
+        $curId   = $dstId;
+        $curLine = $bestLine;
+        while (isset($prev[$curId][$curLine])) {
+            [$prevId, $prevLine, $edgeLine] = $prev[$curId][$curLine];
+            $path[] = [$prevId, $curId, $edgeLine];
+            $curId   = $prevId;
+            $curLine = $prevLine;
         }
         $path = array_reverse($path);
+
+        if (empty($path)) return null;
 
         // Group consecutive same-line hops into legs
         $legs = [];
@@ -175,7 +232,6 @@ class MetroRouter
         $tMin    = min($tFrom, $tTo);
         $tMax    = max($tFrom, $tTo);
 
-        // Collect polyline vertices that fall strictly inside [tMin, tMax]
         $middle = [];
         $cum    = 0.0;
         for ($i = 0; $i < count($coords) - 1; $i++) {

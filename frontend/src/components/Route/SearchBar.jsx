@@ -318,9 +318,11 @@ function ModeCard({ mode, state, isActive, onClick, metroLines }) {
     }
   }
 
-  const trafficNote = mode.id === 'car' ? (data?.traffic?.note ?? data?.segments?.[0]?.meta?.traffic_note) : null
-  const congestion  = mode.id === 'car' ? (data?.traffic?.congestion ?? data?.segments?.[0]?.meta?.congestion) : null
+  const trafficNote  = mode.id === 'car' ? (data?.traffic?.note ?? data?.segments?.[0]?.meta?.traffic_note) : null
+  const congestion   = mode.id === 'car' ? (data?.traffic?.congestion ?? data?.segments?.[0]?.meta?.congestion) : null
   const trafficColor = congestion >= 80 ? '#ff3333' : congestion >= 60 ? '#ffcc00' : '#00ff88'
+  const inefficient  = data?.inefficient === true
+  const inefficientReason = data?.inefficient_reason
 
   return (
     <motion.button
@@ -328,18 +330,20 @@ function ModeCard({ mode, state, isActive, onClick, metroLines }) {
       onClick={onClick}
       whileTap={{ scale: 0.985 }}
       className={`w-full text-left rounded-xl border transition-all overflow-hidden
-        ${isActive
+        ${isActive && !inefficient
           ? 'border-white/30 bg-white/[0.05]'
-          : 'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] hover:border-white/[0.12]'}`}
-      style={isActive ? { boxShadow: `inset 0 0 0 1px ${color}55, 0 0 18px ${color}22`, borderColor: color + '55' } : undefined}
+          : inefficient
+            ? 'border-white/[0.04] bg-white/[0.015] opacity-60'
+            : 'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] hover:border-white/[0.12]'}`}
+      style={isActive && !inefficient ? { boxShadow: `inset 0 0 0 1px ${color}55, 0 0 18px ${color}22`, borderColor: color + '55' } : undefined}
     >
       <div className="flex items-center gap-3 px-3 py-2.5">
         <span
           className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors"
           style={{
-            color,
-            background: isActive ? color + '22' : 'rgba(255,255,255,0.04)',
-            boxShadow: isActive ? `0 0 12px ${color}55, inset 0 0 0 1px ${color}66` : undefined,
+            color:      inefficient ? 'rgba(255,255,255,0.25)' : color,
+            background: isActive && !inefficient ? color + '22' : 'rgba(255,255,255,0.04)',
+            boxShadow:  isActive && !inefficient ? `0 0 12px ${color}55, inset 0 0 0 1px ${color}66` : undefined,
           }}
         >
           <ModeIcon size={20} />
@@ -347,12 +351,18 @@ function ModeCard({ mode, state, isActive, onClick, metroLines }) {
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] font-mono uppercase tracking-wider" style={{ color: isActive ? color : 'rgba(255,255,255,0.55)' }}>
+            <span className="text-[11px] font-mono uppercase tracking-wider"
+                  style={{ color: inefficient ? 'rgba(255,255,255,0.3)' : isActive ? color : 'rgba(255,255,255,0.55)' }}>
               {mode.label}
             </span>
-            {data && (
+            {data && !inefficient && (
               <span className="text-xs font-mono font-medium" style={{ color: isActive ? color : 'rgba(255,255,255,0.9)' }}>
                 {fmtTime(data.duration)}
+              </span>
+            )}
+            {data && inefficient && (
+              <span className="text-[10px] font-mono text-amber-500/70 flex items-center gap-1">
+                ⚠ No eficiente
               </span>
             )}
             {loading && (
@@ -365,12 +375,15 @@ function ModeCard({ mode, state, isActive, onClick, metroLines }) {
             {failed && <span className="text-[10px] font-mono text-white/30">No disponible</span>}
           </div>
 
-          {data && segs.length > 0 && (
+          {data && segs.length > 0 && !inefficient && (
             <div className="mt-1.5">
               <SegmentSequence segments={segs} metroLines={metroLines} />
             </div>
           )}
-          {data && (
+          {data && inefficient && inefficientReason && (
+            <p className="mt-0.5 text-[10px] text-white/30">{inefficientReason}</p>
+          )}
+          {data && !inefficient && (
             <div className="mt-1 flex items-center gap-2 text-[10px] font-mono text-white/35">
               {data.distance != null && <span>{fmtDist(data.distance)}</span>}
               {trafficNote && (

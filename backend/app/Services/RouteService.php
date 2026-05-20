@@ -310,11 +310,34 @@ class RouteService
             ];
         }
 
+        $totalDistance = array_sum(array_column($segments, 'distance'));
+        $totalDuration = array_sum(array_column($segments, 'duration'));
+
+        // Efficiency guard: compare against estimated walking time for the same crow-flies distance
+        $straightLine   = $this->haversine($fromLat, $fromLng, $toLat, $toLng);
+        $walkEstimateSec = $straightLine / 1.25; // 4.5 km/h walking speed
+        $transfers       = count(array_filter($segments, fn($s) => $s['type'] === 'metro')) - 1;
+
+        // Flag as inefficient when metro doesn't save meaningful time over walking,
+        // or when the routed distance is >2.5× the straight-line distance (backtracking)
+        $inefficient = $totalDuration > $walkEstimateSec * 0.85
+            || $totalDistance > $straightLine * 2.5
+            || $transfers >= 2;
+
+        $inefficientReason = null;
+        if ($inefficient) {
+            if ($transfers >= 2) $inefficientReason = 'Muchos transbordos';
+            elseif ($totalDistance > $straightLine * 2.5) $inefficientReason = 'Ruta más larga que a pie';
+            else $inefficientReason = 'Similar tiempo que ir a pie';
+        }
+
         return [
-            'segments' => $segments,
-            'distance' => array_sum(array_column($segments, 'distance')),
-            'duration' => array_sum(array_column($segments, 'duration')),
-            'mode'     => 'transit',
+            'segments'          => $segments,
+            'distance'          => $totalDistance,
+            'duration'          => $totalDuration,
+            'mode'              => 'transit',
+            'inefficient'       => $inefficient,
+            'inefficient_reason'=> $inefficientReason,
         ];
     }
 
@@ -432,12 +455,12 @@ class RouteService
 
             if ($latS === 0.0 || $lngS === 0.0) continue;
 
+            // Valhalla caps exclude_locations at 50 — one midpoint per segment is enough
             $result[] = ['lon' => ($lngS + $lngE) / 2, 'lat' => ($latS + $latE) / 2];
-            $result[] = ['lon' => $lngS, 'lat' => $latS];
-            $result[] = ['lon' => $lngE, 'lat' => $latE];
         }
 
-        return $result;
+        // Hard cap at 48 to stay safely under Valhalla's limit of 50
+        return array_slice($result, 0, 48);
     }
 
     // ── Valhalla response parsing ─────────────────────────────────────────────

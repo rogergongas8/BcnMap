@@ -14,7 +14,7 @@ class CityContextService
         private EventsService     $events,
     ) {}
 
-    public function buildContext(?float $userLat = null, ?float $userLng = null): string
+    public function buildContext(?float $userLat = null, ?float $userLng = null, array $nearbyPois = []): string
     {
         $nowDt   = now('Europe/Madrid');
         $now     = $nowDt->format('d/m/Y H:i');
@@ -72,8 +72,22 @@ class CityContextService
 
         $signalsText = $signals ? "\nSEÑALES OPERATIVAS:\n- " . implode("\n- ", $signals) : '';
 
-        $bicingNote = $isRainy ? ' [lluvia → bicing NO recomendado]' : '';
+        $bicingNote  = $isRainy ? ' [lluvia → bicing NO recomendado]' : '';
         $eventsBlock = $events ? "\nEVENTOS BCN: {$events}." : '';
+
+        $poisBlock = '';
+        if (!empty($nearbyPois)) {
+            $lines = [];
+            foreach (array_slice($nearbyPois, 0, 12) as $p) {
+                $dist = isset($p['distance_m']) ? round((float)$p['distance_m']) . 'm' : '?m';
+                $addr = isset($p['address']) && $p['address'] ? ", {$p['address']}" : '';
+                $lat  = number_format((float)($p['lat'] ?? 0), 6, '.', '');
+                $lng  = number_format((float)($p['lng'] ?? 0), 6, '.', '');
+                $lines[] = "  - {$p['name']} ({$p['category']}{$addr}) — {$dist} [lat={$lat},lng={$lng}]";
+            }
+            $poisBlock = "\n\nPOIS CERCANOS AL USUARIO (en pantalla):\n" . implode("\n", $lines)
+                . "\nUsa lat/lng exactos en calculate_route para rutas a estos lugares.";
+        }
 
         return <<<EOT
         Estado actual de Barcelona ({$now}, {$weekday} {$timeOfDay}, {$season}):
@@ -87,7 +101,7 @@ class CityContextService
 
         CLIMA: {$weatherText}.
 
-        AIRE: {$airText}.{$eventsBlock}{$signalsText}
+        AIRE: {$airText}.{$eventsBlock}{$signalsText}{$poisBlock}
         EOT;
     }
 }

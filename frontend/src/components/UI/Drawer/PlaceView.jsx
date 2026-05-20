@@ -404,7 +404,7 @@ export default function PlaceView() {
       )}
 
       {/* Title block */}
-      <div className="flex items-start justify-between gap-3 px-4 pt-1 pb-2 flex-shrink-0">
+      <div className={`flex items-start justify-between gap-3 px-4 pb-2 flex-shrink-0 ${place.kind === 'poi' ? 'pt-1' : 'pt-4'}`}>
         <div className="min-w-0 flex-1">
           <h2 className="text-white text-[17px] font-semibold leading-tight tracking-tight truncate">
             {place.name}

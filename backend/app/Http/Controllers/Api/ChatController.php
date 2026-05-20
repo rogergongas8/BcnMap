@@ -24,11 +24,13 @@ class ChatController extends Controller
             'conversation_history' => 'nullable|array|max:20',
             'user_lat'             => 'nullable|numeric',
             'user_lng'             => 'nullable|numeric',
+            'nearby_pois'          => 'nullable|array|max:12',
         ]);
 
         $userLat     = $request->input('user_lat') !== null ? (float) $request->input('user_lat') : null;
         $userLng     = $request->input('user_lng') !== null ? (float) $request->input('user_lng') : null;
-        $cityContext = $this->context->buildContext($userLat, $userLng);
+        $nearbyPois  = $request->input('nearby_pois', []);
+        $cityContext = $this->context->buildContext($userLat, $userLng, $nearbyPois);
 
         $result = $this->groq->chat(
             userMessage: $request->input('message'),

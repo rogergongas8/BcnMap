@@ -1,5 +1,6 @@
 import { useChatStore } from '../store/chatStore'
 import { useMapStore } from '../store/mapStore'
+import { useNearbyStore } from '../store/nearbyStore'
 import { useRouteStore } from '../store/routeStore'
 import { sendChat, fetchRoute } from '../services/api'
 import { geocodeLabel } from '../utils/geocode'
@@ -82,7 +83,8 @@ export function useChat() {
         content: m.text,
       }))
       const userLocation = useMapStore.getState().userLocation
-      const data = await sendChat(text.trim(), history, userLocation)
+      const nearbyPois   = useNearbyStore.getState().pois
+      const data = await sendChat(text.trim(), history, userLocation, nearbyPois)
       addMessage('assistant', data.reply ?? 'Sin respuesta')
       await executeMapActions(data.map_actions)
     } catch {

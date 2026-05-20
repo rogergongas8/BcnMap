@@ -14,12 +14,20 @@ export const fetchMetroLines    = () => api.get('/metro/lines').then(r => r.data
 export const fetchMetroArrivals = (stationId) => api.get(`/metro/${stationId}/arrivals`).then(r => r.data)
 export const fetchWeather    = () => api.get('/weather').then(r => r.data)
 export const fetchAirQuality = () => api.get('/air-quality').then(r => r.data)
-export const sendChat = (message, history, userLocation = null) =>
+export const sendChat = (message, history, userLocation = null, nearbyPois = []) =>
   api.post('/chat', {
     message,
     conversation_history: history,
-    user_lat: userLocation?.lat ?? null,
-    user_lng: userLocation?.lng ?? null,
+    user_lat:    userLocation?.lat ?? null,
+    user_lng:    userLocation?.lng ?? null,
+    nearby_pois: nearbyPois.slice(0, 12).map(p => ({
+      name:       p.name,
+      category:   p.category,
+      address:    p.address ?? null,
+      distance_m: p.distance_m ?? null,
+      lat:        p.lat,
+      lng:        p.lng,
+    })),
   }).then(r => r.data)
 
 export const fetchRoute = (fromLat, fromLng, toLat, toLng, mode) =>
