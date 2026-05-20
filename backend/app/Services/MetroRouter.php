@@ -6,9 +6,10 @@ use Illuminate\Support\Facades\Cache;
 
 class MetroRouter
 {
-    private array $stationMap = [];   // station_id => station data
-    private array $adjacency  = [];   // station_id => [neighbor_id => line_name]
-    private array $lineData   = [];   // line_name  => {color, geometry}
+    private array $stationMap    = [];   // station_id => station data
+    private array $adjacency     = [];   // station_id => [neighbor_id => line_name]
+    private array $lineData      = [];   // line_name  => {color, geometry}
+    private array $lineSortedIds = [];   // line_name  => [station_id, ...] sorted along geometry
 
     private const TRANSFER_PENALTY_S = 240; // 4 min per line change
     private const METRO_SPEED_MS     = 6.5; // ~23 km/h average including stops
@@ -49,6 +50,8 @@ class MetroRouter
                 $this->project((float)$a['lat'], (float)$a['lng'], $coords) <=>
                 $this->project((float)$b['lat'], (float)$b['lng'], $coords)
             );
+
+            $this->lineSortedIds[$lineName] = array_column($stns, 'station_id');
 
             for ($i = 0; $i < count($stns) - 1; $i++) {
                 $aId = $stns[$i]['station_id'];
@@ -259,5 +262,27 @@ class MetroRouter
     {
         $c = $this->lineData[$lineName]['color'] ?? '#ff6b35';
         return str_starts_with($c, '#') ? $c : '#' . $c;
+    }
+
+    /**
+     * Return the terminus station name in the direction of travel on a given line.
+     * from/to are station arrays with 'station_id' and 'station_name'.
+     */
+    public function terminus(string $lineName, array $from, array $to): ?string
+    {
+        $sorted = $this->lineSortedIds[$lineName] ?? [];
+        if (count($sorted) < 2) return null;
+
+        $fromIdx = array_search($from['station_id'], $sorted, true);
+        $toIdx   = array_search($to['station_id'],   $sorted, true);
+
+        if ($fromIdx === false || $toIdx === false) return null;
+
+        // Direction: forward (increasing index) → last station; backward → first station
+        $termId = $fromIdx < $toIdx
+            ? $sorted[count($sorted) - 1]
+            : $sorted[0];
+
+        return $this->stationMap[$termId]['station_name'] ?? null;
     }
 }

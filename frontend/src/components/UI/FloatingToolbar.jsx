@@ -205,7 +205,7 @@ function ProfileButton() {
 }
 
 export default function FloatingToolbar() {
-  const { view, openNearby, close } = useDrawerStore()
+  const { view, openNearby, openSaved, close } = useDrawerStore()
   const { activeCategory } = useNearbyStore()
   const { showBeaches, activeLayers } = (() => ({
     showBeaches:  useLeisureStore.getState().showBeaches,
@@ -216,6 +216,11 @@ export default function FloatingToolbar() {
 
   const [layersOpen, setLayersOpen] = useState(false)
   const containerRef = useRef(null)
+
+  // Close layers popover whenever the side drawer opens
+  useEffect(() => {
+    if (view) setLayersOpen(false)
+  }, [view])
 
   useEffect(() => {
     if (!layersOpen) return
@@ -229,6 +234,7 @@ export default function FloatingToolbar() {
   }, [layersOpen])
 
   const nearbyActive = view === 'nearby'
+  const savedActive  = view === 'saved'
   const hasLayersOn  = showBeachesLive || activeLayersLive.length > 0
 
   return (
@@ -248,6 +254,16 @@ export default function FloatingToolbar() {
         icon={Icons.search}
         label="Qué hay cerca"
         badge={activeCategory != null}
+      />
+
+      <ToolButton
+        active={savedActive}
+        onClick={() => {
+          setLayersOpen(false)
+          savedActive ? close() : openSaved()
+        }}
+        icon={Icons.bookmark}
+        label="Guardats"
       />
 
       <div className="relative">

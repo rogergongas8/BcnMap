@@ -7,6 +7,7 @@ export const useDrawerStore = create((set) => ({
   place: null,
 
   openNearby:    () => set({ view: 'nearby', place: null }),
+  openSaved:     () => set({ view: 'saved',  place: null }),
   openPlace:     (place) => set({ view: 'place', place }),
   back:          () => set((s) => ({ view: s.place ? 'nearby' : null, place: null })),
   close:         () => set({ view: null, place: null }),

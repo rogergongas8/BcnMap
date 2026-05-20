@@ -40,6 +40,9 @@ export const sendChat = (message, history, userLocation = null, nearbyPois = [])
 export const fetchRoute = (fromLat, fromLng, toLat, toLng, mode) =>
   api.get('/route', { params: { from_lat: fromLat, from_lng: fromLng, to_lat: toLat, to_lng: toLng, mode } }).then(r => r.data)
 
+export const fetchRoutePlan = (fromLat, fromLng, toLat, toLng, constraint = null) =>
+  api.get('/route/plan', { params: { from_lat: fromLat, from_lng: fromLng, to_lat: toLat, to_lng: toLng, constraint } }).then(r => r.data)
+
 export const fetchBeaches = () => api.get('/beaches').then(r => r.data)
 
 export const fetchPoisNearby = (lat, lng, radius = 800, categories = []) =>

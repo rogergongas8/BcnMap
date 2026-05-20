@@ -16,7 +16,7 @@ function CategoryRail() {
   const { activeCategory, setCategory } = useNearbyStore()
 
   return (
-    <div className="px-3 py-2.5 border-b border-white/[0.05]">
+    <div className="px-3 py-2.5" style={{ borderBottom: '1px solid #262626' }}>
       <div className="flex gap-1.5 overflow-x-auto scrollbar-hide pb-1 -mb-1">
         {NEARBY_CATEGORIES.map(cat => {
           const Icon   = cat.icon
@@ -25,16 +25,18 @@ function CategoryRail() {
             <button
               key={cat.id}
               onClick={() => setCategory(cat.id)}
-              className={`flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-full
-                text-[11px] tracking-wide transition-all duration-150 whitespace-nowrap
-                ${active
-                  ? 'bg-white text-black font-medium'
-                  : 'bg-white/[0.04] text-white/60 hover:text-white hover:bg-white/[0.08] border border-white/[0.06]'
-                }`}
+              className="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 whitespace-nowrap transition-all duration-150"
+              style={{
+                fontFamily: 'Syne, sans-serif',
+                fontSize: 11,
+                fontWeight: active ? 600 : 400,
+                borderRadius: 6,
+                border: `1px solid ${active ? '#E8622A' : '#262626'}`,
+                background: active ? '#E8622A' : '#1C1C1C',
+                color: active ? '#fff' : '#888',
+              }}
             >
-              <span className={active ? 'text-black' : 'text-white/55'}>
-                <Icon size={13} />
-              </span>
+              <span style={{ color: active ? '#fff' : '#555' }}><Icon size={12} /></span>
               <span>{cat.label}</span>
             </button>
           )
@@ -52,29 +54,38 @@ function PoiRow({ poi, categoryIcon, onSelect, onHover, isHovered }) {
       onClick={() => onSelect(poi)}
       onMouseEnter={() => onHover(poi.id)}
       onMouseLeave={() => onHover(null)}
-      className={`px-4 py-3 cursor-pointer transition-colors border-b border-white/[0.03]
-        ${isHovered ? 'bg-white/[0.04]' : 'hover:bg-white/[0.025]'}`}
+      className="flex cursor-pointer transition-colors"
+      style={{
+        borderBottom: '1px solid #1A1A1A',
+        background: isHovered ? '#1C1C1C' : 'transparent',
+      }}
     >
-      <div className="flex items-start gap-3">
-        <div className="w-8 h-8 rounded-lg bg-white/[0.05] border border-white/[0.06] flex items-center justify-center text-white/65 flex-shrink-0">
-          <Icon size={14} />
+      {/* Accent bar */}
+      <div className="w-[3px] flex-shrink-0 self-stretch" style={{ background: isHovered ? '#E8622A' : 'transparent', transition: 'background 0.15s' }} />
+
+      <div className="flex items-start gap-3 px-3.5 py-3 flex-1 min-w-0">
+        <div
+          className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0"
+          style={{ background: '#262626', color: '#888' }}
+        >
+          <Icon size={13} />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline justify-between gap-2">
-            <p className="text-white/95 text-[13px] font-medium leading-tight truncate">
+            <p className="font-syne text-[13px] font-medium leading-tight truncate" style={{ color: '#EBEBEB' }}>
               {poi.name}
             </p>
             {poi.distance_m != null && (
-              <span className="text-white/40 text-[10px] tabular-nums flex-shrink-0">
+              <span className="font-mono text-[10px] flex-shrink-0 tabular-nums" style={{ color: '#555' }}>
                 {formatDistance(poi.distance_m)}
               </span>
             )}
           </div>
           {poi.address && (
-            <p className="text-white/45 text-[11px] truncate mt-0.5">{poi.address}</p>
+            <p className="font-mono text-[10px] truncate mt-0.5" style={{ color: '#555' }}>{poi.address}</p>
           )}
           {poi.cuisine && (
-            <p className="text-white/35 text-[10px] mt-1 capitalize">
+            <p className="font-mono text-[10px] mt-0.5 capitalize" style={{ color: '#555' }}>
               {poi.cuisine.replace(/_/g, ' · ')}
             </p>
           )}
@@ -114,14 +125,14 @@ export default function NearbyView() {
       <div className="flex-1 overflow-y-auto min-h-0">
         {!activeCategory && (
           <div className="px-6 py-12 flex flex-col items-center text-center gap-2">
-            <div className="w-10 h-10 rounded-full bg-white/[0.04] border border-white/[0.06] flex items-center justify-center text-white/40">
-              <Icons.search size={16} />
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: '#1C1C1C', color: '#555' }}>
+              <Icons.search size={15} />
             </div>
-            <p className="text-white/55 text-[13px] leading-snug max-w-[220px]">
-              Selecciona una categoría para descubrir lugares cerca
+            <p className="font-syne text-[13px] leading-snug max-w-[200px]" style={{ color: '#888' }}>
+              Selecciona una categoría per descobrir llocs a prop
             </p>
-            <p className="text-white/25 text-[11px]">
-              {NEARBY_CATEGORIES.length} categorías disponibles
+            <p className="font-mono text-[10px]" style={{ color: '#555' }}>
+              {NEARBY_CATEGORIES.length} categories disponibles
             </p>
           </div>
         )}
@@ -130,20 +141,22 @@ export default function NearbyView() {
           <div className="px-6 py-12 flex flex-col items-center gap-3">
             <div className="flex gap-1.5">
               {[0, 140, 280].map(d => (
-                <span key={d} className="w-1.5 h-1.5 bg-white/30 rounded-full animate-bounce" style={{ animationDelay: `${d}ms` }} />
+                <span key={d} className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: '#E8622A', animationDelay: `${d}ms` }} />
               ))}
             </div>
-            <p className="text-white/35 text-[11px]">Buscando {activeMeta?.label.toLowerCase()}…</p>
+            <p className="font-mono text-[10px] uppercase tracking-[0.1em]" style={{ color: '#555' }}>
+              Cercant {activeMeta?.label.toLowerCase()}…
+            </p>
           </div>
         )}
 
         {activeCategory && !isLoading && pois.length === 0 && (
           <div className="px-6 py-12 flex flex-col items-center text-center gap-2">
-            <div className="w-10 h-10 rounded-full bg-white/[0.04] border border-white/[0.06] flex items-center justify-center text-white/40">
-              <Icons.info size={16} />
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: '#1C1C1C', color: '#555' }}>
+              <Icons.info size={15} />
             </div>
-            <p className="text-white/50 text-[13px]">Sin resultados cerca</p>
-            <p className="text-white/30 text-[11px]">Prueba con otra categoría o muévete a otra zona del mapa</p>
+            <p className="font-syne text-[13px]" style={{ color: '#888' }}>Sense resultats a prop</p>
+            <p className="font-mono text-[10px]" style={{ color: '#555' }}>Prova amb una altra categoria</p>
           </div>
         )}
 
@@ -161,15 +174,23 @@ export default function NearbyView() {
                 />
               ))}
             </ul>
-            <div className="px-4 py-3 border-t border-white/[0.05]">
+            <div className="px-4 py-3" style={{ borderTop: '1px solid #262626' }}>
               <button
                 onClick={() => openChatWithPrompt(
                   `¿Cuál de estas ${activeMeta?.label.toLowerCase() ?? 'lugares'} me recomiendas? Tengo ${pois.length} opciones cerca.`
                 )}
-                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl
-                  bg-cyan-500/[0.07] border border-cyan-500/20 text-cyan-400/80
-                  hover:bg-cyan-500/[0.12] hover:text-cyan-300 hover:border-cyan-400/35
-                  text-[12px] font-mono transition-all duration-150"
+                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 transition-colors"
+                style={{
+                  fontFamily: 'Syne, sans-serif',
+                  fontSize: 12,
+                  fontWeight: 500,
+                  borderRadius: 6,
+                  border: '1px solid #262626',
+                  background: '#1C1C1C',
+                  color: '#888',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = '#E8622A'; e.currentTarget.style.color = '#E8622A' }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = '#262626'; e.currentTarget.style.color = '#888' }}
               >
                 <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
                   <path d="M8 1.5C4.41 1.5 1.5 4.02 1.5 7.12c0 1.64.73 3.11 1.9 4.14L3 14.5l3.88-1.94c.35.07.72.1 1.12.1 3.59 0 6.5-2.52 6.5-5.54S11.59 1.5 8 1.5Z"

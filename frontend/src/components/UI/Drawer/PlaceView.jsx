@@ -203,7 +203,7 @@ function PoiBody({ place, enrich, enrichLoading }) {
       )}
 
       {/* Divider */}
-      <div className="mx-4 mt-3 mb-1 border-t border-white/[0.05]" />
+      <div className="mx-4 mt-3 mb-1" style={{ borderTop: '1px solid #1A1A1A' }} />
 
       {/* Info rows */}
       <div className="px-4 py-1">
@@ -323,23 +323,24 @@ function PinBody({ place }) {
 
 function ActionBar({ onRoute, onCopy, copied }) {
   return (
-    <div className="px-4 pt-2 pb-4 flex gap-2 flex-shrink-0 border-t border-white/[0.05]">
+    <div className="px-4 pt-2 pb-4 flex gap-2 flex-shrink-0" style={{ borderTop: '1px solid #1A1A1A' }}>
       <button
         onClick={onRoute}
-        className="flex-1 h-10 rounded-xl bg-white text-black text-[12px] font-semibold tracking-wide
-          flex items-center justify-center gap-2 hover:bg-white/90 active:scale-[0.98] transition-all"
+        className="flex-1 h-10 flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+        style={{ borderRadius: 6, background: '#E8622A', border: '1px solid #E8622A' }}
       >
-        <Icons.route size={14} />
-        <span>Cómo llegar</span>
+        <Icons.route size={13} style={{ color: '#fff' }} />
+        <span className="font-syne text-[12px] font-semibold" style={{ color: '#fff' }}>Com arribar-hi</span>
       </button>
       <button
         onClick={onCopy}
-        className="h-10 px-3.5 rounded-xl bg-white/[0.05] border border-white/[0.07]
-          text-white/60 hover:text-white hover:bg-white/[0.09] active:scale-[0.98]
-          transition-all flex items-center justify-center gap-1.5 text-[11px]"
+        className="h-10 px-3.5 flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]"
+        style={{ borderRadius: 6, background: '#1C1C1C', border: '1px solid #262626', color: '#888' }}
       >
-        <Icons.copy size={13} />
-        <span>{copied ? 'Copiado' : 'Coords'}</span>
+        <Icons.copy size={12} />
+        <span className="font-mono text-[10px] uppercase tracking-[0.08em]">
+          {copied ? 'Copiat' : 'Coords'}
+        </span>
       </button>
     </div>
   )
@@ -406,27 +407,27 @@ export default function PlaceView() {
       {/* Title block */}
       <div className={`flex items-start justify-between gap-3 px-4 pb-2 flex-shrink-0 ${place.kind === 'poi' ? 'pt-1' : 'pt-4'}`}>
         <div className="min-w-0 flex-1">
-          <h2 className="text-white text-[17px] font-semibold leading-tight tracking-tight truncate">
+          <h2 className="font-syne text-[16px] font-semibold leading-tight truncate" style={{ color: '#EBEBEB' }}>
             {place.name}
           </h2>
           {place.kind === 'poi' && place.category?.label && (
             <span
-              className="inline-block mt-1 text-[10px] font-medium px-2 py-0.5 rounded-full"
-              style={{ color: accent, background: `${accent}18` }}
+              className="inline-block mt-1 font-mono text-[9px] uppercase tracking-[0.1em] px-2 py-0.5"
+              style={{ color: accent, background: `${accent}18`, borderRadius: 3, border: `1px solid ${accent}30` }}
             >
               {place.category.label}
             </span>
           )}
           {subtitle && (
-            <p className="text-white/40 text-[11px] mt-1 leading-snug truncate">{subtitle}</p>
+            <p className="font-mono text-[10px] mt-1.5 truncate" style={{ color: '#555' }}>{subtitle}</p>
           )}
         </div>
         <button
           onClick={close}
-          className="text-white/30 hover:text-white/80 transition-colors w-8 h-8 flex items-center
-            justify-center rounded-xl hover:bg-white/[0.06] flex-shrink-0 mt-0.5"
+          className="w-7 h-7 flex items-center justify-center transition-colors flex-shrink-0 mt-0.5"
+          style={{ borderRadius: 6, color: '#555' }}
         >
-          <Icons.close size={15} />
+          <Icons.close size={13} />
         </button>
       </div>
 

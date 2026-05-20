@@ -33,10 +33,7 @@ export default function ChatPanel() {
     }
   }, [pendingPrompt])
 
-  // Ajusta el padding del mapa para que la ruta no quede tapada por el panel lateral
-  useEffect(() => {
-    setMapPadding(isOpen ? { right: 340 } : { right: 0 })
-  }, [isOpen, setMapPadding])
+  // Map padding managed centrally in App.jsx — no local setMapPadding here
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -44,38 +41,7 @@ export default function ChatPanel() {
 
   return (
     <>
-      {/* Toggle button — bottom-right, above MapControls */}
-      <AnimatePresence>
-        {!isOpen && (
-          <motion.button
-            key="chat-btn"
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.8 }}
-            transition={{ delay: hasEverOpened.current ? 0 : 4.4, duration: 0.25 }}
-            onClick={toggleChat}
-            title="Chat IA"
-            className="absolute bottom-[200px] right-4 z-40 w-10 h-10
-              flex items-center justify-center rounded-xl
-              panel-glass border border-cyan-500/25
-              text-cyan-400/70 hover:text-cyan-300 hover:border-cyan-400/50
-              transition-all duration-200"
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M8 1.5C4.41 1.5 1.5 4.02 1.5 7.12c0 1.64.73 3.11 1.9 4.14L3 14.5l3.88-1.94c.35.07.72.1 1.12.1 3.59 0 6.5-2.52 6.5-5.54S11.59 1.5 8 1.5Z"
-                stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" fill="none"/>
-              <circle cx="5.5" cy="7.5" r="0.8" fill="currentColor"/>
-              <circle cx="8" cy="7.5" r="0.8" fill="currentColor"/>
-              <circle cx="10.5" cy="7.5" r="0.8" fill="currentColor"/>
-            </svg>
-            {hasUnread && (
-              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-cyan-400 rounded-full border border-black/50" />
-            )}
-          </motion.button>
-        )}
-      </AnimatePresence>
-
-      {/* Side panel — slides in from the right edge */}
+      {/* Side panel — slides in from the right edge, below the 56px TopBar */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
@@ -84,30 +50,29 @@ export default function ChatPanel() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: '100%' }}
             transition={{ duration: 0.28, ease: [0.25, 0.46, 0.45, 0.94] }}
-            className="absolute top-0 right-0 bottom-0 z-40 w-[340px] flex flex-col
-              bg-[#0a0c10] border-l border-white/[0.07]
-              shadow-[-20px_0_60px_rgba(0,0,0,0.6)]"
+            className="absolute top-14 right-0 bottom-0 z-40 w-[340px] flex flex-col
+              border-l shadow-[-20px_0_60px_rgba(0,0,0,0.6)]"
+            style={{ background: '#141414', borderColor: '#262626' }}
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3.5 border-b border-white/[0.06] flex-shrink-0 mt-0">
-              <div className="flex items-center gap-2.5">
-                <span className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-pulse" />
-                <span className="text-white/80 text-sm font-mono tracking-wide">BCN Live AI</span>
-                <span className="text-white/20 text-[10px] font-mono">gemma2-9b</span>
+            <div className="flex items-center justify-between px-4 py-3 flex-shrink-0" style={{ borderBottom: '1px solid #262626' }}>
+              <div className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#3CB887' }} />
+                <span className="font-syne text-[13px] font-medium" style={{ color: '#EBEBEB' }}>BCN Live AI</span>
+                <span className="font-mono text-[9px]" style={{ color: '#555' }}>gemma2</span>
               </div>
               <div className="flex items-center gap-1">
                 {messages.length > 0 && (
-                  <button
-                    onClick={clearChat}
-                    title="Limpiar chat"
-                    className="text-white/20 hover:text-white/60 transition-colors text-[10px] font-mono px-1.5 py-1 rounded hover:bg-white/5"
-                  >
-                    limpiar
-                  </button>
+                  <button onClick={clearChat} className="font-mono text-[10px] px-2 py-1 rounded transition-colors" style={{ color: '#555' }}
+                    onMouseEnter={e => { e.currentTarget.style.color = '#888'; e.currentTarget.style.background = '#1C1C1C' }}
+                    onMouseLeave={e => { e.currentTarget.style.color = '#555'; e.currentTarget.style.background = 'transparent' }}
+                  >netejar</button>
                 )}
-                <button
-                  onClick={toggleChat}
-                  className="text-white/25 hover:text-white/70 transition-colors w-7 h-7 flex items-center justify-center rounded-lg hover:bg-white/[0.05] text-lg leading-none"
+                <button onClick={toggleChat}
+                  className="w-7 h-7 flex items-center justify-center rounded-lg text-lg leading-none transition-colors"
+                  style={{ color: '#555' }}
+                  onMouseEnter={e => { e.currentTarget.style.color = '#EBEBEB'; e.currentTarget.style.background = '#1C1C1C' }}
+                  onMouseLeave={e => { e.currentTarget.style.color = '#555'; e.currentTarget.style.background = 'transparent' }}
                 >×</button>
               </div>
             </div>

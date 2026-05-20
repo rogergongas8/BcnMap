@@ -13,41 +13,64 @@
     width: 100%;
     height: 100%;
     overflow: hidden;
-    background: #000;
-    font-family: 'Inter', system-ui, sans-serif;
+    background: #0e0e0e;
+    font-family: 'Syne', system-ui, sans-serif;
   }
 }
 
 @layer utilities {
+  /* Solid panel — design system "Registre" */
+  .panel {
+    background: #141414;
+    border: 1px solid #262626;
+    border-radius: 8px;
+  }
+  .panel-inner {
+    background: #1C1C1C;
+    border: 1px solid #1C1C1C;
+    border-radius: 6px;
+  }
+
+  /* Legacy glass — mantenim per compatibilitat */
   .panel-glass {
-    @apply bg-black/85 border border-white/10 backdrop-blur-md;
+    background: #141414;
+    border: 1px solid #262626;
+    border-radius: 8px;
   }
 
-  .panel-glass-premium {
-    background: linear-gradient(180deg, rgba(15, 18, 24, 0.78), rgba(0, 0, 0, 0.88));
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    backdrop-filter: blur(20px) saturate(140%);
-    -webkit-backdrop-filter: blur(20px) saturate(140%);
-    box-shadow:
-      0 1px 0 rgba(255, 255, 255, 0.04) inset,
-      0 20px 60px -20px rgba(0, 0, 0, 0.6),
-      0 0 0 1px rgba(0, 0, 0, 0.4);
+  /* Typographic utilities */
+  .font-syne { font-family: 'Syne', sans-serif; }
+  .font-imono { font-family: 'Instrument Mono', monospace; }
+
+  /* Accent bar (3px left edge on transport cards) */
+  .accent-bar {
+    width: 3px;
+    flex-shrink: 0;
+    border-radius: 1.5px 0 0 1.5px;
   }
 
-  .neon-edge::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 12px; right: 12px;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(34, 211, 238, 0.45), transparent);
-    pointer-events: none;
+  /* Text scale */
+  .text-hi   { color: #EBEBEB; }
+  .text-mid  { color: #888888; }
+  .text-lo   { color: #555555; }
+
+  /* Status badge */
+  .badge {
+    font-family: 'Instrument Mono', monospace;
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    padding: 2px 6px;
+    border-radius: 3px;
+    text-transform: uppercase;
   }
 
-  .text-neon-green { color: #00ff88; }
-  .text-neon-blue  { color: #00aaff; }
+  /* Legacy neon */
+  .text-neon-green  { color: #00ff88; }
+  .text-neon-blue   { color: #00aaff; }
   .text-neon-yellow { color: #ffcc00; }
-  .text-neon-red   { color: #ff3333; }
-  .text-neon-cyan  { color: #22d3ee; }
+  .text-neon-red    { color: #ff3333; }
+  .text-neon-cyan   { color: #22d3ee; }
 }
 
 /* Ensure MapLibre controls are always clickable above React overlays */
@@ -113,15 +136,15 @@
   mix-blend-mode: overlay;
 }
 
-/* Scrollbar (cyberpunk) */
-::-webkit-scrollbar { width: 6px; height: 6px; }
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 3px;
+  background: #262626;
+  border-radius: 2px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(34, 211, 238, 0.25);
+  background: #333333;
 }
 
 /* Beach marker (professional, monochrome SVG) */

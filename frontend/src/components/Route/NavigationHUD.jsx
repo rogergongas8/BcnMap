@@ -59,8 +59,9 @@ export default function NavigationHUD() {
         transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
         className="absolute bottom-6 left-1/2 -translate-x-1/2 z-50 w-[340px] max-w-[calc(100vw-32px)]"
       >
-        <div className="rounded-2xl bg-[#0a0c10]/95 border border-white/[0.09] shadow-[0_8px_40px_rgba(0,0,0,0.7)] backdrop-blur-xl overflow-hidden">
-
+        <div className="overflow-hidden shadow-[0_4px_32px_rgba(0,0,0,0.6)]"
+          style={{ background: '#141414', border: '1px solid #262626', borderRadius: 8 }}
+        >
           {/* Off-route warning */}
           <AnimatePresence>
             {offRoute && (
@@ -68,38 +69,45 @@ export default function NavigationHUD() {
                 initial={{ height: 0, opacity: 0 }}
                 animate={{ height: 'auto', opacity: 1 }}
                 exit={{ height: 0, opacity: 0 }}
-                className="px-4 py-2 bg-amber-500/10 border-b border-amber-500/20 flex items-center gap-2"
+                className="px-4 py-2 flex items-center gap-2"
+                style={{ background: '#C98E2E18', borderBottom: '1px solid #C98E2E44' }}
               >
-                <span className="text-amber-400 text-sm">⚠</span>
-                <span className="text-amber-300/80 text-[11px] font-mono">Fuera de ruta</span>
+                <span className="text-[12px]" style={{ color: '#C98E2E' }}>⚠</span>
+                <span className="font-mono text-[10px] uppercase tracking-[0.1em]" style={{ color: '#C98E2E' }}>
+                  Fora de ruta — recalculant
+                </span>
               </motion.div>
             )}
           </AnimatePresence>
 
           {/* Current step */}
-          <div className="px-4 py-3 flex items-center gap-4">
+          <div className="px-4 py-3.5 flex items-center gap-3.5">
             <div
-              className="w-14 h-14 rounded-xl flex items-center justify-center text-3xl flex-shrink-0"
-              style={{ background: 'rgba(34,211,238,0.08)', border: '1px solid rgba(34,211,238,0.2)' }}
+              className="w-12 h-12 rounded-lg flex items-center justify-center text-2xl flex-shrink-0"
+              style={{ background: '#1C1C1C', border: '1px solid #262626', color: '#E8622A' }}
             >
-              <span style={{ color: '#22d3ee' }}>{arrow}</span>
+              {arrow}
             </div>
 
             <div className="flex-1 min-w-0">
               {isLast ? (
                 <>
-                  <p className="text-white text-[14px] font-medium leading-snug">Has llegado a tu destino</p>
+                  <p className="font-syne text-[14px] font-semibold leading-snug" style={{ color: '#EBEBEB' }}>
+                    Has arribat al destí
+                  </p>
                   {destination?.label && (
-                    <p className="text-white/50 text-[11px] font-mono mt-0.5 truncate">{destination.label}</p>
+                    <p className="font-mono text-[10px] mt-0.5 truncate" style={{ color: '#555' }}>
+                      {destination.label}
+                    </p>
                   )}
                 </>
               ) : (
                 <>
-                  <p className="text-white text-[14px] font-medium leading-snug line-clamp-2">
-                    {step?.instruction ?? 'Continúa recto'}
+                  <p className="font-syne text-[14px] font-semibold leading-snug line-clamp-2" style={{ color: '#EBEBEB' }}>
+                    {step?.instruction ?? 'Continua recte'}
                   </p>
                   {step?.distance > 0 && (
-                    <p className="text-cyan-400/70 text-[12px] font-mono mt-0.5">
+                    <p className="font-mono text-[11px] mt-0.5" style={{ color: '#E8622A' }}>
                       en {fmtDist(step.distance)}
                     </p>
                   )}
@@ -109,8 +117,10 @@ export default function NavigationHUD() {
 
             <button
               onClick={stopNavigation}
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-white/30
-                hover:text-white/70 hover:bg-white/[0.06] transition-colors flex-shrink-0 text-lg"
+              className="w-8 h-8 rounded-md flex items-center justify-center transition-colors flex-shrink-0 text-lg"
+              style={{ background: '#1C1C1C', border: '1px solid #262626', color: '#555' }}
+              onMouseEnter={e => { e.currentTarget.style.color = '#D45555' }}
+              onMouseLeave={e => { e.currentTarget.style.color = '#555' }}
             >
               ×
             </button>
@@ -118,19 +128,25 @@ export default function NavigationHUD() {
 
           {/* Next step + total remaining */}
           {!isLast && (
-            <div className="px-4 py-2.5 border-t border-white/[0.05] flex items-center justify-between gap-4">
+            <div className="px-4 py-2.5 flex items-center justify-between gap-4"
+              style={{ borderTop: '1px solid #1A1A1A' }}
+            >
               <div className="flex items-center gap-2 min-w-0">
                 {next && (
                   <>
-                    <span className="text-white/25 text-xs flex-shrink-0">después</span>
-                    <span className="text-white/45 text-[11px] font-mono truncate">{next.instruction}</span>
+                    <span className="font-mono text-[9px] uppercase tracking-[0.1em] flex-shrink-0" style={{ color: '#555' }}>
+                      després
+                    </span>
+                    <span className="font-mono text-[10px] truncate" style={{ color: '#888' }}>
+                      {next.instruction}
+                    </span>
                   </>
                 )}
               </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <span className="text-white/30 text-[10px] font-mono">{fmtDist(totalLeft)}</span>
-                <span className="text-white/20 text-[10px]">·</span>
-                <span className="text-white/30 text-[10px] font-mono">
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <span className="font-mono text-[10px]" style={{ color: '#555' }}>{fmtDist(totalLeft)}</span>
+                <span style={{ color: '#333' }}>·</span>
+                <span className="font-mono text-[10px]" style={{ color: '#555' }}>
                   {fmtTime(steps.slice(currentStepIndex).reduce((a, s) => a + (s.duration ?? 0), 0))}
                 </span>
               </div>

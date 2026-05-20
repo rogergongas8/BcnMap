@@ -23,6 +23,50 @@ class RouteService
 
     // ── Public API ────────────────────────────────────────────────────────────
 
+    public function planMultimodal(float $fromLat, float $fromLng, float $toLat, float $toLng, ?string $constraint = null): array
+    {
+        $options = [];
+        foreach (['foot', 'bicing', 'bus', 'car'] as $mode) {
+            try {
+                $result = $this->calculate($fromLat, $fromLng, $toLat, $toLng, $mode);
+                $options[$mode] = isset($result['error']) ? null : $result;
+            } catch (\Throwable) {
+                $options[$mode] = null;
+            }
+        }
+
+        return [
+            'recommended' => $this->scoreRoutes($options, $constraint),
+            'options'     => $options,
+        ];
+    }
+
+    private function scoreRoutes(array $options, ?string $constraint): string
+    {
+        $weather    = Cache::get('weather_current');
+        $isRainy    = $weather && preg_match('/rain|lluvio|lluvia|shower/i', $weather['description'] ?? '');
+        $congestion = $this->currentCongestion();
+        $noMetro    = $constraint && preg_match('/sin metro|no metro/i', $constraint);
+        $noBici     = $constraint && preg_match('/sin bici|no bici/i', $constraint);
+
+        $scores = [];
+        foreach ($options as $mode => $route) {
+            if (!$route) { $scores[$mode] = PHP_INT_MAX; continue; }
+            $score    = (float)($route['duration'] ?? PHP_INT_MAX);
+            $distance = (float)($route['distance'] ?? 0);
+            if ($mode === 'car'    && $congestion > 60) $score *= 1.5;
+            if ($mode === 'bicing' && $isRainy)         $score *= 3.0;
+            if ($mode === 'foot'   && $distance > 3000) $score *= 1.8;
+            if ($mode === 'bicing' && $noBici)          $score  = PHP_INT_MAX;
+            if ($mode === 'bus'    && $noMetro)         $score  = PHP_INT_MAX;
+            $scores[$mode] = $score;
+        }
+
+        $min  = min($scores);
+        $best = array_keys(array_filter($scores, fn($s) => $s === $min));
+        return $best[0] ?? 'foot';
+    }
+
     public function calculate(float $fromLat, float $fromLng, float $toLat, float $toLng, string $mode): array
     {
         return match ($mode) {
@@ -299,6 +343,7 @@ class RouteService
                     'to_lat'          => (float)$to['lat'], 'to_lng' => (float)$to['lng'],
                     'lines'           => [$lineName],
                     'line_colors'     => [$lineName => $color],
+                    'direction'       => $router->terminus($lineName, $from, $to),
                 ],
             ];
         }

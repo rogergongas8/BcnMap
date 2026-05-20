@@ -3,7 +3,7 @@ import { useMapStore } from '../store/mapStore'
 import { useNearbyStore } from '../store/nearbyStore'
 import { useRouteStore } from '../store/routeStore'
 import { useDrawerStore } from '../store/drawerStore'
-import { sendChat, fetchRoute } from '../services/api'
+import { sendChat, fetchRoute, fetchRoutePlan } from '../services/api'
 import { geocodeLabel } from '../utils/geocode'
 
 const BCN_HOME = { lat: 41.3851, lng: 2.1734, zoom: 13 }
@@ -40,6 +40,44 @@ async function executeMapActions(actions) {
           meta:     nearby,
           category: action.category ? { label: action.category } : null,
         })
+      }
+
+    } else if (action.type === 'plan_trip') {
+      const userLoc = useMapStore.getState().userLocation
+
+      let origin = null
+      if (action.origin_lat != null && action.origin_lng != null) {
+        origin = { lat: action.origin_lat, lng: action.origin_lng, label: action.origin_label ?? 'Mi ubicación' }
+      } else if (userLoc) {
+        origin = { ...userLoc, label: 'Mi ubicación' }
+      } else if (action.origin_label) {
+        origin = await geocodeLabel(action.origin_label + ' Barcelona')
+      }
+
+      let dest = null
+      if (action.dest_lat != null && action.dest_lng != null) {
+        dest = { lat: action.dest_lat, lng: action.dest_lng, label: action.dest_label ?? 'Destino' }
+      } else if (action.dest_label) {
+        dest = await geocodeLabel(action.dest_label + ' Barcelona')
+      }
+
+      if (!origin || !dest) continue
+
+      useMapStore.getState().flyTo({ lat: dest.lat, lng: dest.lng, zoom: 14 })
+
+      try {
+        const plan = await fetchRoutePlan(origin.lat, origin.lng, dest.lat, dest.lng, action.constraint ?? null)
+        const { setOrigin, setDestination, setMode, setChatRequest } = useRouteStore.getState()
+        setOrigin(origin)
+        setDestination(dest)
+        setMode(plan.recommended ?? 'foot')
+        setChatRequest({ origin, destination: dest, mode: plan.recommended ?? 'foot', plan })
+      } catch {
+        const { setOrigin, setDestination, setMode, setChatRequest } = useRouteStore.getState()
+        setOrigin(origin)
+        setDestination(dest)
+        setMode('foot')
+        setChatRequest({ origin, destination: dest, mode: 'foot', route: null })
       }
 
     } else if (action.type === 'calculate_route') {

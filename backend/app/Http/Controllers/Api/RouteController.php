@@ -34,4 +34,25 @@ class RouteController extends Controller
 
         return response()->json($result);
     }
+
+    public function plan(Request $request): JsonResponse
+    {
+        $request->validate([
+            'from_lat'   => 'required|numeric|between:-90,90',
+            'from_lng'   => 'required|numeric|between:-180,180',
+            'to_lat'     => 'required|numeric|between:-90,90',
+            'to_lng'     => 'required|numeric|between:-180,180',
+            'constraint' => 'nullable|string|max:200',
+        ]);
+
+        $result = $this->routeService->planMultimodal(
+            (float) $request->input('from_lat'),
+            (float) $request->input('from_lng'),
+            (float) $request->input('to_lat'),
+            (float) $request->input('to_lng'),
+            $request->input('constraint'),
+        );
+
+        return response()->json($result);
+    }
 }

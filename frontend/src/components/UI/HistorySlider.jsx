@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { useTimeStore } from '../../store/timeStore'
 import { useDataStore } from '../../store/dataStore'
+import { useRouteStore } from '../../store/routeStore'
 import { fetchTraffic, fetchBicing } from '../../services/api'
 
 const BASE = (import.meta.env.VITE_API_URL ?? '') + '/api/v1'
@@ -24,6 +25,7 @@ function formatAt(iso) {
 export default function HistorySlider() {
   const { isHistorical, selectedAt, range, setRange, setHistorical, setLive } = useTimeStore()
   const { setTraffic, setBicing } = useDataStore()
+  const isNavigating = useRouteStore(s => s.isNavigating)
 
   const [value, setValue] = useState(100)
   const [loading, setLoading] = useState(false)
@@ -85,10 +87,10 @@ export default function HistorySlider() {
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.8, duration: 0.3 }}
-      className="absolute bottom-4 left-1/2 -translate-x-1/2 z-40
+      className={`absolute ${isNavigating ? 'bottom-[192px]' : 'bottom-4'} left-1/2 -translate-x-1/2 z-40
         flex items-center gap-3 px-4 py-2.5 rounded-2xl
         bg-[#0a0c10]/90 backdrop-blur-2xl border border-white/[0.08]
-        shadow-[0_0_40px_rgba(0,0,0,0.5)]"
+        shadow-[0_0_40px_rgba(0,0,0,0.5)]`}
       style={{ minWidth: 320, maxWidth: 480 }}
     >
       {/* Live indicator / button */}
