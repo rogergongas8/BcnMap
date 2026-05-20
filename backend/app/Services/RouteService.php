@@ -271,22 +271,43 @@ class RouteService
 
         $originStation  = $this->nearestPoint($metroStations, $fromLat, $fromLng);
         $destCandidates = array_values(array_filter($metroStations, fn($s) => $s['station_id'] !== ($originStation['station_id'] ?? null)));
-        $destStation    = $this->nearestPoint($destCandidates ?: $metroStations, $toLat, $toLng);
 
-        if (!$originStation || !$destStation) {
+        if (!$originStation || empty($destCandidates)) {
             return $this->singleSegment('pedestrian', $fromLat, $fromLng, $toLat, $toLng, 'walk');
         }
 
         $router = new MetroRouter();
-        $legs   = $router->route($originStation, $destStation);
 
-        if (!$legs) {
-            $legs = [[
-                'line'         => ($originStation['lines'][0]['name'] ?? 'M'),
-                'from_station' => $originStation,
-                'to_station'   => $destStation,
-            ]];
+        // Try the 5 nearest destination stations and keep the one with fewest transfers (then shortest duration)
+        usort($destCandidates, fn($a, $b) =>
+            $this->haversine($toLat, $toLng, (float)$a['lat'], (float)$a['lng']) <=>
+            $this->haversine($toLat, $toLng, (float)$b['lat'], (float)$b['lng'])
+        );
+        $topDest = array_slice($destCandidates, 0, 5);
+
+        $bestLegs      = null;
+        $bestTransfers = PHP_INT_MAX;
+        $bestDist      = PHP_FLOAT_MAX;
+        $destStation   = $topDest[0];
+
+        foreach ($topDest as $candidate) {
+            $legs = $router->route($originStation, $candidate);
+            if (!$legs) continue;
+            $transfers = count($legs) - 1;
+            $dist = $this->haversine((float)$candidate['lat'], (float)$candidate['lng'], $toLat, $toLng);
+            if ($transfers < $bestTransfers || ($transfers === $bestTransfers && $dist < $bestDist)) {
+                $bestLegs      = $legs;
+                $bestTransfers = $transfers;
+                $bestDist      = $dist;
+                $destStation   = $candidate;
+            }
         }
+
+        $legs = $bestLegs ?? [[
+            'line'         => ($originStation['lines'][0]['name'] ?? 'M'),
+            'from_station' => $originStation,
+            'to_station'   => $destStation,
+        ]];
 
         $firstFrom = $legs[0]['from_station'];
         $lastTo    = $legs[count($legs) - 1]['to_station'];
@@ -365,15 +386,15 @@ class RouteService
         $transfers       = count(array_filter($segments, fn($s) => $s['type'] === 'metro')) - 1;
 
         // Flag as inefficient when metro doesn't save meaningful time over walking,
-        // or when the routed distance is >2.5× the straight-line distance (backtracking)
+        // or when the routed distance is >3.5× the straight-line distance (excessive backtracking)
         $inefficient = $totalDuration > $walkEstimateSec * 0.85
-            || $totalDistance > $straightLine * 2.5
-            || $transfers >= 2;
+            || $totalDistance > $straightLine * 3.5
+            || $transfers >= 3;
 
         $inefficientReason = null;
         if ($inefficient) {
-            if ($transfers >= 2) $inefficientReason = 'Muchos transbordos';
-            elseif ($totalDistance > $straightLine * 2.5) $inefficientReason = 'Ruta más larga que a pie';
+            if ($transfers >= 3) $inefficientReason = 'Muchos transbordos';
+            elseif ($totalDistance > $straightLine * 3.5) $inefficientReason = 'Ruta más larga que a pie';
             else $inefficientReason = 'Similar tiempo que ir a pie';
         }
 
