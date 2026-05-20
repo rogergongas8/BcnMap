@@ -7,8 +7,10 @@ services:
     ports:
       - "5173:5173"
     volumes:
-      - ./frontend:/app
-      - /app/node_modules
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - ./frontend/index.html:/app/index.html
+      - ./frontend/vite.config.js:/app/vite.config.js
     environment:
       - VITE_API_URL=http://localhost:8000
       - VITE_REVERB_APP_KEY=bcnlive_key
@@ -17,7 +19,6 @@ services:
       - VITE_REVERB_SCHEME=http
     depends_on:
       - backend
-
   backend:
     build:
       context: ./backend
