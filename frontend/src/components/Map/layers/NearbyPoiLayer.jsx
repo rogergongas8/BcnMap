@@ -1,92 +1,143 @@
 import { useEffect, useRef } from 'react'
-import maplibregl from 'maplibre-gl'
 import { useMapStore } from '../../../store/mapStore'
-import { useNearbyStore } from '../../../store/nearbyStore'
+import { useNearbyStore, NEARBY_CATEGORIES } from '../../../store/nearbyStore'
 import { useDrawerStore } from '../../../store/drawerStore'
-import { iconHtml, POI_CATEGORY_COLORS } from '../../UI/icons'
+import { POI_CATEGORY_COLORS } from '../../UI/icons'
 
-function buildElement(poi, onHover) {
-  const el = document.createElement('div')
-  el.className = 'bcn-poi'
-  el.title = poi.name
-  const color = POI_CATEGORY_COLORS[poi.category] ?? 'rgba(255,255,255,0.85)'
-  const icon  = iconHtml(poi.category, { size: 13, stroke: color, strokeWidth: 1.8 })
-  el.innerHTML = `<span class="bcn-poi-dot">${icon}</span>`
-  el.addEventListener('mouseenter', () => onHover(poi.id))
-  el.addEventListener('mouseleave', () => onHover(null))
-  return el
+const SRC     = 'nearby-pois'
+const LYR     = 'nearby-pois-circle'
+const LYR_HOV = 'nearby-pois-hover'
+
+function toGeoJSON(pois) {
+  return {
+    type: 'FeatureCollection',
+    features: pois.map(poi => ({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [poi.lng, poi.lat] },
+      properties: {
+        id:    poi.id,
+        color: POI_CATEGORY_COLORS[poi.category] ?? '#ffffff',
+        _poi:  JSON.stringify(poi),
+      },
+    })),
+  }
 }
 
 export default function NearbyPoiLayer() {
   const mapInstance = useMapStore(s => s.mapInstance)
   const isLoaded    = useMapStore(s => s.isLoaded)
+  const styleKey    = useMapStore(s => s.styleKey)
   const pois        = useNearbyStore(s => s.pois)
   const hoveredId   = useNearbyStore(s => s.hoveredId)
   const setHovered  = useNearbyStore(s => s.setHovered)
 
-  // Use refs for callbacks so markers never need rebuilding when they change
   const openPlaceRef = useRef(useDrawerStore.getState().openPlace)
   const flyToRef     = useRef(useMapStore.getState().flyTo)
-  const setHoveredRef = useRef(setHovered)
-
   useEffect(() => { openPlaceRef.current = useDrawerStore.getState().openPlace })
   useEffect(() => { flyToRef.current = useMapStore.getState().flyTo })
-  useEffect(() => { setHoveredRef.current = setHovered }, [setHovered])
 
-  // Map from poi.id → { marker, element }
-  const markersRef = useRef(new Map())
-
-  // Rebuild markers only when the POI list changes
+  // Build source + layers after map load or style change
   useEffect(() => {
     if (!mapInstance || !isLoaded) return
 
-    const prev    = markersRef.current
-    const nextIds = new Set(pois.map(p => p.id))
-
-    // Remove stale markers
-    for (const [id, { marker }] of prev) {
-      if (!nextIds.has(id)) {
-        marker.remove()
-        prev.delete(id)
-      }
-    }
-
-    // Add new markers
-    for (const poi of pois) {
-      if (prev.has(poi.id)) continue
-
-      const el = buildElement(poi, (id) => setHoveredRef.current(id))
-
-      el.addEventListener('click', (e) => {
-        e.stopPropagation()
-        flyToRef.current({ lat: poi.lat, lng: poi.lng, zoom: 16 })
-        openPlaceRef.current({
-          kind: 'poi', id: poi.id, name: poi.name,
-          lat: poi.lat, lng: poi.lng,
-          address: poi.address, meta: poi,
-        })
+    const onClick = (e) => {
+      if (!e.features?.length) return
+      e.preventDefault?.()
+      const poi    = JSON.parse(e.features[0].properties._poi)
+      const catMeta = NEARBY_CATEGORIES.find(c => c.id === poi.category)
+      flyToRef.current({ lat: poi.lat, lng: poi.lng, zoom: 16 })
+      openPlaceRef.current({
+        kind:     'poi',
+        id:       poi.id,
+        name:     poi.name,
+        lat:      poi.lat,
+        lng:      poi.lng,
+        address:  poi.address,
+        meta:     poi,
+        category: catMeta ?? { id: poi.category, label: poi.category },
       })
-
-      const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
-        .setLngLat([poi.lng, poi.lat])
-        .addTo(mapInstance)
-
-      prev.set(poi.id, { marker, element: el })
     }
 
-    // Cleanup only on unmount
+    const onEnter = (e) => {
+      mapInstance.getCanvas().style.cursor = 'pointer'
+      setHovered(e.features?.[0]?.properties?.id ?? null)
+    }
+
+    const onLeave = () => {
+      mapInstance.getCanvas().style.cursor = ''
+      setHovered(null)
+    }
+
+    try {
+      if (!mapInstance.getSource(SRC)) {
+        mapInstance.addSource(SRC, { type: 'geojson', data: toGeoJSON([]) })
+      }
+
+      if (!mapInstance.getLayer(LYR)) {
+        mapInstance.addLayer({
+          id: LYR, type: 'circle', source: SRC,
+          paint: {
+            'circle-radius': [
+              'interpolate', ['linear'], ['zoom'],
+              11, 4, 14, 7, 17, 10,
+            ],
+            'circle-color':        ['get', 'color'],
+            'circle-opacity':      0.92,
+            'circle-stroke-width': 1.5,
+            'circle-stroke-color': 'rgba(10,12,16,0.88)',
+          },
+        })
+        mapInstance.on('click',      LYR, onClick)
+        mapInstance.on('mouseenter', LYR, onEnter)
+        mapInstance.on('mouseleave', LYR, onLeave)
+      }
+
+      if (!mapInstance.getLayer(LYR_HOV)) {
+        mapInstance.addLayer({
+          id: LYR_HOV, type: 'circle', source: SRC,
+          filter: ['==', 1, 0],
+          paint: {
+            'circle-radius': [
+              'interpolate', ['linear'], ['zoom'],
+              11, 8, 14, 12, 17, 15,
+            ],
+            'circle-color':        'rgba(0,0,0,0)',
+            'circle-opacity':      1,
+            'circle-stroke-width': 2,
+            'circle-stroke-color': 'rgba(56,189,248,0.9)',
+          },
+        })
+      }
+
+      mapInstance.getSource(SRC)?.setData(toGeoJSON(pois))
+    } catch (err) {
+      console.error('[NearbyPoiLayer] setup error:', err)
+    }
+
     return () => {
-      for (const { marker } of markersRef.current.values()) marker.remove()
-      markersRef.current = new Map()
+      try { mapInstance.off('click',      LYR, onClick) } catch (_) {}
+      try { mapInstance.off('mouseenter', LYR, onEnter) } catch (_) {}
+      try { mapInstance.off('mouseleave', LYR, onLeave) } catch (_) {}
+      try { if (mapInstance.getLayer(LYR_HOV)) mapInstance.removeLayer(LYR_HOV) } catch (_) {}
+      try { if (mapInstance.getLayer(LYR))     mapInstance.removeLayer(LYR)     } catch (_) {}
+      try { if (mapInstance.getSource(SRC))    mapInstance.removeSource(SRC)    } catch (_) {}
     }
-  }, [mapInstance, isLoaded, pois]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [mapInstance, isLoaded, styleKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Update hover class directly on DOM — no marker rebuild
+  // Update GeoJSON when pois change — no layer rebuild, no drift
   useEffect(() => {
-    for (const [id, { element }] of markersRef.current) {
-      element.classList.toggle('is-hovered', id === hoveredId)
-    }
-  }, [hoveredId])
+    if (!mapInstance || !isLoaded) return
+    mapInstance.getSource(SRC)?.setData(toGeoJSON(pois))
+  }, [pois, mapInstance, isLoaded])
+
+  // Hover ring: update filter only — zero JS overhead per frame
+  useEffect(() => {
+    if (!mapInstance || !isLoaded) return
+    if (!mapInstance.getLayer(LYR_HOV)) return
+    mapInstance.setFilter(LYR_HOV,
+      hoveredId != null ? ['==', ['get', 'id'], hoveredId] : ['==', 1, 0]
+    )
+  }, [hoveredId, mapInstance, isLoaded])
 
   return null
 }

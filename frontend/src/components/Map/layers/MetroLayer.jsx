@@ -75,7 +75,9 @@ export default function MetroLayer({ onHover }) {
           data: buildLinesGeojson(metroLines),
         })
 
-        // Glow de línea
+        // Insert line layers before 3D buildings so the Z-buffer doesn't occlude them in pitched view
+        const beforeLayer = mapInstance.getLayer('buildings-3d') ? 'buildings-3d' : undefined
+
         mapInstance.addLayer({
           id: LYR_LINES_GLOW,
           type: 'line',
@@ -87,7 +89,7 @@ export default function MetroLayer({ onHover }) {
             'line-opacity': 0.3,
             'line-blur':    4,
           },
-        })
+        }, beforeLayer)
 
         mapInstance.addLayer({
           id: LYR_LINES,
@@ -99,7 +101,7 @@ export default function MetroLayer({ onHover }) {
             'line-width':   ['interpolate', ['linear'], ['zoom'], 10, 2, 14, 3, 16, 4.5],
             'line-opacity': 0.95,
           },
-        })
+        }, beforeLayer)
       } else {
         mapInstance.getSource(SRC_LINES).setData(buildLinesGeojson(metroLines))
       }

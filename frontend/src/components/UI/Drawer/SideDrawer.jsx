@@ -1,12 +1,22 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useDrawerStore } from '../../../store/drawerStore'
+import { useMapStore } from '../../../store/mapStore'
 import { Icons } from '../icons'
 import NearbyView from './NearbyView'
 import PlaceView from './PlaceView'
 
+// Drawer is 340px wide, starts at left-[68px] — pad map so content stays visible
+const DRAWER_PADDING = { left: 420, top: 0, right: 0, bottom: 0 }
+const NO_PADDING     = { left: 0,   top: 0, right: 0, bottom: 0 }
+
 export default function SideDrawer() {
   const { view, close } = useDrawerStore()
+  const setMapPadding   = useMapStore(s => s.setMapPadding)
+
+  useEffect(() => {
+    setMapPadding(view ? DRAWER_PADDING : NO_PADDING)
+  }, [view, setMapPadding])
 
   const title = view === 'nearby' ? 'Qué hay cerca' : null
 

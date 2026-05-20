@@ -4,7 +4,7 @@ import { useDrawerStore } from '../../store/drawerStore'
 import { reverseGeocode } from '../../utils/reverseGeocode'
 
 const INTERACTIVE_LAYER_PATTERNS = [
-  /^bicing/, /^metro/, /^bus/, /^route/, /^user-location/,
+  /^bicing/, /^metro/, /^bus/, /^route/, /^user-location/, /^nearby-pois/,
 ]
 
 export default function MapClickHandler() {

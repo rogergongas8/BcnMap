@@ -1009,7 +1009,7 @@ export default function SearchBar() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
             transition={{ duration: 0.25 }}
-            onClick={enterSearch}
+            onClick={showActiveInPill ? () => setPhase('options') : enterSearch}
             className="absolute top-4 left-1/2 -translate-x-1/2 z-40
               flex items-center gap-2.5 px-5 py-2.5
               panel-glass rounded-full transition-all

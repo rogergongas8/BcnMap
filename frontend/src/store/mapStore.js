@@ -36,9 +36,15 @@ export const useMapStore = create((set) => ({
       center:  center  ?? state.center,
     })),
 
-  flyTo: ({ lat, lng, zoom = 15 }) =>
+  flyTo: ({ lat, lng, zoom = 15, pitch } = {}) =>
     set((state) => {
-      state.mapInstance?.flyTo({ center: [lng, lat], zoom, pitch: 50, duration: 1800 })
+      const currentPitch = state.mapInstance?.getPitch() ?? state.pitch
+      state.mapInstance?.flyTo({
+        center:   [lng, lat],
+        zoom,
+        pitch:    pitch ?? currentPitch,
+        duration: 1800,
+      })
       return {}
     }),
 

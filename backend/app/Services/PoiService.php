@@ -169,12 +169,18 @@ class PoiService
     private function fetchFromOverpass(float $lat, float $lng, int $radiusM, array $categories): array
     {
         try {
+            // number_format forces period as decimal separator regardless of server locale.
+            // sprintf('%F') is locale-aware on some PHP/OS combinations and can output
+            // commas, which breaks the Overpass around: filter and returns global results.
+            $latStr = number_format($lat, 6, '.', '');
+            $lngStr = number_format($lng, 6, '.', '');
+
             $clauses = [];
             foreach ($categories as $cat) {
                 foreach (self::CATEGORY_TAGS[$cat] as [$k, $v]) {
-                    $clauses[] = sprintf('node["%s"="%s"](around:%d,%F,%F);',     $k, $v, $radiusM, $lat, $lng);
-                    $clauses[] = sprintf('way["%s"="%s"](around:%d,%F,%F);',      $k, $v, $radiusM, $lat, $lng);
-                    $clauses[] = sprintf('relation["%s"="%s"](around:%d,%F,%F);', $k, $v, $radiusM, $lat, $lng);
+                    $clauses[] = sprintf('node["%s"="%s"](around:%d,%s,%s);',     $k, $v, $radiusM, $latStr, $lngStr);
+                    $clauses[] = sprintf('way["%s"="%s"](around:%d,%s,%s);',      $k, $v, $radiusM, $latStr, $lngStr);
+                    $clauses[] = sprintf('relation["%s"="%s"](around:%d,%s,%s);', $k, $v, $radiusM, $latStr, $lngStr);
                 }
             }
 

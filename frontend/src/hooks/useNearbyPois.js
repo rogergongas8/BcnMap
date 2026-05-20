@@ -12,7 +12,6 @@ export function useNearbyPois() {
   const setPois        = useNearbyStore(s => s.setPois)
   const setLoading     = useNearbyStore(s => s.setLoading)
   const userLocation   = useMapStore(s => s.userLocation)
-  const mapInstance    = useMapStore(s => s.mapInstance)
   const tokenRef       = useRef(0)
 
   const doFetch = useCallback((center) => {
@@ -34,34 +33,24 @@ export function useNearbyPois() {
       })
   }, [activeCategory, setPois, setLoading])
 
-  // Fetch when category or user location changes
+  // When category is selected, center map on user (or current map center) with flat view
+  useEffect(() => {
+    if (!activeCategory) return
+    const { flyTo, userLocation: loc, mapInstance } = useMapStore.getState()
+    const mapCenter = mapInstance?.getCenter()
+    const target = loc ?? (mapCenter ? { lat: mapCenter.lat, lng: mapCenter.lng } : BCN_CENTER)
+    flyTo({ lat: target.lat, lng: target.lng, zoom: 14, pitch: 0 })
+  }, [activeCategory])
+
+  // Fetch when category or user location changes (not on map pan)
   useEffect(() => {
     if (!activeCategory) { setPois([]); return }
 
+    const mapCenter = useMapStore.getState().mapInstance?.getCenter()
     const center = userLocation
-      ?? (mapInstance ? { lat: mapInstance.getCenter().lat, lng: mapInstance.getCenter().lng } : BCN_CENTER)
+      ?? (mapCenter ? { lat: mapCenter.lat, lng: mapCenter.lng } : BCN_CENTER)
 
     doFetch(center)
-  }, [activeCategory, userLocation, mapInstance, doFetch, setPois])
+  }, [activeCategory, userLocation, doFetch, setPois])
 
-  // Re-fetch when the map is panned/zoomed (debounced 600ms) — only if no user GPS
-  useEffect(() => {
-    if (!activeCategory || !mapInstance || userLocation) return
-
-    let timer = null
-
-    const onMoveEnd = () => {
-      clearTimeout(timer)
-      timer = setTimeout(() => {
-        const c = mapInstance.getCenter()
-        doFetch({ lat: c.lat, lng: c.lng })
-      }, 600)
-    }
-
-    mapInstance.on('moveend', onMoveEnd)
-    return () => {
-      mapInstance.off('moveend', onMoveEnd)
-      clearTimeout(timer)
-    }
-  }, [activeCategory, mapInstance, userLocation, doFetch])
 }
