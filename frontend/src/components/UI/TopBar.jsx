@@ -21,6 +21,7 @@ const DATA_LAYERS = [
   { id: 'bicing',  label: 'Bicing',  color: '#00aaff' },
   { id: 'bus',     label: 'Bus',     color: '#FF6B35' },
   { id: 'metro',   label: 'Metro',   color: '#A855F7' },
+  { id: 'events',  label: 'Esdeveniments', color: '#C98E2E' },
 ]
 
 const CARD_STYLE = {

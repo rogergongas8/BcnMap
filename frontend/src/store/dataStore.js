@@ -6,6 +6,7 @@ export const useDataStore = create((set) => ({
   bus: [],
   metro: [],
   metroLines: [],
+  events: [],
   weather: null,
   airQuality: null,
   lastUpdated: null,
@@ -15,6 +16,7 @@ export const useDataStore = create((set) => ({
   setBus:        (data) => set({ bus: data }),
   setMetro:      (data) => set({ metro: data }),
   setMetroLines: (data) => set({ metroLines: data }),
+  setEvents:     (data) => set({ events: data }),
   setWeather:    (data) => set({ weather: data }),
   setAirQuality: (data) => set({ airQuality: data }),
 }))

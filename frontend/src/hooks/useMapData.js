@@ -1,12 +1,12 @@
 import { useEffect } from 'react'
 import { useDataStore } from '../store/dataStore'
 import { useTimeStore } from '../store/timeStore'
-import { fetchTraffic, fetchBicing, fetchBus, fetchMetro, fetchMetroLines, fetchWeather, fetchAirQuality } from '../services/api'
+import { fetchTraffic, fetchBicing, fetchBus, fetchMetro, fetchMetroLines, fetchWeather, fetchAirQuality, fetchEventsToday } from '../services/api'
 
 const POLL_INTERVAL = 120_000 // 2 min
 
 export function useMapData() {
-  const { setTraffic, setBicing, setBus, setMetro, setMetroLines, setWeather, setAirQuality } = useDataStore()
+  const { setTraffic, setBicing, setBus, setMetro, setMetroLines, setEvents, setWeather, setAirQuality } = useDataStore()
 
   async function loadAll() {
     if (useTimeStore.getState().isHistorical) return
@@ -30,17 +30,21 @@ export function useMapData() {
     if (air.status === 'fulfilled')      setAirQuality(air.value)
   }
 
-  // Las líneas de metro son datos estáticos — cargar solo una vez
-  async function loadMetroLines() {
+  // Datos estáticos o de baja frecuencia — cargar solo una vez al inicio
+  async function loadStatic() {
     try {
       const lines = await fetchMetroLines()
       setMetroLines(lines)
+    } catch {}
+    try {
+      const events = await fetchEventsToday()
+      setEvents(Array.isArray(events) ? events : [])
     } catch {}
   }
 
   useEffect(() => {
     loadAll()
-    loadMetroLines()
+    loadStatic()
     const interval = setInterval(loadAll, POLL_INTERVAL)
     return () => clearInterval(interval)
   }, [])

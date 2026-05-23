@@ -189,6 +189,58 @@ function BicingTooltip({ object }) {
   )
 }
 
+const EVENT_COLORS = {
+  musica:      '#C98E2E',
+  esport:      '#3CB887',
+  cultura:     '#8B6AD4',
+  gastronomia: '#E8622A',
+  familia:     '#4D84D4',
+  altres:      '#6B6055',
+}
+
+const EVENT_CAT_LABELS = {
+  musica: 'Música', esport: 'Esport', cultura: 'Cultura',
+  gastronomia: 'Gastronomia', familia: 'Família', altres: 'Altres',
+}
+
+function EventTooltip({ object }) {
+  const color = EVENT_COLORS[object.category] ?? EVENT_COLORS.altres
+  const catLabel = EVENT_CAT_LABELS[object.category] ?? object.category
+
+  const formatDate = (iso) => {
+    if (!iso) return null
+    const d = new Date(iso)
+    return d.toLocaleDateString('ca', { day: 'numeric', month: 'short' })
+  }
+
+  return (
+    <Card accent={color}>
+      <div className="flex items-center gap-1.5 mb-1.5">
+        <span
+          className="font-mono text-[8px] uppercase tracking-[0.12em] px-1.5 py-0.5 rounded"
+          style={{ background: color + '22', color, border: `1px solid ${color}44` }}
+        >
+          {catLabel}
+        </span>
+      </div>
+      <p className="font-syne text-[13px] font-medium leading-snug mb-1" style={{ color: '#EBEBEB' }}>
+        {object.title}
+      </p>
+      {object.place && (
+        <p className="font-mono text-[10px] truncate" style={{ color: '#666' }}>
+          {object.place}
+        </p>
+      )}
+      {object.start && (
+        <p className="font-mono text-[9px] mt-1.5" style={{ color: '#555' }}>
+          {formatDate(object.start)}
+          {object.end && object.end !== object.start && ` → ${formatDate(object.end)}`}
+        </p>
+      )}
+    </Card>
+  )
+}
+
 function TrafficTooltip({ object }) {
   const estado = object.estado ?? ''
   const color  = estado === 'fluido' ? C.green : estado === 'lento' ? C.amber : estado === 'congestionado' ? C.red : '#D45555'
@@ -218,7 +270,9 @@ export default function Tooltip({ info }) {
   const { x, y, object } = info
 
   let content
-  if (object.type === 'metro' || object.type === 'tram' || object.type === 'fgc') {
+  if (object.type === 'event') {
+    content = <EventTooltip object={object} />
+  } else if (object.type === 'metro' || object.type === 'tram' || object.type === 'fgc') {
     content = <MetroTooltip object={object} />
   } else if (object.type === 'bus') {
     content = <BusTooltip object={object} />

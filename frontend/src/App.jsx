@@ -12,6 +12,7 @@ import AirQualityLayer from './components/Map/layers/AirQualityLayer'
 import BeachLayer from './components/Map/layers/BeachLayer'
 import NearbyPoiLayer from './components/Map/layers/NearbyPoiLayer'
 import RouteLayer from './components/Map/layers/RouteLayer'
+import EventsLayer from './components/Map/layers/EventsLayer'
 import UserLocationLayer from './components/Map/layers/UserLocationLayer'
 import PinLayer from './components/Map/layers/PinLayer'
 
@@ -70,6 +71,7 @@ function AppContent() {
       <BeachLayer />
       <NearbyPoiLayer />
       <RouteLayer />
+      <EventsLayer onHover={setHoverInfo} />
       <UserLocationLayer />
       <PinLayer />
 
