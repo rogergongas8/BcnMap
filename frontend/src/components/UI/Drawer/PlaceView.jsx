@@ -8,11 +8,18 @@ import { fetchPlaceEnrich } from '../../../services/api'
 
 /* ── Constants ─────────────────────────────────────────────────────────── */
 
-const FLAG_LABEL = { green: 'Bandera verde', yellow: 'Bandera amarilla', red: 'Bandera roja' }
-const FLAG_DOT   = { green: 'bg-emerald-400', yellow: 'bg-amber-400', red: 'bg-rose-400' }
-const OCC_LABEL  = { low: 'Poca afluencia', medium: 'Afluencia moderada', high: 'Mucha afluencia' }
-const OCC_TEXT   = { low: 'text-emerald-300', medium: 'text-amber-300', high: 'text-rose-300' }
-const OCC_BAR    = { low: 'bg-emerald-400', medium: 'bg-amber-400', high: 'bg-rose-400' }
+const C = {
+  orange: '#E8622A',
+  blue:   '#4D84D4',
+  green:  '#3CB887',
+  amber:  '#C98E2E',
+  red:    '#D45555',
+}
+
+const FLAG_LABEL = { green: 'Bandera verda', yellow: 'Bandera groga', red: 'Bandera vermella' }
+const FLAG_COLOR = { green: C.green, yellow: C.amber, red: C.red }
+const OCC_LABEL  = { low: 'Poca afluència', medium: 'Afluència moderada', high: 'Molta afluència' }
+const OCC_COLOR  = { low: C.green, medium: C.amber, high: C.red }
 
 const CATEGORY_ICONS = {
   restaurant: Icons.restaurant, cafe: Icons.cafe, bar: Icons.bar,
@@ -23,14 +30,33 @@ const CATEGORY_ICONS = {
 
 /* ── Small helpers ──────────────────────────────────────────────────────── */
 
-function MetaRow({ icon: Icon, children }) {
-  if (!children) return null
+function DataRow({ label, value, color, pct }) {
   return (
-    <div className="flex items-start gap-2.5 py-1.5">
-      <span className="text-white/30 mt-0.5 flex-shrink-0"><Icon size={13} /></span>
-      <span className="text-white/70 text-[12px] leading-snug min-w-0 break-words">{children}</span>
+    <div>
+      <div className="flex items-baseline justify-between mb-1">
+        <span className="font-mono text-[9px] uppercase tracking-[0.12em]" style={{ color: '#555' }}>{label}</span>
+        <span className="font-mono text-[11px] font-medium" style={{ color: color ?? '#EBEBEB' }}>{value}</span>
+      </div>
+      {pct != null && (
+        <div className="h-[2px] w-full rounded-full" style={{ background: '#262626' }}>
+          <div className="h-full rounded-full transition-all duration-700"
+            style={{ width: `${Math.min(100, Math.max(0, pct))}%`, background: color ?? '#888' }} />
+        </div>
+      )}
     </div>
   )
+}
+
+function MetaRow({ icon: Icon, children, href }) {
+  if (!children) return null
+  const content = (
+    <div className="flex items-start gap-2.5 py-1.5">
+      <span className="flex-shrink-0 mt-0.5" style={{ color: '#555' }}><Icon size={13} /></span>
+      <span className="font-mono text-[11px] leading-snug min-w-0 break-words" style={{ color: '#888' }}>{children}</span>
+    </div>
+  )
+  if (href) return <a href={href} target="_blank" rel="noreferrer" className="block hover:opacity-80 transition-opacity">{content}</a>
+  return content
 }
 
 function StarRating({ rating }) {
@@ -45,20 +71,20 @@ function StarRating({ rating }) {
         {half && <StarHalf />}
         {Array.from({ length: empty }).map((_, i) => <StarEmpty key={`e${i}`} />)}
       </div>
-      <span className="text-white/85 text-[13px] font-semibold tabular-nums">{rating.toFixed(1)}</span>
+      <span className="font-mono text-[12px] font-semibold tabular-nums" style={{ color: '#EBEBEB' }}>{rating.toFixed(1)}</span>
     </div>
   )
 }
 
-const StarFull  = () => <svg width="12" height="12" viewBox="0 0 12 12" fill="#fbbf24"><path d="M6 1l1.4 2.8 3.1.45-2.25 2.2.53 3.1L6 8.1 3.22 9.55l.53-3.1L1.5 4.25l3.1-.45z"/></svg>
-const StarHalf  = () => <svg width="12" height="12" viewBox="0 0 12 12"><path d="M6 1l1.4 2.8 3.1.45-2.25 2.2.53 3.1L6 8.1V1z" fill="#fbbf24"/><path d="M6 1L4.6 3.8l-3.1.45 2.25 2.2-.53 3.1L6 8.1V1z" fill="rgba(255,255,255,0.1)"/></svg>
-const StarEmpty = () => <svg width="12" height="12" viewBox="0 0 12 12" fill="rgba(255,255,255,0.12)"><path d="M6 1l1.4 2.8 3.1.45-2.25 2.2.53 3.1L6 8.1 3.22 9.55l.53-3.1L1.5 4.25l3.1-.45z"/></svg>
+const StarFull  = () => <svg width="11" height="11" viewBox="0 0 12 12" fill="#C98E2E"><path d="M6 1l1.4 2.8 3.1.45-2.25 2.2.53 3.1L6 8.1 3.22 9.55l.53-3.1L1.5 4.25l3.1-.45z"/></svg>
+const StarHalf  = () => <svg width="11" height="11" viewBox="0 0 12 12"><path d="M6 1l1.4 2.8 3.1.45-2.25 2.2.53 3.1L6 8.1V1z" fill="#C98E2E"/><path d="M6 1L4.6 3.8l-3.1.45 2.25 2.2-.53 3.1L6 8.1V1z" fill="#1C1C1C"/></svg>
+const StarEmpty = () => <svg width="11" height="11" viewBox="0 0 12 12" fill="#262626"><path d="M6 1l1.4 2.8 3.1.45-2.25 2.2.53 3.1L6 8.1 3.22 9.55l.53-3.1L1.5 4.25l3.1-.45z"/></svg>
 
 /* ── Photo / Hero ───────────────────────────────────────────────────────── */
 
 function PlaceHero({ photos, category }) {
-  const [idx, setIdx]       = useState(0)
-  const [loaded, setLoaded] = useState(false)
+  const [idx,      setIdx]      = useState(0)
+  const [loaded,   setLoaded]   = useState(false)
   const [imgError, setImgError] = useState(false)
 
   const showPhoto = photos?.length > 0 && !imgError
@@ -68,30 +94,18 @@ function PlaceHero({ photos, category }) {
 
   if (!showPhoto) {
     return (
-      <div
-        className="relative w-full h-[130px] flex-shrink-0 flex items-center justify-center overflow-hidden"
-        style={{ background: `linear-gradient(135deg, ${accent}22 0%, ${accent}08 100%)` }}
-      >
-        <div
-          className="w-16 h-16 rounded-2xl flex items-center justify-center"
-          style={{ background: `${accent}18`, boxShadow: `0 0 40px ${accent}30` }}
-        >
-          <span style={{ color: accent, opacity: 0.9 }}>
-            <CatIcon size={32} />
-          </span>
+      <div className="relative w-full h-[120px] flex-shrink-0 flex items-center justify-center overflow-hidden"
+        style={{ background: `linear-gradient(135deg, ${accent}18 0%, ${accent}06 100%)`, borderBottom: '1px solid #262626' }}>
+        <div className="w-14 h-14 rounded-xl flex items-center justify-center"
+          style={{ background: `${accent}14`, boxShadow: `0 0 32px ${accent}28` }}>
+          <span style={{ color: accent, opacity: 0.85 }}><CatIcon size={28} /></span>
         </div>
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background: `radial-gradient(ellipse at 50% 50%, ${accent}12 0%, transparent 70%)`,
-          }}
-        />
       </div>
     )
   }
 
   return (
-    <div className="relative w-full h-[160px] bg-white/[0.03] overflow-hidden flex-shrink-0">
+    <div className="relative w-full h-[150px] overflow-hidden flex-shrink-0" style={{ borderBottom: '1px solid #262626' }}>
       <AnimatePresence mode="wait">
         <motion.img
           key={photos[idx]}
@@ -100,20 +114,19 @@ function PlaceHero({ photos, category }) {
           initial={{ opacity: 0, scale: 1.04 }}
           animate={{ opacity: loaded ? 1 : 0, scale: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.35 }}
+          transition={{ duration: 0.32 }}
           onLoad={() => setLoaded(true)}
           onError={() => setImgError(true)}
           className="w-full h-full object-cover"
         />
       </AnimatePresence>
-      <div className="absolute inset-0 bg-gradient-to-t from-[#0a0c10]/70 via-transparent to-transparent pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-t from-[#141414]/80 via-transparent to-transparent pointer-events-none" />
       {photos.length > 1 && (
-        <div className="absolute bottom-2.5 left-0 right-0 flex justify-center gap-1.5">
+        <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1.5">
           {photos.map((_, i) => (
-            <button
-              key={i}
-              onClick={() => { setIdx(i); setLoaded(false) }}
-              className={`w-1.5 h-1.5 rounded-full transition-all ${i === idx ? 'bg-white scale-125' : 'bg-white/40'}`}
+            <button key={i} onClick={() => { setIdx(i); setLoaded(false) }}
+              className="w-1.5 h-1.5 rounded-full transition-all"
+              style={{ background: i === idx ? '#fff' : 'rgba(255,255,255,0.3)', transform: i === idx ? 'scale(1.3)' : 'scale(1)' }}
             />
           ))}
         </div>
@@ -127,7 +140,6 @@ function PlaceHero({ photos, category }) {
 function usePlaceEnrich(place) {
   const [data, setData]       = useState(null)
   const [loading, setLoading] = useState(false)
-
   useEffect(() => {
     if (place?.kind !== 'poi') { setData(null); return }
     let cancelled = false
@@ -139,52 +151,82 @@ function usePlaceEnrich(place) {
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [place?.id])
-
   return { data, loading }
 }
 
-/* ── POI body ───────────────────────────────────────────────────────────── */
+/* ── Tabs ───────────────────────────────────────────────────────────────── */
 
-function PoiBody({ place, enrich, enrichLoading }) {
+const TABS = [
+  { id: 'info',      label: 'Info' },
+  { id: 'horaris',   label: 'Horaris' },
+  { id: 'ruta',      label: 'Com arribar-hi' },
+]
+
+function TabBar({ active, onChange }) {
+  return (
+    <div className="flex flex-shrink-0" style={{ borderBottom: '1px solid #262626' }}>
+      {TABS.map(tab => (
+        <button
+          key={tab.id}
+          onClick={() => onChange(tab.id)}
+          className="flex-1 py-2.5 font-mono text-[10px] uppercase tracking-[0.1em] transition-colors relative"
+          style={{ color: active === tab.id ? '#EBEBEB' : '#555' }}
+        >
+          {tab.label}
+          {active === tab.id && (
+            <motion.div
+              layoutId="tab-underline"
+              className="absolute bottom-0 left-3 right-3 h-[2px] rounded-full"
+              style={{ background: '#E8622A' }}
+              transition={{ type: 'spring', stiffness: 400, damping: 38 }}
+            />
+          )}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/* ── Tab: Info ──────────────────────────────────────────────────────────── */
+
+function InfoTab({ place, enrich, enrichLoading }) {
   const m = place.meta ?? {}
-  const website      = enrich?.website      ?? m.website
-  const phone        = enrich?.phone        ?? m.phone
-  const hours        = enrich?.hours        ?? m.opening_hours
+  const website      = enrich?.website ?? m.website
+  const phone        = enrich?.phone   ?? m.phone
   const cuisine      = m.cuisine
   const cleanWebsite = website ? website.replace(/^https?:\/\//, '').replace(/\/$/, '') : null
-
-  const catId  = place.category?.id ?? 'attraction'
-  const accent = POI_CATEGORY_COLORS[catId] ?? '#8b5cf6'
 
   return (
     <div className="flex-1 overflow-y-auto min-h-0">
 
-      {/* Rating / status bar */}
+      {/* Rating + status */}
       {enrichLoading ? (
-        <div className="mx-4 mt-3 mb-2 flex items-center gap-2">
+        <div className="px-4 pt-3 pb-2 flex items-center gap-2">
           {[0, 100, 200].map(d => (
-            <span key={d} className="w-1.5 h-1.5 bg-white/20 rounded-full animate-bounce" style={{ animationDelay: `${d}ms` }} />
+            <span key={d} className="w-1.5 h-1.5 rounded-full animate-bounce"
+              style={{ background: '#333', animationDelay: `${d}ms` }} />
           ))}
-          <span className="text-white/25 text-[11px]">Buscando info…</span>
+          <span className="font-mono text-[10px]" style={{ color: '#555' }}>Buscant informació…</span>
         </div>
       ) : enrich && (enrich.rating != null || enrich.is_open_now != null || enrich.price) ? (
         <motion.div
-          initial={{ opacity: 0, y: 3 }}
+          initial={{ opacity: 0, y: 4 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.2 }}
-          className="mx-4 mt-3 mb-1 flex items-center gap-3 flex-wrap"
+          className="px-4 pt-3 pb-2 flex items-center gap-3 flex-wrap"
+          style={{ borderBottom: '1px solid #1A1A1A' }}
         >
           {enrich.rating != null && <StarRating rating={enrich.rating} />}
           {enrich.price && (
-            <span className="text-white/45 text-[12px] tracking-wider">{enrich.price}</span>
+            <span className="font-mono text-[11px]" style={{ color: '#555' }}>{enrich.price}</span>
           )}
           {enrich.is_open_now != null && (
-            <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${
-              enrich.is_open_now
-                ? 'text-emerald-300 bg-emerald-500/15 border border-emerald-500/20'
-                : 'text-rose-300 bg-rose-500/15 border border-rose-500/20'
-            }`}>
-              {enrich.is_open_now ? 'Abierto ahora' : 'Cerrado'}
+            <span className="font-mono text-[9px] uppercase tracking-[0.08em] px-2 py-0.5 rounded"
+              style={{
+                color:      enrich.is_open_now ? C.green : C.red,
+                background: enrich.is_open_now ? `${C.green}18` : `${C.red}18`,
+                border:     `1px solid ${enrich.is_open_now ? C.green : C.red}44`,
+              }}>
+              {enrich.is_open_now ? 'Obert ara' : 'Tancat'}
             </span>
           )}
         </motion.div>
@@ -195,36 +237,27 @@ function PoiBody({ place, enrich, enrichLoading }) {
         <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ duration: 0.25, delay: 0.05 }}
-          className="mx-4 mt-2 mb-1 text-white/50 text-[12px] leading-relaxed line-clamp-3"
+          className="px-4 py-3 font-mono text-[11px] leading-relaxed"
+          style={{ color: '#888', borderBottom: '1px solid #1A1A1A' }}
         >
           {enrich.description}
         </motion.p>
       )}
 
-      {/* Divider */}
-      <div className="mx-4 mt-3 mb-1" style={{ borderTop: '1px solid #1A1A1A' }} />
-
-      {/* Info rows */}
-      <div className="px-4 py-1">
+      {/* Meta info */}
+      <div className="px-4 py-2">
         {cuisine && (
           <MetaRow icon={Icons.restaurant}>
             <span className="capitalize">{cuisine.replace(/_/g, ' · ')}</span>
           </MetaRow>
         )}
-        {hours && <MetaRow icon={Icons.clock}>{hours}</MetaRow>}
-        {phone && (
-          <MetaRow icon={Icons.phone}>
-            <a href={`tel:${phone}`} className="hover:text-white transition-colors">{phone}</a>
-          </MetaRow>
-        )}
+        {phone && <MetaRow icon={Icons.phone} href={`tel:${phone}`}>{phone}</MetaRow>}
         {cleanWebsite && (
-          <MetaRow icon={Icons.globe}>
-            <a href={website} target="_blank" rel="noreferrer"
-               className="hover:text-white transition-colors inline-flex items-center gap-1.5">
+          <MetaRow icon={Icons.globe} href={website}>
+            <span className="flex items-center gap-1">
               {cleanWebsite}
-              <Icons.external size={10} />
-            </a>
+              <Icons.external size={9} />
+            </span>
           </MetaRow>
         )}
         {m.distance_m != null && (
@@ -233,26 +266,159 @@ function PoiBody({ place, enrich, enrichLoading }) {
           </MetaRow>
         )}
         {m.wheelchair === 'yes' && (
-          <MetaRow icon={Icons.check}><span className="text-emerald-400/80">Accesible</span></MetaRow>
+          <MetaRow icon={Icons.check}><span style={{ color: C.green }}>Accessible</span></MetaRow>
         )}
       </div>
 
-      {/* Wikipedia link */}
       {enrich?.wiki_url && (
-        <div className="px-4 pt-1 pb-2">
+        <div className="px-4 pb-3" style={{ borderTop: '1px solid #1A1A1A' }}>
           <a href={enrich.wiki_url} target="_blank" rel="noreferrer"
-             className="inline-flex items-center gap-1.5 text-[10px] text-white/25 hover:text-white/55 transition-colors">
-            <Icons.external size={10} />
-            Ver en Wikipedia
+            className="inline-flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.1em] transition-colors"
+            style={{ color: '#555' }}
+            onMouseEnter={e => { e.currentTarget.style.color = '#888' }}
+            onMouseLeave={e => { e.currentTarget.style.color = '#555' }}>
+            <Icons.external size={9} />
+            Veure a Wikipedia
           </a>
         </div>
       )}
+    </div>
+  )
+}
 
-      {enrich?.sources?.length > 0 && (
-        <div className="px-4 pb-3">
-          <p className="text-white/12 text-[9px]">Fuentes: {enrich.sources.join(' · ')}</p>
+/* ── Tab: Horaris ───────────────────────────────────────────────────────── */
+
+function HorarisTab({ place, enrich, enrichLoading }) {
+  const hours = enrich?.hours ?? place.meta?.opening_hours
+
+  if (enrichLoading) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="flex gap-1.5">
+            {[0, 140, 280].map(d => (
+              <span key={d} className="w-1.5 h-1.5 rounded-full animate-bounce"
+                style={{ background: '#E8622A', animationDelay: `${d}ms` }} />
+            ))}
+          </div>
+          <span className="font-mono text-[10px] uppercase tracking-[0.1em]" style={{ color: '#555' }}>
+            Buscant horaris…
+          </span>
         </div>
-      )}
+      </div>
+    )
+  }
+
+  if (!hours) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center gap-2 px-6 text-center">
+        <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: '#1C1C1C', color: '#555' }}>
+          <Icons.clock size={16} />
+        </div>
+        <p className="font-syne text-[13px]" style={{ color: '#888' }}>Horari no disponible</p>
+        <p className="font-mono text-[10px]" style={{ color: '#555' }}>No tenim dades d'horari per a aquest lloc</p>
+      </div>
+    )
+  }
+
+  // Parse "Mo-Fr 09:00-20:00; Sa 09:00-14:00" style or plain text
+  const lines = typeof hours === 'string'
+    ? hours.split(';').map(s => s.trim()).filter(Boolean)
+    : []
+
+  return (
+    <div className="flex-1 overflow-y-auto min-h-0">
+      <div className="px-4 pt-3 pb-4">
+        <p className="font-mono text-[9px] uppercase tracking-[0.14em] mb-3" style={{ color: '#555' }}>Horari d'obertura</p>
+
+        {enrich?.is_open_now != null && (
+          <div className="mb-3 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full flex-shrink-0"
+              style={{ background: enrich.is_open_now ? C.green : C.red,
+                       boxShadow: `0 0 6px ${enrich.is_open_now ? C.green : C.red}` }} />
+            <span className="font-syne text-[13px] font-medium"
+              style={{ color: enrich.is_open_now ? C.green : C.red }}>
+              {enrich.is_open_now ? 'Obert ara' : 'Tancat ara'}
+            </span>
+          </div>
+        )}
+
+        {lines.length > 0 ? (
+          <div className="flex flex-col" style={{ borderRadius: 6, border: '1px solid #262626', overflow: 'hidden' }}>
+            {lines.map((line, i) => (
+              <div key={i} className="px-3 py-2 font-mono text-[11px]"
+                style={{ color: '#888', borderBottom: i < lines.length - 1 ? '1px solid #1A1A1A' : 'none' }}>
+                {line}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="font-mono text-[11px] leading-relaxed" style={{ color: '#888' }}>{hours}</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/* ── Tab: Com arribar-hi ────────────────────────────────────────────────── */
+
+const ROUTE_MODES = [
+  { id: 'foot',   label: 'A peu',  color: '#ffffff' },
+  { id: 'bicing', label: 'Bicing', color: '#E8622A' },
+  { id: 'bus',    label: 'Metro',  color: '#8B6AD4' },
+  { id: 'car',    label: 'Cotxe',  color: '#C98E2E' },
+]
+
+function RutaTab({ place, onRoute }) {
+  const [selectedMode, setSelectedMode] = useState('foot')
+
+  return (
+    <div className="flex-1 flex flex-col min-h-0">
+      <div className="px-4 pt-3 pb-2 flex-shrink-0">
+        <p className="font-mono text-[9px] uppercase tracking-[0.14em] mb-2.5" style={{ color: '#555' }}>Mode de transport</p>
+        <div className="grid grid-cols-4 gap-1">
+          {ROUTE_MODES.map(m => (
+            <button
+              key={m.id}
+              onClick={() => setSelectedMode(m.id)}
+              className="py-2 flex flex-col items-center gap-1 transition-all"
+              style={{
+                borderRadius: 6,
+                border: `1px solid ${selectedMode === m.id ? m.color + '55' : '#262626'}`,
+                background: selectedMode === m.id ? '#1C1C1C' : 'transparent',
+              }}
+            >
+              <span className="font-mono text-[9px] uppercase tracking-[0.08em]"
+                style={{ color: selectedMode === m.id ? m.color : '#555' }}>
+                {m.label}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="px-4 py-3 flex-shrink-0" style={{ borderTop: '1px solid #1A1A1A' }}>
+        <div className="p-3 rounded-lg" style={{ background: '#1C1C1C', border: '1px solid #262626' }}>
+          <p className="font-mono text-[10px]" style={{ color: '#555' }}>Destí</p>
+          <p className="font-syne text-[13px] font-medium mt-0.5 truncate" style={{ color: '#EBEBEB' }}>{place.name}</p>
+          {place.address && (
+            <p className="font-mono text-[10px] mt-0.5 truncate" style={{ color: '#555' }}>{place.address}</p>
+          )}
+        </div>
+      </div>
+
+      <div className="flex-1" />
+
+      <div className="px-4 pb-4 flex-shrink-0">
+        <button
+          onClick={() => onRoute(selectedMode)}
+          className="w-full h-11 flex items-center justify-center gap-2 font-syne text-[13px] font-semibold transition-all active:scale-[0.98]"
+          style={{ borderRadius: 6, background: '#E8622A', border: '1px solid #E8622A', color: '#fff' }}
+        >
+          <Icons.route size={14} style={{ color: '#fff' }} />
+          Calcular ruta
+        </button>
+      </div>
     </div>
   )
 }
@@ -261,42 +427,44 @@ function PoiBody({ place, enrich, enrichLoading }) {
 
 function BeachBody({ place }) {
   const b = place.meta ?? {}
+  const flagColor = FLAG_COLOR[b.flag] ?? '#888'
+  const occColor  = OCC_COLOR[b.occupancy_level] ?? '#888'
+
   return (
     <div className="flex-1 overflow-y-auto min-h-0">
-      <div className="px-4 py-3 border-t border-white/[0.05] grid grid-cols-3 gap-2">
-        {[
-          { label: 'Aire', value: `${b.weather?.temp ?? '—'}°` },
-          { label: 'Agua', value: `${b.water_temp ?? '—'}°` },
-          { label: 'Aforo', value: `${b.occupancy_pct}%`, cls: OCC_TEXT[b.occupancy_level] ?? 'text-white' },
-        ].map(({ label, value, cls }) => (
-          <div key={label} className="px-3 py-2.5 rounded-lg bg-white/[0.03] border border-white/[0.05]">
-            <p className="text-white/35 text-[9px] uppercase tracking-wider mb-1">{label}</p>
-            <p className={`text-[15px] tabular-nums font-medium ${cls ?? 'text-white'}`}>{value}</p>
-          </div>
-        ))}
+      {/* Stats grid */}
+      <div className="px-4 pt-3 pb-3 grid grid-cols-3 gap-2" style={{ borderBottom: '1px solid #1A1A1A' }}>
+        <DataRow label="Aire"  value={`${b.weather?.temp ?? '—'}°`} color="#EBEBEB" />
+        <DataRow label="Aigua" value={`${b.water_temp ?? '—'}°`}    color={C.blue} />
+        <DataRow label="Afluència" value={`${b.occupancy_pct ?? '—'}%`} color={occColor} />
       </div>
-      <div className="px-4 py-3 border-t border-white/[0.05]">
+
+      {/* Flag + occupancy */}
+      <div className="px-4 py-3" style={{ borderBottom: '1px solid #1A1A1A' }}>
         <div className="flex items-center gap-2 mb-2">
-          <span className={`w-1.5 h-1.5 rounded-full ${FLAG_DOT[b.flag] ?? 'bg-white/40'}`} />
-          <span className="text-white/85 text-[12px]">{FLAG_LABEL[b.flag] ?? b.flag}</span>
-          {b.flag_reason && <span className="text-white/35 text-[11px]">· {b.flag_reason}</span>}
+          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: flagColor }} />
+          <span className="font-syne text-[12px] font-medium" style={{ color: '#EBEBEB' }}>
+            {FLAG_LABEL[b.flag] ?? b.flag}
+          </span>
+          {b.flag_reason && <span className="font-mono text-[10px]" style={{ color: '#555' }}>· {b.flag_reason}</span>}
         </div>
-        <div className="flex items-center gap-2 mb-3">
-          <span className="text-white/55 text-[11px] flex-shrink-0 w-16">{OCC_LABEL[b.occupancy_level]}</span>
-          <div className="flex-1 h-1 bg-white/[0.05] rounded-full overflow-hidden">
-            <div className={`h-full ${OCC_BAR[b.occupancy_level] ?? 'bg-white/30'} transition-all`}
-                 style={{ width: `${b.occupancy_pct}%` }} />
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-[10px] w-24" style={{ color: '#888' }}>{OCC_LABEL[b.occupancy_level]}</span>
+          <div className="flex-1 h-[2px] rounded-full" style={{ background: '#262626' }}>
+            <div className="h-full rounded-full" style={{ width: `${b.occupancy_pct}%`, background: occColor }} />
           </div>
-          <span className="text-white/55 text-[11px] tabular-nums w-9 text-right">{b.occupancy_pct}%</span>
         </div>
       </div>
+
+      {/* Amenities */}
       {b.amenities?.length > 0 && (
-        <div className="px-4 py-3 border-t border-white/[0.05]">
-          <p className="text-white/30 text-[10px] uppercase tracking-[0.15em] mb-2.5">Servicios</p>
+        <div className="px-4 py-3">
+          <p className="font-mono text-[9px] uppercase tracking-[0.14em] mb-2" style={{ color: '#555' }}>Serveis</p>
           <div className="flex flex-wrap gap-1.5">
             {b.amenities.map(a => (
-              <span key={a} className="px-2.5 py-1 rounded-md bg-white/[0.04] border border-white/[0.06] text-white/65 text-[10px] capitalize">
-                {a === 'lifeguard' ? 'socorrista' : a === 'showers' ? 'duchas' : a === 'accessible' ? 'accesible' : a}
+              <span key={a} className="font-mono text-[9px] px-2 py-1 uppercase tracking-[0.08em]"
+                style={{ borderRadius: 4, background: '#1C1C1C', border: '1px solid #262626', color: '#888' }}>
+                {a === 'lifeguard' ? 'socorrista' : a === 'showers' ? 'dutxes' : a === 'accessible' ? 'accessible' : a}
               </span>
             ))}
           </div>
@@ -310,38 +478,11 @@ function BeachBody({ place }) {
 
 function PinBody({ place }) {
   return (
-    <div className="flex-1 px-4 py-4 border-t border-white/[0.05]">
-      <p className="text-white/30 text-[10px] uppercase tracking-[0.15em] mb-2">Coordenadas</p>
-      <p className="text-white/70 text-[12px] font-mono tabular-nums">
+    <div className="flex-1 px-4 py-4">
+      <p className="font-mono text-[9px] uppercase tracking-[0.14em] mb-2" style={{ color: '#555' }}>Coordenades</p>
+      <p className="font-mono text-[12px] tabular-nums" style={{ color: '#888' }}>
         {place.lat.toFixed(5)}, {place.lng.toFixed(5)}
       </p>
-    </div>
-  )
-}
-
-/* ── Action bar ─────────────────────────────────────────────────────────── */
-
-function ActionBar({ onRoute, onCopy, copied }) {
-  return (
-    <div className="px-4 pt-2 pb-4 flex gap-2 flex-shrink-0" style={{ borderTop: '1px solid #1A1A1A' }}>
-      <button
-        onClick={onRoute}
-        className="flex-1 h-10 flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
-        style={{ borderRadius: 6, background: '#E8622A', border: '1px solid #E8622A' }}
-      >
-        <Icons.route size={13} style={{ color: '#fff' }} />
-        <span className="font-syne text-[12px] font-semibold" style={{ color: '#fff' }}>Com arribar-hi</span>
-      </button>
-      <button
-        onClick={onCopy}
-        className="h-10 px-3.5 flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]"
-        style={{ borderRadius: 6, background: '#1C1C1C', border: '1px solid #262626', color: '#888' }}
-      >
-        <Icons.copy size={12} />
-        <span className="font-mono text-[10px] uppercase tracking-[0.08em]">
-          {copied ? 'Copiat' : 'Coords'}
-        </span>
-      </button>
     </div>
   )
 }
@@ -353,20 +494,25 @@ export default function PlaceView() {
   const back         = useDrawerStore(s => s.back)
   const close        = useDrawerStore(s => s.close)
   const userLocation = useMapStore(s => s.userLocation)
-  const [copied, setCopied] = React.useState(false)
+  const [tab,    setTab]    = useState('info')
+  const [copied, setCopied] = useState(false)
 
   const { data: enrich, loading: enrichLoading } = usePlaceEnrich(place)
 
+  // Reset tab when place changes
+  useEffect(() => { setTab('info') }, [place?.id])
+
   if (!place) return null
 
-  const handleRoute = () => {
+  const handleRoute = (mode = 'foot') => {
     const { setDestination, setOrigin, setMode, setChatRequest } = useRouteStore.getState()
-    const origin      = userLocation ? { ...userLocation, label: 'Mi ubicación' } : null
+    const origin      = userLocation ? { ...userLocation, label: 'La meva ubicació' } : null
     const destination = { lat: place.lat, lng: place.lng, label: place.name }
-    setMode('foot')
+    setMode(mode)
     if (origin) setOrigin(origin)
     setDestination(destination)
-    setChatRequest({ origin, destination, mode: 'foot', route: null })
+    setChatRequest({ origin, destination, mode, route: null })
+    close()
   }
 
   const handleCopy = () => {
@@ -380,41 +526,38 @@ export default function PlaceView() {
 
   const subtitle = place.kind === 'beach'
     ? [place.meta?.district, place.meta?.length_m ? `${place.meta.length_m}m` : null].filter(Boolean).join(' · ')
-    : place.kind === 'poi'
-      ? place.address ?? null
-      : place.address ?? `${place.lat.toFixed(5)}, ${place.lng.toFixed(5)}`
+    : place.kind === 'poi' ? (place.address ?? null)
+    : place.address ?? `${place.lat.toFixed(5)}, ${place.lng.toFixed(5)}`
+
+  const showTabs = place.kind === 'poi'
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
 
-      {/* Hero: photo carousel or category gradient */}
+      {/* Hero */}
       {place.kind === 'poi' && (
         <PlaceHero photos={enrich?.photos} category={place.category} />
       )}
 
-      {/* Back button (for POIs opened from nearby list) */}
-      {place.kind === 'poi' && (
-        <button
-          onClick={back}
-          className="px-4 pt-3 pb-1 flex items-center gap-1 text-white/40 hover:text-white/80
-            text-[11px] tracking-wide transition-colors w-fit flex-shrink-0"
-        >
-          <Icons.chevronLeft size={13} />
-          <span>Volver</span>
-        </button>
-      )}
-
       {/* Title block */}
-      <div className={`flex items-start justify-between gap-3 px-4 pb-2 flex-shrink-0 ${place.kind === 'poi' ? 'pt-1' : 'pt-4'}`}>
+      <div className="flex items-start justify-between gap-3 px-4 pt-3 pb-2.5 flex-shrink-0"
+        style={{ borderBottom: showTabs ? 'none' : '1px solid #262626' }}>
         <div className="min-w-0 flex-1">
-          <h2 className="font-syne text-[16px] font-semibold leading-tight truncate" style={{ color: '#EBEBEB' }}>
+          {place.kind === 'poi' && (
+            <button onClick={back}
+              className="flex items-center gap-1 mb-1.5 font-mono text-[9px] uppercase tracking-[0.1em] transition-colors"
+              style={{ color: '#555' }}
+              onMouseEnter={e => { e.currentTarget.style.color = '#888' }}
+              onMouseLeave={e => { e.currentTarget.style.color = '#555' }}>
+              ← Tornar
+            </button>
+          )}
+          <h2 className="font-syne text-[15px] font-semibold leading-tight" style={{ color: '#EBEBEB' }}>
             {place.name}
           </h2>
           {place.kind === 'poi' && place.category?.label && (
-            <span
-              className="inline-block mt-1 font-mono text-[9px] uppercase tracking-[0.1em] px-2 py-0.5"
-              style={{ color: accent, background: `${accent}18`, borderRadius: 3, border: `1px solid ${accent}30` }}
-            >
+            <span className="inline-block mt-1 font-mono text-[8px] uppercase tracking-[0.1em] px-1.5 py-0.5"
+              style={{ color: accent, background: `${accent}18`, borderRadius: 3, border: `1px solid ${accent}30` }}>
               {place.category.label}
             </span>
           )}
@@ -422,21 +565,64 @@ export default function PlaceView() {
             <p className="font-mono text-[10px] mt-1.5 truncate" style={{ color: '#555' }}>{subtitle}</p>
           )}
         </div>
-        <button
-          onClick={close}
-          className="w-7 h-7 flex items-center justify-center transition-colors flex-shrink-0 mt-0.5"
-          style={{ borderRadius: 6, color: '#555' }}
-        >
-          <Icons.close size={13} />
+        <button onClick={close}
+          className="w-7 h-7 flex items-center justify-center rounded-md transition-colors flex-shrink-0"
+          style={{ color: '#555' }}
+          onMouseEnter={e => { e.currentTarget.style.color = '#EBEBEB' }}
+          onMouseLeave={e => { e.currentTarget.style.color = '#555' }}>
+          <Icons.close size={12} />
         </button>
       </div>
 
-      {/* Body */}
-      {place.kind === 'poi'   && <PoiBody   place={place} enrich={enrich} enrichLoading={enrichLoading} />}
-      {place.kind === 'beach' && <BeachBody place={place} />}
-      {place.kind === 'pin'   && <PinBody   place={place} />}
+      {/* Tabs (POI only) */}
+      {showTabs && (
+        <TabBar active={tab} onChange={setTab} />
+      )}
 
-      <ActionBar onRoute={handleRoute} onCopy={handleCopy} copied={copied} />
+      {/* Tab content */}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={tab}
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -4 }}
+          transition={{ duration: 0.16, ease: [0.25, 0.46, 0.45, 0.94] }}
+          className="flex-1 flex flex-col min-h-0 overflow-hidden"
+        >
+          {/* POI tabs */}
+          {showTabs && tab === 'info' && (
+            <InfoTab place={place} enrich={enrich} enrichLoading={enrichLoading} />
+          )}
+          {showTabs && tab === 'horaris' && (
+            <HorarisTab place={place} enrich={enrich} enrichLoading={enrichLoading} />
+          )}
+          {showTabs && tab === 'ruta' && (
+            <RutaTab place={place} onRoute={handleRoute} />
+          )}
+
+          {/* Non-POI content */}
+          {place.kind === 'beach' && <BeachBody place={place} />}
+          {place.kind === 'pin'   && <PinBody   place={place} />}
+        </motion.div>
+      </AnimatePresence>
+
+      {/* Action bar — hide when ruta tab active (it has its own CTA) */}
+      {!(showTabs && tab === 'ruta') && (
+        <div className="px-4 pt-2 pb-3.5 flex gap-2 flex-shrink-0" style={{ borderTop: '1px solid #1A1A1A' }}>
+          <button onClick={() => showTabs ? setTab('ruta') : handleRoute()}
+            className="flex-1 h-10 flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+            style={{ borderRadius: 6, background: '#E8622A', border: '1px solid #E8622A' }}>
+            <Icons.route size={13} style={{ color: '#fff' }} />
+            <span className="font-syne text-[12px] font-semibold" style={{ color: '#fff' }}>Com arribar-hi</span>
+          </button>
+          <button onClick={handleCopy}
+            className="h-10 px-3 flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]"
+            style={{ borderRadius: 6, background: '#1C1C1C', border: `1px solid ${copied ? '#E8622A' : '#262626'}`, color: copied ? '#E8622A' : '#555' }}>
+            <Icons.copy size={12} />
+            <span className="font-mono text-[9px] uppercase tracking-[0.08em]">{copied ? 'Copiat' : 'Coords'}</span>
+          </button>
+        </div>
+      )}
     </div>
   )
 }

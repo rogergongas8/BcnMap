@@ -665,15 +665,60 @@ function StepSegment({ seg }) {
   )
 }
 
+/* ── Numbered turn-by-turn steps (foot / bike) ──────────────────────── */
+
+function NumberedSteps({ steps, currentStep }) {
+  if (!steps?.length) return null
+  return (
+    <div className="flex flex-col">
+      {steps.map((step, i) => {
+        const isCurrent = i === currentStep
+        return (
+          <div key={i} className="flex items-start gap-2.5 py-1.5"
+            style={{ borderBottom: i < steps.length - 1 ? '1px solid #1A1A1A' : 'none' }}>
+            {/* Step number badge */}
+            <span
+              className="w-5 h-5 rounded flex items-center justify-center font-mono text-[9px] font-semibold flex-shrink-0 mt-0.5"
+              style={{
+                background: isCurrent ? '#E8622A' : '#1C1C1C',
+                border: `1px solid ${isCurrent ? '#E8622A' : '#262626'}`,
+                color: isCurrent ? '#fff' : '#555',
+              }}
+            >
+              {i + 1}
+            </span>
+            <div className="flex-1 min-w-0">
+              <p className="font-mono text-[11px] leading-snug"
+                style={{ color: isCurrent ? '#EBEBEB' : '#888' }}>
+                {step.instruction}
+              </p>
+              {step.distance > 0 && (
+                <p className="font-mono text-[9px] mt-0.5" style={{ color: '#555' }}>
+                  {fmtDist(step.distance)}
+                </p>
+              )}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 function RouteStepPanel({ segments, origin, destination, mode }) {
-  const { isNavigating, startNavigation, stopNavigation } = useRouteStore()
-  const canNavigate = (mode === 'foot' || mode === 'bike') && segments?.[0]?.steps?.length > 0
+  const { isNavigating, startNavigation, stopNavigation, currentStepIndex } = useRouteStore()
+  const canNavigate = (mode === 'foot' || mode === 'bicing') && segments?.[0]?.steps?.length > 0
+  const isSimpleRoute = segments?.length <= 2 && (mode === 'foot' || mode === 'bicing')
 
   if (!segments?.length) return null
 
-  /* Construye la secuencia de nodos intercalados con segmentos. */
+  // For foot/bike routes with actual steps → show numbered steps
+  const allSteps = isSimpleRoute
+    ? segments.flatMap(seg => seg.steps ?? []).filter(s => s.instruction)
+    : []
+
+  /* For multimodal / transit → show transit node timeline */
   const nodes = []
-  // Nodo de origen al inicio
   nodes.push({ kind: 'origin', label: origin?.label })
 
   for (let i = 0; i < segments.length; i++) {
@@ -681,121 +726,88 @@ function RouteStepPanel({ segments, origin, destination, mode }) {
     const next = segments[i + 1]
     nodes.push({ kind: 'segment', seg })
 
-    // Nodo intermedio entre dos segmentos: estación
     if (next) {
-      // Bicing: walk → bike (estación de recogida), bike → walk (estación de devolución)
       if (seg.type === 'walk' && next.type === 'bike') {
         const m = next.meta ?? {}
-        nodes.push({
-          kind: 'bicing',
-          name: m.from_station ?? 'Estación Bicing',
-          bikes: m.bikes_available,
-          ebikes: m.ebikes_available,
-          docks: null,
-        })
+        nodes.push({ kind: 'bicing', name: m.from_station ?? 'Estació Bicing',
+          bikes: m.bikes_available, ebikes: m.ebikes_available, docks: null })
       } else if (seg.type === 'bike' && next.type === 'walk') {
         const m = seg.meta ?? {}
-        nodes.push({
-          kind: 'bicing',
-          name: m.to_station ?? 'Estación Bicing',
-          bikes: null,
-          ebikes: null,
-          docks: m.docks_available,
-        })
+        nodes.push({ kind: 'bicing', name: m.to_station ?? 'Estació Bicing',
+          bikes: null, ebikes: null, docks: m.docks_available })
       } else if (seg.type === 'walk' && (next.type === 'metro' || next.type === 'bus')) {
         const m = next.meta ?? {}
-        nodes.push({
-          kind: 'metro',
-          name: m.from_station ?? 'Estación',
-          lineNames: m.lines ?? [],
-          lineColors: m.line_colors ?? {},
-          stationId: m.from_station_id ?? null,
-          direction: m.direction ?? null,
-        })
+        nodes.push({ kind: 'metro', name: m.from_station ?? 'Estació',
+          lineNames: m.lines ?? [], lineColors: m.line_colors ?? {},
+          stationId: m.from_station_id ?? null, direction: m.direction ?? null })
       } else if ((seg.type === 'metro' || seg.type === 'bus') && (next.type === 'metro' || next.type === 'bus')) {
-        // Transfer between lines: to_station of current leg = from_station of next
         const m = seg.meta ?? {}
-        nodes.push({
-          kind: 'transfer',
-          name: m.to_station ?? 'Transbordo',
-          fromLine: seg.meta?.lines?.[0],
-          fromColor: seg.color,
-          toLine: next.meta?.lines?.[0],
-          toColor: next.color,
-          toDirection: next.meta?.direction ?? null,
-          stationId: m.to_station_id ?? null,
-        })
+        nodes.push({ kind: 'transfer', name: m.to_station ?? 'Transbord',
+          fromLine: seg.meta?.lines?.[0], fromColor: seg.color,
+          toLine: next.meta?.lines?.[0], toColor: next.color,
+          toDirection: next.meta?.direction ?? null, stationId: m.to_station_id ?? null })
       } else if ((seg.type === 'metro' || seg.type === 'bus') && next.type === 'walk') {
         const m = seg.meta ?? {}
-        nodes.push({
-          kind: 'metro',
-          name: m.to_station ?? 'Estación',
-          lineNames: m.lines ?? [],
-          lineColors: m.line_colors ?? {},
-          stationId: null,
-          direction: null,
-        })
+        nodes.push({ kind: 'metro', name: m.to_station ?? 'Estació',
+          lineNames: m.lines ?? [], lineColors: m.line_colors ?? {},
+          stationId: m.to_station_id ?? null, direction: null })
       }
     }
   }
-
-  // Nodo de destino al final
   nodes.push({ kind: 'dest', label: destination?.label })
 
+  const totalSteps = allSteps.length
+
   return (
-    <div className="mx-3 mb-3 mt-1 rounded-xl bg-white/[0.02] border border-white/[0.05] p-3 max-h-[280px] overflow-y-auto">
-      <div className="flex items-center justify-between mb-2.5">
-        <p className="text-[9px] font-mono uppercase tracking-wider text-white/35">Paso a paso</p>
+    <div className="mx-3 mb-3 mt-1 overflow-hidden"
+      style={{ borderRadius: 6, border: '1px solid #262626', background: '#1A1A1A' }}>
+
+      {/* Header */}
+      <div className="flex items-center justify-between px-3 py-2"
+        style={{ borderBottom: '1px solid #262626' }}>
+        <div className="flex items-center gap-2">
+          <p className="font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color: '#555' }}>
+            {isSimpleRoute && allSteps.length > 0 ? 'Instruccions' : 'Pas a pas'}
+          </p>
+          {isSimpleRoute && totalSteps > 0 && (
+            <span className="font-mono text-[9px]" style={{ color: '#555' }}>
+              {isNavigating ? `${currentStepIndex + 1} de ${totalSteps}` : `${totalSteps} passos`}
+            </span>
+          )}
+        </div>
         {canNavigate && (
           <button
             onClick={isNavigating ? stopNavigation : startNavigation}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-mono transition-all
-              ${isNavigating
-                ? 'bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20'
-                : 'bg-cyan-500/10 border border-cyan-500/25 text-cyan-400 hover:bg-cyan-500/20'}`}
+            className="flex items-center gap-1.5 px-2.5 py-1 font-syne text-[10px] font-semibold transition-all"
+            style={{
+              borderRadius: 5,
+              background: isNavigating ? '#D4555518' : '#E8622A',
+              border: `1px solid ${isNavigating ? '#D4555544' : '#E8622A'}`,
+              color: isNavigating ? '#D45555' : '#fff',
+            }}
           >
-            {isNavigating ? '⏹ Parar' : '▶ Navegar'}
+            {isNavigating ? 'Aturar' : 'Inici de navegació →'}
           </button>
         )}
       </div>
-      <div className="flex flex-col">
-        {nodes.map((node, idx) => {
-          if (node.kind === 'origin')  return <StepNodeOrigin  key={idx} label={node.label} />
-          if (node.kind === 'dest')    return <StepNodeDest    key={idx} label={node.label} />
-          if (node.kind === 'bicing')  return (
-            <StepNodeBicing
-              key={idx}
-              name={node.name}
-              bikes={node.bikes}
-              ebikes={node.ebikes}
-              docks={node.docks}
-            />
-          )
-          if (node.kind === 'metro')   return (
-            <StepNodeMetro
-              key={idx}
-              name={node.name}
-              lineNames={node.lineNames}
-              lineColors={node.lineColors}
-              stationId={node.stationId}
-              direction={node.direction}
-            />
-          )
-          if (node.kind === 'transfer') return (
-            <StepNodeTransfer
-              key={idx}
-              name={node.name}
-              fromLine={node.fromLine}
-              fromColor={node.fromColor}
-              toLine={node.toLine}
-              toColor={node.toColor}
-              toDirection={node.toDirection}
-              stationId={node.stationId}
-            />
-          )
-          if (node.kind === 'segment') return <StepSegment key={idx} seg={node.seg} />
-          return null
-        })}
+
+      {/* Steps */}
+      <div className="px-3 py-1.5 max-h-[240px] overflow-y-auto">
+        {isSimpleRoute && allSteps.length > 0 ? (
+          <NumberedSteps steps={allSteps} currentStep={isNavigating ? currentStepIndex : -1} />
+        ) : (
+          <div className="flex flex-col py-1">
+            {nodes.map((node, idx) => {
+              if (node.kind === 'origin')   return <StepNodeOrigin   key={idx} label={node.label} />
+              if (node.kind === 'dest')     return <StepNodeDest     key={idx} label={node.label} />
+              if (node.kind === 'bicing')   return <StepNodeBicing   key={idx} name={node.name} bikes={node.bikes} ebikes={node.ebikes} docks={node.docks} />
+              if (node.kind === 'metro')    return <StepNodeMetro    key={idx} name={node.name} lineNames={node.lineNames} lineColors={node.lineColors} stationId={node.stationId} direction={node.direction} />
+              if (node.kind === 'transfer') return <StepNodeTransfer key={idx} name={node.name} fromLine={node.fromLine} fromColor={node.fromColor} toLine={node.toLine} toColor={node.toColor} toDirection={node.toDirection} stationId={node.stationId} />
+              if (node.kind === 'segment')  return <StepSegment      key={idx} seg={node.seg} />
+              return null
+            })}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -1247,43 +1259,49 @@ export default function SearchBar({ embedded = false }) {
       </div>
     )
 
+    const pillCard = {
+      background:   '#141414',
+      border:       '1px solid #262626',
+      borderRadius: 8,
+      boxShadow:    '0 2px 16px rgba(0,0,0,0.55)',
+    }
+
     return (
       <>
         {/* ── PILL inline ── */}
         {phase === 'pill' && (
-          <div className="w-full flex items-center gap-1.5">
+          <div className="flex items-center gap-2 px-3 h-11" style={{ ...pillCard, width: 300 }}>
             <button
               onClick={showActiveInPill ? () => setPhase('options') : enterSearch}
-              className="flex-1 h-10 flex items-center gap-2.5 px-3 rounded-lg transition-all min-w-0"
-              style={{
-                background: showActiveInPill ? '#1C1C1C' : 'transparent',
-                border: `1px solid ${showActiveInPill ? activeModeMeta.color + '44' : '#262626'}`,
-              }}
+              className="flex-1 flex items-center gap-2.5 min-w-0 h-full transition-all"
             >
               {showActiveInPill ? (
                 <>
-                  <span className="w-1.5 h-1.5 rounded-full animate-pulse flex-shrink-0" style={{ background: activeModeMeta.color }} />
-                  <span className="font-syne text-[12px] font-medium truncate flex-1 text-left" style={{ color: '#EBEBEB' }}>
+                  <span className="w-2 h-2 rounded-full animate-pulse flex-shrink-0" style={{ background: activeModeMeta.color }} />
+                  <span className="font-syne text-[13px] font-medium truncate flex-1 text-left" style={{ color: '#EBEBEB' }}>
                     {destPoint?.label ?? destination?.label ?? 'Destí'}
                   </span>
-                  <span className="font-syne text-[12px] font-semibold flex-shrink-0" style={{ color: activeModeMeta.color }}>
+                  <span className="font-syne text-[13px] font-semibold flex-shrink-0" style={{ color: activeModeMeta.color }}>
                     {fmtTime(route.duration)}
                   </span>
                 </>
               ) : (
                 <>
-                  <Icon.search size={12} style={{ color: '#555', flexShrink: 0 }} />
-                  <span className="font-syne text-[12px]" style={{ color: '#555' }}>On vols anar?</span>
+                  <Icon.search size={14} style={{ color: '#444', flexShrink: 0 }} />
+                  <span className="font-syne text-[13px]" style={{ color: '#555' }}>On vols anar?</span>
                 </>
               )}
             </button>
             {showActiveInPill && (
-              <button onClick={shareRoute} title="Copiar enllaç"
-                className="w-9 h-9 flex items-center justify-center rounded-lg transition-all flex-shrink-0"
-                style={{ background: shareToast ? '#E8622A1A' : '#1C1C1C', border: `1px solid ${shareToast ? '#E8622A' : '#262626'}`, color: shareToast ? '#E8622A' : '#555' }}
-              >
-                <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><ShareIcon /></svg>
-              </button>
+              <>
+                <div className="w-px h-5 flex-shrink-0" style={{ background: '#262626' }} />
+                <button onClick={shareRoute} title="Copiar enllaç"
+                  className="w-8 h-8 flex items-center justify-center rounded-md transition-all flex-shrink-0"
+                  style={{ color: shareToast ? '#E8622A' : '#555', background: shareToast ? '#E8622A1A' : 'transparent' }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><ShareIcon /></svg>
+                </button>
+              </>
             )}
           </div>
         )}
@@ -1291,36 +1309,33 @@ export default function SearchBar({ embedded = false }) {
         {/* ── SEARCH inline ── */}
         {phase === 'search' && (
           <>
-            <div className="w-full flex items-center gap-2 h-10">
-              <button onClick={exitToPill} className="w-7 h-7 flex items-center justify-center flex-shrink-0 transition-colors" style={{ color: '#555' }}
+            <div className="flex items-center gap-2.5 px-3 h-11" style={{ ...pillCard, width: 440 }}>
+              <button onClick={exitToPill} className="flex items-center justify-center flex-shrink-0 transition-colors" style={{ color: '#555' }}
                 onMouseEnter={e => { e.currentTarget.style.color = '#EBEBEB' }} onMouseLeave={e => { e.currentTarget.style.color = '#555' }}
-              ><Icon.back size={13} /></button>
-              <div className="flex items-center gap-2 flex-1 px-3 py-2 rounded-lg min-w-0"
-                style={{ background: '#1C1C1C', border: '1px solid #3a3a3a' }}
-              >
-                <Icon.search size={12} style={{ color: '#555', flexShrink: 0 }} />
-                <input
-                  ref={destInputRef}
-                  className="flex-1 bg-transparent outline-none font-mono text-[13px] min-w-0"
-                  style={{ color: '#EBEBEB' }}
-                  placeholder="On vols anar?"
-                  value={destQuery}
-                  onChange={e => setDestQuery(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Escape') exitToPill()
-                    if (e.key === 'Enter' && destSugg[0]) handlePickDestination(destSugg[0])
-                  }}
-                />
-                {destQuery && (
-                  <button onMouseDown={e => { e.preventDefault(); setDestQuery('') }} style={{ color: '#555', flexShrink: 0 }}>
-                    <Icon.close size={11} />
-                  </button>
-                )}
-              </div>
+              ><Icon.back size={14} /></button>
+              <div className="w-px h-5 flex-shrink-0" style={{ background: '#262626' }} />
+              <Icon.search size={13} style={{ color: '#444', flexShrink: 0 }} />
+              <input
+                ref={destInputRef}
+                className="flex-1 bg-transparent outline-none font-syne text-[13px] min-w-0"
+                style={{ color: '#EBEBEB' }}
+                placeholder="On vols anar?"
+                value={destQuery}
+                onChange={e => setDestQuery(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Escape') exitToPill()
+                  if (e.key === 'Enter' && destSugg[0]) handlePickDestination(destSugg[0])
+                }}
+              />
+              {destQuery && (
+                <button onMouseDown={e => { e.preventDefault(); setDestQuery('') }} style={{ color: '#555', flexShrink: 0 }}>
+                  <Icon.close size={11} />
+                </button>
+              )}
             </div>
             {/* Suggestions dropdown */}
             {(destLoading || destSugg.length > 0) && (
-              <div style={{ ...dropdownStyle, width: 420, maxWidth: '92vw' }}>
+              <div style={{ ...dropdownStyle, width: 440, maxWidth: '92vw' }}>
                 <div style={{ background: '#141414', border: '1px solid #262626', borderRadius: 8, overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,0.7)' }}>
                   <SuggestionList items={destSugg} loading={destLoading} query={destQuery} onPick={handlePickDestination} />
                 </div>
@@ -1332,12 +1347,15 @@ export default function SearchBar({ embedded = false }) {
         {/* ── OPTIONS inline header ── */}
         {phase === 'options' && (
           <>
-            <div className="w-full flex items-center gap-2 h-10">
-              <button onClick={() => setPhase('search')} className="w-7 h-7 flex items-center justify-center flex-shrink-0 transition-colors" style={{ color: '#555' }}
+            <div className="flex items-center gap-2.5 px-3 h-11"
+              style={{ ...pillCard, width: 440, borderColor: showActiveInPill ? activeModeMeta.color + '55' : '#262626' }}
+            >
+              <button onClick={() => setPhase('search')} className="flex items-center justify-center flex-shrink-0 transition-colors" style={{ color: '#555' }}
                 onMouseEnter={e => { e.currentTarget.style.color = '#EBEBEB' }} onMouseLeave={e => { e.currentTarget.style.color = '#555' }}
-              ><Icon.back size={13} /></button>
+              ><Icon.back size={14} /></button>
+              <div className="w-px h-5 flex-shrink-0" style={{ background: '#262626' }} />
               <div className="flex-1 min-w-0">
-                <p className="font-syne text-[12px] font-medium truncate" style={{ color: '#EBEBEB' }}>{destPoint?.label ?? '—'}</p>
+                <p className="font-syne text-[13px] font-medium truncate" style={{ color: '#EBEBEB' }}>{destPoint?.label ?? '—'}</p>
                 {showActiveInPill && (
                   <p className="font-mono text-[9px] leading-none mt-0.5" style={{ color: activeModeMeta.color }}>
                     {activeModeMeta.label} · {fmtTime(route.duration)}
@@ -1345,12 +1363,12 @@ export default function SearchBar({ embedded = false }) {
                 )}
               </div>
               <button onClick={shareRoute} title="Copiar enllaç"
-                className="w-7 h-7 flex items-center justify-center flex-shrink-0 transition-colors rounded"
-                style={{ color: shareToast ? '#E8622A' : '#555' }}
+                className="w-8 h-8 flex items-center justify-center flex-shrink-0 rounded-md transition-colors"
+                style={{ color: shareToast ? '#E8622A' : '#555', background: shareToast ? '#E8622A1A' : 'transparent' }}
               >
                 <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><ShareIcon /></svg>
               </button>
-              <button onClick={exitToPill} className="w-7 h-7 flex items-center justify-center flex-shrink-0 transition-colors" style={{ color: '#555' }}
+              <button onClick={exitToPill} className="w-8 h-8 flex items-center justify-center flex-shrink-0 transition-colors rounded-md" style={{ color: '#555' }}
                 onMouseEnter={e => { e.currentTarget.style.color = '#EBEBEB' }} onMouseLeave={e => { e.currentTarget.style.color = '#555' }}
               ><Icon.close size={11} /></button>
             </div>

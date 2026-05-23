@@ -23,7 +23,6 @@ import ErrorBoundary from './components/UI/ErrorBoundary'
 import ChatPanel from './components/Chat/ChatPanel'
 import SearchBar from './components/Route/SearchBar'
 import NavigationHUD from './components/Route/NavigationHUD'
-import HistorySlider from './components/UI/HistorySlider'
 
 import { useMapData } from './hooks/useMapData'
 import { useWebSocket } from './hooks/useWebSocket'
@@ -89,7 +88,6 @@ function AppContent() {
 
       {/* ── Bottom HUDs ── */}
       <NavigationHUD />
-      <HistorySlider />
 
       {/* ── Hover tooltips ── */}
       {hoverInfo && <Tooltip info={hoverInfo} />}

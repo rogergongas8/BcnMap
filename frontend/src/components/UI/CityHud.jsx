@@ -1,7 +1,6 @@
-import React, { useState } from 'react'
+import React, { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useDataStore } from '../../store/dataStore'
-import { useChatStore } from '../../store/chatStore'
 import { useTimeStore } from '../../store/timeStore'
 
 const C = {
@@ -56,8 +55,7 @@ function DataRow({ label, value, sub, pct, color }) {
   )
 }
 
-/* ── Expanded card (variant B) ─────────────────────────────────────── */
-function HudExpanded({ weather, airQuality, traffic, bicing, now, onCollapse }) {
+function HudExpanded({ weather, airQuality, traffic, bicing, now }) {
   const congested     = traffic.filter(t => ['congestionado', 'cortado'].includes(t.estado)).length
   const congestionPct = traffic.length ? Math.round((congested / traffic.length) * 100) : 0
 
@@ -75,12 +73,9 @@ function HudExpanded({ weather, airQuality, traffic, bicing, now, onCollapse }) 
   const congLabel = congestionPct < 15 ? 'Fluid' : congestionPct < 40 ? 'Moderat' : 'Dens'
 
   return (
-    <div className="panel w-[260px] overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.5)]">
+    <div className="panel w-[260px] overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.6)]">
       {/* Header */}
-      <button
-        onClick={onCollapse}
-        className="w-full flex items-center justify-between px-3.5 py-2.5 border-b border-[#262626] hover:bg-[#1a1a1a] transition-colors"
-      >
+      <div className="w-full flex items-center justify-between px-3.5 py-2.5 border-b border-[#262626]">
         <div className="flex items-center gap-2">
           <span className="w-1.5 h-1.5 rounded-full bg-[#3CB887] animate-pulse" />
           <span className="font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color: '#555' }}>
@@ -90,7 +85,7 @@ function HudExpanded({ weather, airQuality, traffic, bicing, now, onCollapse }) 
         <span className="font-mono text-[9px]" style={{ color: '#555' }}>
           {fmtDate(now)} · {fmtTime(now)}
         </span>
-      </button>
+      </div>
 
       {/* Temperature */}
       <div className="px-3.5 py-3 border-b border-[#1a1a1a]">
@@ -117,7 +112,7 @@ function HudExpanded({ weather, airQuality, traffic, bicing, now, onCollapse }) 
       </div>
 
       {/* Data rows */}
-      <div className="px-3.5 py-3 space-y-3">
+      <div className="px-3.5 py-3 space-y-3" style={{ borderBottom: '1px solid #1A1A1A' }}>
         <DataRow
           label="Qualitat de l'aire"
           value={aqiLabel}
@@ -140,121 +135,109 @@ function HudExpanded({ weather, airQuality, traffic, bicing, now, onCollapse }) 
           color={C.orange}
         />
       </div>
+
+      {/* AQI pollutant detail */}
+      {airQuality && (airQuality.pm25 != null || airQuality.pm10 != null || airQuality.no2 != null || airQuality.o3 != null) && (
+        <div className="px-3.5 py-3">
+          <p className="font-mono text-[9px] uppercase tracking-[0.14em] mb-2.5" style={{ color: '#555' }}>
+            Contaminants
+          </p>
+          <div className="space-y-2">
+            {[
+              { label: 'PM2.5', value: airQuality.pm25,  max: 35  },
+              { label: 'PM10',  value: airQuality.pm10,  max: 50  },
+              { label: 'NO₂',   value: airQuality.no2,   max: 100 },
+              { label: 'O₃',    value: airQuality.o3,    max: 120 },
+            ].filter(r => r.value != null).map(row => {
+              const pct   = Math.min(100, (row.value / row.max) * 100)
+              const color = pct < 50 ? C.green : pct < 80 ? C.amber : C.red
+              return (
+                <div key={row.label}>
+                  <div className="flex justify-between mb-0.5">
+                    <span className="font-mono text-[9px] uppercase tracking-[0.1em]" style={{ color: '#555' }}>{row.label}</span>
+                    <span className="font-mono text-[10px] tabular-nums" style={{ color }}>{row.value.toFixed(1)}</span>
+                  </div>
+                  <div className="h-[2px] w-full rounded-full" style={{ background: '#262626' }}>
+                    <div className="h-full rounded-full transition-all duration-700"
+                      style={{ width: `${pct}%`, background: color }} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
-/* ── Compact pills (variant C) ─────────────────────────────────────── */
-function HudPills({ weather, airQuality, traffic, bicing, onExpand }) {
-  const congested     = traffic.filter(t => ['congestionado', 'cortado'].includes(t.estado)).length
-  const congestionPct = traffic.length ? Math.round((congested / traffic.length) * 100) : 0
-
-  const activeBicing  = bicing.filter(s => s.status === 'active')
-  const totalBikes    = activeBicing.reduce((a, s) => a + s.bikes_available + s.ebikes_available, 0)
-
-  const aqi      = airQuality?.aqi ?? null
-  const aqiColor = !aqi ? C.blue : aqi <= 50 ? C.green : aqi <= 100 ? C.amber : C.red
-  const congColor = congestionPct < 15 ? C.green : congestionPct < 40 ? C.amber : C.red
-
-  return (
-    <button
-      onClick={onExpand}
-      className="flex items-center gap-2 hover:opacity-90 transition-opacity"
-    >
-      {/* Weather pill */}
-      <div className="panel px-3 py-1.5 flex items-center gap-2 rounded-full shadow-[0_2px_12px_rgba(0,0,0,0.4)]">
-        <span className="w-1.5 h-1.5 rounded-full bg-[#3CB887] animate-pulse flex-shrink-0" />
-        <span className="font-syne text-[13px] font-medium" style={{ color: '#EBEBEB' }}>
-          {weather?.temp != null ? `${Math.round(weather.temp)}°` : '—'}
-        </span>
-        <span className="font-syne text-[11px]" style={{ color: '#888' }}>
-          {weather?.description ?? '—'}
-        </span>
-      </div>
-
-      {/* Stat pills */}
-      <div className="flex gap-1.5">
-        {[
-          { label: 'AQI', value: aqi ?? '—', color: aqiColor },
-          { label: 'Trànsit', value: `${congestionPct}%`, color: congColor },
-          { label: 'Bicis', value: totalBikes > 0 ? `${(totalBikes / 1000).toFixed(1)}k` : '—', color: C.orange },
-        ].map(({ label, value, color }) => (
-          <div key={label} className="panel px-2.5 py-1.5 text-center rounded-lg shadow-[0_2px_8px_rgba(0,0,0,0.35)]">
-            <p className="font-mono text-[8px] uppercase tracking-[0.1em] mb-0.5" style={{ color: '#555' }}>{label}</p>
-            <p className="font-mono text-[12px] font-medium leading-none" style={{ color }}>{value}</p>
-          </div>
-        ))}
-      </div>
-    </button>
-  )
-}
-
-/* ── Main ──────────────────────────────────────────────────────────── */
 export default function CityHud() {
   const weather     = useDataStore(s => s.weather)
   const airQuality  = useDataStore(s => s.airQuality)
   const traffic     = useDataStore(s => s.traffic)
   const bicing      = useDataStore(s => s.bicing)
   const lastUpdated = useDataStore(s => s.lastUpdated)
-  const chatOpen    = useChatStore(s => s.isOpen)
   const isHistorical = useTimeStore(s => s.isHistorical)
 
-  const [compact, setCompact] = useState(false)
+  const [open, setOpen] = useState(false)
+  const timerRef = useRef(null)
 
-  const now = lastUpdated ?? new Date()
+  const show = () => { clearTimeout(timerRef.current); setOpen(true) }
+  const hide = () => { timerRef.current = setTimeout(() => setOpen(false), 180) }
+
+  const congested     = traffic.filter(t => ['congestionado', 'cortado'].includes(t.estado)).length
+  const congestionPct = traffic.length ? Math.round((congested / traffic.length) * 100) : 0
+  const statusColor   = congestionPct < 15 ? C.green : congestionPct < 40 ? C.amber : C.red
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: -8 }}
-      animate={{ opacity: 1, y: 0, x: chatOpen ? -356 : 0 }}
-      transition={{ delay: chatOpen ? 0 : 0.3, duration: 0.26, ease: [0.25, 0.46, 0.45, 0.94] }}
-      className="absolute top-4 right-4 z-30"
-    >
-      {isHistorical && (
-        <div className="mb-2 flex justify-end">
-          <div className="panel px-3 py-1.5 flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full" style={{ background: C.amber }} />
-            <span className="font-mono text-[9px] uppercase tracking-[0.12em]" style={{ color: C.amber }}>
-              Mode Històric
-            </span>
-          </div>
-        </div>
-      )}
-
-      <AnimatePresence mode="wait">
-        {compact ? (
-          <motion.div key="pills"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 0.18 }}
+    <div className="relative" onMouseEnter={show} onMouseLeave={hide}>
+      {/* Compact pill */}
+      <div
+        className="flex items-center gap-2 h-9 px-2.5 rounded-lg cursor-default select-none transition-colors"
+        style={{ background: open ? '#1a1a1a' : 'transparent' }}
+      >
+        <span
+          className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+          style={{
+            background: isHistorical ? C.amber : statusColor,
+            boxShadow: `0 0 5px ${isHistorical ? C.amber : statusColor}`,
+          }}
+        />
+        <span className="font-syne text-[13px] font-medium" style={{ color: '#EBEBEB' }}>
+          {weather?.temp != null ? `${Math.round(weather.temp)}°` : '—'}
+        </span>
+        {weather?.description && (
+          <span
+            className="font-syne text-[11px] max-w-[72px] truncate"
+            style={{ color: '#666' }}
           >
-            <HudPills
-              weather={weather}
-              airQuality={airQuality}
-              traffic={traffic}
-              bicing={bicing}
-              onExpand={() => setCompact(false)}
-            />
-          </motion.div>
-        ) : (
-          <motion.div key="expanded"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 0.18 }}
+            {weather.description}
+          </span>
+        )}
+      </div>
+
+      {/* Hover dropdown */}
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: -6, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -6, scale: 0.97 }}
+            transition={{ duration: 0.15, ease: [0.25, 0.46, 0.45, 0.94] }}
+            className="absolute top-full right-0 mt-2 z-[60]"
+            onMouseEnter={show}
+            onMouseLeave={hide}
           >
             <HudExpanded
               weather={weather}
               airQuality={airQuality}
               traffic={traffic}
               bicing={bicing}
-              now={now}
-              onCollapse={() => setCompact(true)}
+              now={lastUpdated ?? new Date()}
             />
           </motion.div>
         )}
       </AnimatePresence>
-    </motion.div>
+    </div>
   )
 }

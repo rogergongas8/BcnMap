@@ -4,12 +4,11 @@ import { Icons } from './icons'
 import { useDrawerStore } from '../../store/drawerStore'
 import { useMapStore } from '../../store/mapStore'
 import { useLeisureStore } from '../../store/leisureStore'
-import { useDataStore } from '../../store/dataStore'
 import { useChatStore } from '../../store/chatStore'
 import { useAuthStore } from '../../store/authStore'
-import { useTimeStore } from '../../store/timeStore'
 import { useAuth } from '../../hooks/useAuth'
 import LoginModal from './LoginModal'
+import CityHud from './CityHud'
 
 const THEMES = [
   { id: 'dark',    label: 'Fosc' },
@@ -23,6 +22,15 @@ const DATA_LAYERS = [
   { id: 'bus',     label: 'Bus',     color: '#FF6B35' },
   { id: 'metro',   label: 'Metro',   color: '#A855F7' },
 ]
+
+const CARD_STYLE = {
+  background:   '#141414',
+  border:       '1px solid #262626',
+  borderRadius: 8,
+  boxShadow:    '0 2px 16px rgba(0,0,0,0.45)',
+}
+
+// ── Sub-components ────────────────────────────────────────────────────────────
 
 function IconBtn({ active, onClick, icon: Icon, label, badge }) {
   return (
@@ -116,60 +124,7 @@ function LayersDropdown({ onClose }) {
   )
 }
 
-function CityStatChips() {
-  const weather    = useDataStore(s => s.weather)
-  const airQuality = useDataStore(s => s.airQuality)
-  const bicing     = useDataStore(s => s.bicing)
-  const traffic    = useDataStore(s => s.traffic)
-  const isHistorical = useTimeStore(s => s.isHistorical)
-
-  const temp = weather?.temp != null
-    ? Math.round(weather.temp)
-    : weather?.temperature != null ? Math.round(weather.temperature) : null
-
-  const aqi      = airQuality?.aqi ?? null
-  const aqiColor = !aqi ? '#3CB887' : aqi <= 50 ? '#3CB887' : aqi <= 100 ? '#C98E2E' : '#D45555'
-
-  const bikes = Array.isArray(bicing)
-    ? bicing.reduce((a, s) => a + (s.bikes_available ?? s.num_bikes_available ?? 0), 0)
-    : null
-
-  const congested = Array.isArray(traffic) ? traffic.filter(t => ['congestionado', 'cortado'].includes(t.estado)).length : 0
-  const congPct   = traffic?.length ? Math.round((congested / traffic.length) * 100) : null
-  const congColor = congPct == null ? '#555' : congPct < 15 ? '#3CB887' : congPct < 40 ? '#C98E2E' : '#D45555'
-
-  return (
-    <div className="flex items-center gap-3">
-      {isHistorical && (
-        <div className="flex items-center gap-1 px-2 py-1" style={{ background: '#C98E2E12', border: '1px solid #C98E2E44', borderRadius: 4 }}>
-          <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#C98E2E' }} />
-          <span className="font-mono text-[9px] uppercase tracking-[0.1em]" style={{ color: '#C98E2E' }}>Històric</span>
-        </div>
-      )}
-      {temp != null && (
-        <div className="flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full animate-pulse flex-shrink-0" style={{ background: '#3CB887' }} />
-          <span className="font-mono text-[12px] font-medium" style={{ color: '#EBEBEB' }}>{temp}°</span>
-        </div>
-      )}
-      {aqi != null && (
-        <div className="flex items-center gap-1">
-          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: aqiColor }} />
-          <span className="font-mono text-[10px]" style={{ color: '#888' }}>AQI {aqi}</span>
-        </div>
-      )}
-      {congPct != null && (
-        <div className="flex items-center gap-1 hidden lg:flex">
-          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: congColor }} />
-          <span className="font-mono text-[10px]" style={{ color: '#888' }}>{congPct}%</span>
-        </div>
-      )}
-      {bikes != null && bikes > 0 && (
-        <span className="font-mono text-[10px] hidden xl:block" style={{ color: '#888' }}>🚲 {bikes.toLocaleString()}</span>
-      )}
-    </div>
-  )
-}
+// ── Profile ───────────────────────────────────────────────────────────────────
 
 function ProfileBtn() {
   const { isLogged, user } = useAuthStore()
@@ -236,12 +191,7 @@ function ProfileBtn() {
   )
 }
 
-const CARD = {
-  background: '#141414',
-  border: '1px solid #262626',
-  borderRadius: 8,
-  boxShadow: '0 2px 16px rgba(0,0,0,0.45)',
-}
+// ── TopBar ────────────────────────────────────────────────────────────────────
 
 export default function TopBar({ children }) {
   const { view, openNearby, openSaved, close } = useDrawerStore()
@@ -268,41 +218,38 @@ export default function TopBar({ children }) {
   const hasLayersOn  = showBeaches || activeLayers.length > 0
 
   return (
-    // Transparent positioning container — no background, no border
-    <div className="absolute top-0 left-0 right-0 z-50 flex items-center h-14 px-3 gap-3 overflow-visible pointer-events-none">
+    <div className="absolute top-0 left-0 right-0 z-50 flex items-center h-14 px-3 gap-2.5 overflow-visible pointer-events-none">
+      {/* ── SearchBar: absolutely centered in viewport, not flex-1 ── */}
+      <div className="absolute inset-0 flex items-center justify-center overflow-visible pointer-events-none">
+        <div className="pointer-events-auto overflow-visible">
+          {children}
+        </div>
+      </div>
 
-      {/* ── Left card: action buttons ── */}
-      <div
-        className="flex items-center gap-1 p-1.5 flex-shrink-0 pointer-events-auto"
-        style={CARD}
-      >
+      {/* ── Left: action buttons ── */}
+      <div className="flex items-center gap-1 px-1.5 flex-shrink-0 pointer-events-auto" style={{ ...CARD_STYLE, height: 44 }}>
         <IconBtn active={nearbyActive} onClick={() => nearbyActive ? close() : openNearby()} icon={Icons.search} label="Qué hay cerca" />
         <IconBtn active={savedActive}  onClick={() => savedActive  ? close() : openSaved()}  icon={Icons.bookmark} label="Guardats" />
         <div ref={layersRef} className="relative">
-          <IconBtn active={layersOpen} onClick={() => setLayersOpen(v => !v)} icon={Icons.layers} label="Capes" badge={hasLayersOn} />
+          <IconBtn active={layersOpen} onClick={() => { const next = !layersOpen; if (next && view) close(); setLayersOpen(next) }} icon={Icons.layers} label="Capes" badge={hasLayersOn} />
           <AnimatePresence>
             {layersOpen && <LayersDropdown onClose={() => setLayersOpen(false)} />}
           </AnimatePresence>
         </div>
       </div>
 
-      {/* ── Center: search pill (transparent zone, SearchBar has its own card) ── */}
-      <div className="flex-1 min-w-0 h-full flex items-center overflow-visible relative pointer-events-auto">
-        {children}
-      </div>
+      {/* ── Center: truly centered in viewport ── */}
+      <div className="flex-1 pointer-events-none" />
 
-      {/* ── Right card: city stats + profile + chat ── */}
-      <div
-        className="flex items-center gap-2 px-3 py-1.5 flex-shrink-0 pointer-events-auto"
-        style={CARD}
-      >
-        <CityStatChips />
-        <div className="w-px h-5 flex-shrink-0" style={{ background: '#262626' }} />
+      {/* ── Right: HUD + Profile + Chat ── */}
+      <div className="flex items-center gap-1 px-1.5 flex-shrink-0 pointer-events-auto" style={{ ...CARD_STYLE, height: 44 }}>
+        <CityHud />
+        <div style={{ width: 1, height: 16, background: '#262626', flexShrink: 0, margin: '0 2px' }} />
         <ProfileBtn />
         <button
           onClick={toggleChat}
           title="Chat IA"
-          className="relative w-8 h-8 flex items-center justify-center rounded-lg transition-all flex-shrink-0"
+          className="relative w-9 h-9 flex items-center justify-center rounded-lg transition-all flex-shrink-0"
           style={{
             background: chatOpen ? '#E8622A1A' : 'transparent',
             border: `1px solid ${chatOpen ? '#E8622A' : 'transparent'}`,

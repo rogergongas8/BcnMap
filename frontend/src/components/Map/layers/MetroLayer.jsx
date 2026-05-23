@@ -68,45 +68,7 @@ export default function MetroLayer({ onHover }) {
     if (!mapInstance || !isLoaded) return
 
     try {
-      // ── Líneas ──
-      if (!mapInstance.getSource(SRC_LINES)) {
-        mapInstance.addSource(SRC_LINES, {
-          type: 'geojson',
-          data: buildLinesGeojson(metroLines),
-        })
-
-        // Insert line layers before 3D buildings so the Z-buffer doesn't occlude them in pitched view
-        const beforeLayer = mapInstance.getLayer('buildings-3d') ? 'buildings-3d' : undefined
-
-        mapInstance.addLayer({
-          id: LYR_LINES_GLOW,
-          type: 'line',
-          source: SRC_LINES,
-          layout: { 'line-join': 'round', 'line-cap': 'round' },
-          paint: {
-            'line-color':   ['get', 'color'],
-            'line-width':   ['interpolate', ['linear'], ['zoom'], 10, 5, 16, 10],
-            'line-opacity': 0.3,
-            'line-blur':    4,
-          },
-        }, beforeLayer)
-
-        mapInstance.addLayer({
-          id: LYR_LINES,
-          type: 'line',
-          source: SRC_LINES,
-          layout: { 'line-join': 'round', 'line-cap': 'round' },
-          paint: {
-            'line-color':   ['get', 'color'],
-            'line-width':   ['interpolate', ['linear'], ['zoom'], 10, 2, 14, 3, 16, 4.5],
-            'line-opacity': 0.95,
-          },
-        }, beforeLayer)
-      } else {
-        mapInstance.getSource(SRC_LINES).setData(buildLinesGeojson(metroLines))
-      }
-
-      // ── Estaciones ──
+      // ── Estaciones (primero, para que LYR_STA_GLOW exista antes de insertar líneas) ──
       if (!mapInstance.getSource(SRC_STATIONS)) {
         mapInstance.addSource(SRC_STATIONS, {
           type: 'geojson',
@@ -160,27 +122,28 @@ export default function MetroLayer({ onHover }) {
 
         // Listeners
         const loadArrivals = async (props, point) => {
-          const stationId   = props.station_id
+          // Normalise to string — MapLibre coerces numeric-looking properties to numbers
+          const stationId   = String(props.station_id)
           const stationType = props.type ?? 'metro'
           activeStation.current = stationId
           lastPoint.current     = point
 
-          // Look up the full station record from the live metro array to get all lines.
-          // Avoids any MapLibre vector-tile serialisation issues with the JSON string property.
-          const stationRecord = metroRef.current.find(s => String(s.station_id) === String(stationId))
+          const stationRecord = metroRef.current.find(s => String(s.station_id) === stationId)
           const lines = stationRecord?.lines ?? (() => {
             try { return JSON.parse(props.lines ?? '[]') } catch { return [] }
           })()
 
           const baseObject = {
             type:         stationType,
-            station_id:   props.station_id,
+            station_id:   stationId,
             station_name: props.station_name,
             lines,
           }
 
-          // Tram y FGC no tienen imetro — mostrar solo nombre y líneas
-          if (stationType !== 'metro') {
+          // Overpass-sourced FGC/Tram stations (station_id like 'fgc_...' / 'tram_...')
+          // have no numeric TMB estacioId — backend returns [] immediately, no need to show loading
+          const hasNumericId = /^\d+$/.test(stationId)
+          if (!hasNumericId) {
             onHoverRef.current?.({ x: point.x, y: point.y, object: { ...baseObject, trains: [], loading: false } })
             return
           }
@@ -188,7 +151,7 @@ export default function MetroLayer({ onHover }) {
           onHoverRef.current?.({ x: point.x, y: point.y, object: { ...baseObject, trains: [], loading: true } })
 
           try {
-            const data = await fetchMetroArrivals(props.station_id)
+            const data = await fetchMetroArrivals(stationId)
             if (activeStation.current === stationId) {
               onHoverRef.current?.({
                 x: lastPoint.current.x, y: lastPoint.current.y,
@@ -214,7 +177,8 @@ export default function MetroLayer({ onHover }) {
         mapInstance.on('mousemove', LYR_STA, (e) => {
           const props = e.features[0]?.properties ?? {}
           lastPoint.current = e.point
-          if (activeStation.current !== props.station_id) {
+          // Compare as strings — MapLibre may coerce numeric properties
+          if (activeStation.current !== String(props.station_id)) {
             loadArrivals(props, e.point)
           }
         })
@@ -226,6 +190,41 @@ export default function MetroLayer({ onHover }) {
         })
       } else {
         mapInstance.getSource(SRC_STATIONS).setData(buildStationsGeojson(metro))
+      }
+
+      // ── Líneas (después de estaciones, LYR_STA_GLOW ya existe) ──
+      if (!mapInstance.getSource(SRC_LINES)) {
+        mapInstance.addSource(SRC_LINES, {
+          type: 'geojson',
+          data: buildLinesGeojson(metroLines),
+        })
+
+        mapInstance.addLayer({
+          id: LYR_LINES_GLOW,
+          type: 'line',
+          source: SRC_LINES,
+          layout: { 'line-join': 'round', 'line-cap': 'round' },
+          paint: {
+            'line-color':   ['get', 'color'],
+            'line-width':   ['interpolate', ['linear'], ['zoom'], 10, 8, 16, 14],
+            'line-opacity': 0.25,
+            'line-blur':    6,
+          },
+        }, LYR_STA_GLOW)
+
+        mapInstance.addLayer({
+          id: LYR_LINES,
+          type: 'line',
+          source: SRC_LINES,
+          layout: { 'line-join': 'round', 'line-cap': 'round' },
+          paint: {
+            'line-color':   ['get', 'color'],
+            'line-width':   ['interpolate', ['linear'], ['zoom'], 10, 2.5, 14, 4, 16, 6],
+            'line-opacity': 1,
+          },
+        }, LYR_STA_GLOW)
+      } else {
+        mapInstance.getSource(SRC_LINES).setData(buildLinesGeojson(metroLines))
       }
 
     } catch (err) {

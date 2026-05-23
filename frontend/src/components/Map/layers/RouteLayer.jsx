@@ -214,6 +214,11 @@ export default function RouteLayer() {
       }
     }
 
+    // Ensure buildings render below route lines (fill-extrusion can occlude 2D layers in pitched views)
+    if (segIds.current.length > 0 && mapInstance.getLayer('buildings-3d')) {
+      try { mapInstance.moveLayer('buildings-3d', segIds.current[0] + '-glow') } catch (_) {}
+    }
+
     // ───────────── Marcadores origen / destino ─────────────
     const allCoords = segments.flatMap(s => s.geometry?.coordinates ?? [])
 

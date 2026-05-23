@@ -179,7 +179,7 @@ class RouteService
             return $this->singleSegment('pedestrian', $fromLat, $fromLng, $toLat, $toLng, 'bike');
         }
 
-        $originStation = $this->nearestStation($stations, $fromLat, $fromLng, 'bikes');
+        $originStation = $this->bestOriginStation($stations, $fromLat, $fromLng, $toLat, $toLng);
         $destStation   = $this->nearestStation($stations, $toLat, $toLng, 'docks');
 
         if (!$originStation || !$destStation || $originStation['station_id'] === $destStation['station_id']) {
@@ -645,12 +645,46 @@ class RouteService
 
     private function nearestStation(array $stations, float $lat, float $lng, string $prefer): ?array
     {
-        $field     = $prefer === 'bikes' ? 'bikes_available' : 'docks_available';
-        $available = array_values(array_filter($stations, fn($s) => ($s[$field] ?? 0) > 0 && ($s['status'] ?? '') === 'active'));
+        if ($prefer === 'bikes') {
+            $available = array_values(array_filter($stations, fn($s) =>
+                (($s['bikes_available'] ?? 0) + ($s['ebikes_available'] ?? 0)) > 0
+                && ($s['status'] ?? '') === 'active'
+            ));
+        } else {
+            $available = array_values(array_filter($stations, fn($s) =>
+                ($s['docks_available'] ?? 0) > 0 && ($s['status'] ?? '') === 'active'
+            ));
+        }
         if (empty($available)) {
             $available = array_values(array_filter($stations, fn($s) => ($s['status'] ?? '') === 'active'));
         }
         return $this->nearestPoint($available, $lat, $lng);
+    }
+
+    /**
+     * Pick the best origin Bicing station accounting for direction to destination.
+     * Scores each candidate as walk_distance + 0.35 * bike_distance_to_dest,
+     * reflecting that cycling is ~3× faster than walking.
+     */
+    private function bestOriginStation(array $stations, float $fromLat, float $fromLng, float $toLat, float $toLng): ?array
+    {
+        $available = array_values(array_filter($stations, fn($s) =>
+            (($s['bikes_available'] ?? 0) + ($s['ebikes_available'] ?? 0)) > 0
+            && ($s['status'] ?? '') === 'active'
+        ));
+        if (empty($available)) {
+            $available = array_values(array_filter($stations, fn($s) => ($s['status'] ?? '') === 'active'));
+        }
+        if (empty($available)) return null;
+
+        $best = null; $bestScore = PHP_FLOAT_MAX;
+        foreach ($available as $s) {
+            $walkDist = $this->haversine($fromLat, $fromLng, (float)$s['lat'], (float)$s['lng']);
+            $bikeDist = $this->haversine((float)$s['lat'], (float)$s['lng'], $toLat, $toLng);
+            $score = $walkDist + 0.35 * $bikeDist;
+            if ($score < $bestScore) { $bestScore = $score; $best = $s; }
+        }
+        return $best;
     }
 
     private function nearestPoint(array $points, float $lat, float $lng): ?array

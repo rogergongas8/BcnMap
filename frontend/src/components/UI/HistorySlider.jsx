@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useTimeStore } from '../../store/timeStore'
 import { useDataStore } from '../../store/dataStore'
 import { useRouteStore } from '../../store/routeStore'
@@ -9,17 +9,26 @@ const BASE = (import.meta.env.VITE_API_URL ?? '') + '/api/v1'
 
 function formatAt(iso) {
   if (!iso) return ''
-  const d = new Date(iso)
+  const d   = new Date(iso)
   const now = new Date()
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const dStart = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  const dStart     = new Date(d.getFullYear(), d.getMonth(), d.getDate())
   const hh = d.getHours().toString().padStart(2, '0')
   const mm = d.getMinutes().toString().padStart(2, '0')
   const time = `${hh}:${mm}`
   const diffDays = Math.round((todayStart - dStart) / 86400000)
-  if (diffDays === 0) return `Hoy ${time}`
-  if (diffDays === 1) return `Ayer ${time}`
-  return `Hace ${diffDays}d ${time}`
+  if (diffDays === 0) return `Avui ${time}`
+  if (diffDays === 1) return `Ahir ${time}`
+  return `Fa ${diffDays}d ${time}`
+}
+
+function ClockIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+      <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.3"/>
+      <path d="M8 5v3.5l2 1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  )
 }
 
 export default function HistorySlider() {
@@ -27,23 +36,27 @@ export default function HistorySlider() {
   const { setTraffic, setBicing } = useDataStore()
   const isNavigating = useRouteStore(s => s.isNavigating)
 
-  const [value, setValue] = useState(100)
+  const [isOpen, setIsOpen]   = useState(false)
+  const [value,   setValue]   = useState(100)
   const [loading, setLoading] = useState(false)
   const debounceRef = useRef(null)
 
   useEffect(() => {
     fetch(`${BASE}/history/range`)
       .then(r => r.json())
-      .then(data => {
-        if (data.earliest && data.latest) setRange(data)
-      })
+      .then(data => { if (data.earliest && data.latest) setRange(data) })
       .catch(() => {})
   }, [])
+
+  // Auto-open when entering historical mode from outside (e.g. AI action)
+  useEffect(() => {
+    if (isHistorical) setIsOpen(true)
+  }, [isHistorical])
 
   const loadSnapshot = useCallback(async (at) => {
     setLoading(true)
     try {
-      const res = await fetch(`${BASE}/history/snapshot?at=${encodeURIComponent(at)}`)
+      const res  = await fetch(`${BASE}/history/snapshot?at=${encodeURIComponent(at)}`)
       const snap = await res.json()
       if (snap.traffic) setTraffic(snap.traffic)
       if (snap.bicing)  setBicing(snap.bicing)
@@ -57,17 +70,15 @@ export default function HistorySlider() {
   const handleSliderChange = (e) => {
     const pct = Number(e.target.value)
     setValue(pct)
-
     if (!range?.earliest || !range?.latest) return
     const earliest = new Date(range.earliest).getTime()
     const latest   = new Date(range.latest).getTime()
     const at = new Date(earliest + (pct / 100) * (latest - earliest)).toISOString()
-
     clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => loadSnapshot(at), 300)
+    debounceRef.current = setTimeout(() => loadSnapshot(at), 280)
   }
 
-  const handleLive = async () => {
+  const handleLive = useCallback(async () => {
     setLive()
     setValue(100)
     setLoading(true)
@@ -78,80 +89,159 @@ export default function HistorySlider() {
     } finally {
       setLoading(false)
     }
+  }, [setLive, setTraffic, setBicing])
+
+  const handleClose = () => {
+    setIsOpen(false)
+    if (isHistorical) handleLive()
   }
 
   const displayAt = isHistorical && selectedAt ? formatAt(selectedAt) : null
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 16 }}
+      initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.8, duration: 0.3 }}
-      className={`absolute ${isNavigating ? 'bottom-[192px]' : 'bottom-4'} left-1/2 -translate-x-1/2 z-40
-        flex items-center gap-3 px-4 py-2.5 rounded-2xl
-        bg-[#0a0c10]/90 backdrop-blur-2xl border border-white/[0.08]
-        shadow-[0_0_40px_rgba(0,0,0,0.5)]`}
-      style={{ minWidth: 320, maxWidth: 480 }}
+      transition={{ delay: 0.8, duration: 0.25, ease: [0.25, 0.46, 0.45, 0.94] }}
+      className={`absolute ${isNavigating ? 'bottom-[200px]' : 'bottom-4'} left-1/2 -translate-x-1/2 z-40`}
     >
-      {/* Live indicator / button */}
-      <button
-        onClick={handleLive}
-        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold
-          tracking-wider transition-all flex-shrink-0
-          ${!isHistorical
-            ? 'text-emerald-300 bg-emerald-500/10 border border-emerald-500/20'
-            : 'text-white/40 hover:text-white/70 border border-white/[0.07] hover:border-white/[0.14]'
-          }`}
-      >
-        <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${!isHistorical ? 'bg-emerald-400 shadow-[0_0_6px_#4ade80]' : 'bg-white/25'}`} />
-        LIVE
-      </button>
+      <AnimatePresence mode="wait">
+        {!isOpen ? (
+          /* ── Collapsed: clock pill ── */
+          <motion.button
+            key="collapsed"
+            initial={{ opacity: 0, scale: 0.92 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.92 }}
+            transition={{ duration: 0.18 }}
+            onClick={() => setIsOpen(true)}
+            className="panel flex items-center gap-2 px-3 py-2 shadow-[0_4px_20px_rgba(0,0,0,0.5)] transition-opacity hover:opacity-80"
+            title="Veure dades històriques"
+          >
+            <ClockIcon />
+            <span
+              className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+              style={{
+                background: '#3CB887',
+                boxShadow: '0 0 6px #3CB887',
+                animation: 'hsPulse 1.8s ease-in-out infinite',
+              }}
+            />
+            <span className="font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color: '#3CB887' }}>
+              Temps real
+            </span>
+          </motion.button>
+        ) : (
+          /* ── Expanded: full slider ── */
+          <motion.div
+            key="expanded"
+            initial={{ opacity: 0, y: 6, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 6, scale: 0.97 }}
+            transition={{ duration: 0.2 }}
+            className="panel flex items-center gap-3 px-3 py-2.5 shadow-[0_4px_24px_rgba(0,0,0,0.55)]"
+            style={{ minWidth: 340, maxWidth: 480 }}
+          >
+            {/* Live button */}
+            <button
+              onClick={handleLive}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 flex-shrink-0 transition-all"
+              style={{
+                borderRadius: 6,
+                border: `1px solid ${!isHistorical ? '#3CB88744' : '#262626'}`,
+                background: !isHistorical ? '#3CB88718' : '#1C1C1C',
+              }}
+            >
+              <span
+                className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                style={{
+                  background: !isHistorical ? '#3CB887' : '#555',
+                  boxShadow: !isHistorical ? '0 0 6px #3CB887' : 'none',
+                  animation: !isHistorical ? 'hsPulse 1.8s ease-in-out infinite' : 'none',
+                }}
+              />
+              <span
+                className="font-mono text-[9px] uppercase tracking-[0.14em]"
+                style={{ color: !isHistorical ? '#3CB887' : '#555' }}
+              >
+                Live
+              </span>
+            </button>
 
-      {/* Slider */}
-      <div className="flex-1 flex flex-col gap-1 min-w-0">
-        {isHistorical && displayAt && (
-          <p className="text-[10px] font-medium text-amber-400/90 text-center tracking-wide leading-none">
-            {loading ? 'Cargando…' : displayAt}
-          </p>
+            {/* Slider section */}
+            <div className="flex-1 flex flex-col gap-1.5 min-w-0">
+              <div className="flex items-center justify-center h-3.5">
+                {loading ? (
+                  <span className="font-mono text-[9px] uppercase tracking-[0.1em]" style={{ color: '#C98E2E' }}>
+                    Carregant…
+                  </span>
+                ) : isHistorical && displayAt ? (
+                  <span className="font-mono text-[9px]" style={{ color: '#C98E2E' }}>{displayAt}</span>
+                ) : null}
+              </div>
+
+              <div className="relative flex items-center">
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={0.5}
+                  value={value}
+                  onChange={handleSliderChange}
+                  className="w-full h-[3px] appearance-none cursor-pointer rounded-full outline-none"
+                  style={{
+                    background: `linear-gradient(to right, #E8622A ${value}%, #262626 ${value}%)`,
+                  }}
+                />
+              </div>
+
+              <div className="flex justify-between">
+                <span className="font-mono text-[9px]" style={{ color: '#555' }}>
+                  {range?.earliest ? formatAt(range.earliest) : '–24h'}
+                </span>
+                <span className="font-mono text-[9px]" style={{ color: '#555' }}>Ara</span>
+              </div>
+            </div>
+
+            {/* Close button */}
+            <button
+              onClick={handleClose}
+              className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded transition-colors"
+              style={{ color: '#555' }}
+              onMouseEnter={e => { e.currentTarget.style.color = '#888' }}
+              onMouseLeave={e => { e.currentTarget.style.color = '#555' }}
+              title="Tancar"
+            >
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <path d="M1.5 1.5l7 7M8.5 1.5l-7 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+            </button>
+          </motion.div>
         )}
-        <div className="relative flex items-center">
-          <input
-            type="range"
-            min={0}
-            max={100}
-            step={0.5}
-            value={value}
-            onChange={handleSliderChange}
-            className="w-full h-1 appearance-none cursor-pointer rounded-full outline-none"
-            style={{
-              background: `linear-gradient(to right,
-                #22d3ee ${value}%,
-                rgba(255,255,255,0.1) ${value}%)`,
-            }}
-          />
-        </div>
-        <div className="flex justify-between">
-          <span className="text-white/25 text-[9px]">{range?.earliest ? formatAt(range.earliest) : '24h'}</span>
-          <span className="text-white/25 text-[9px]">Ahora</span>
-        </div>
-      </div>
+      </AnimatePresence>
 
       <style>{`
         input[type=range]::-webkit-slider-thumb {
           -webkit-appearance: none;
-          width: 14px; height: 14px;
+          width: 13px; height: 13px;
           border-radius: 50%;
-          background: #22d3ee;
-          box-shadow: 0 0 8px #22d3ee80;
+          background: #E8622A;
+          box-shadow: 0 0 0 2px #141414, 0 0 8px #E8622A80;
+          cursor: pointer;
+          transition: transform 0.15s;
+        }
+        input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+        input[type=range]::-moz-range-thumb {
+          width: 13px; height: 13px;
+          border-radius: 50%;
+          background: #E8622A;
+          box-shadow: 0 0 0 2px #141414, 0 0 8px #E8622A80;
+          border: none;
           cursor: pointer;
         }
-        input[type=range]::-moz-range-thumb {
-          width: 14px; height: 14px;
-          border-radius: 50%;
-          background: #22d3ee;
-          box-shadow: 0 0 8px #22d3ee80;
-          cursor: pointer;
-          border: none;
+        @keyframes hsPulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.4; }
         }
       `}</style>
     </motion.div>

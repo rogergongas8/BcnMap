@@ -11,30 +11,23 @@ use Illuminate\Support\Facades\Log;
 class MetroService
 {
     private const BASE           = 'https://api.tmb.cat/v1';
-    private const OVERPASS       = 'https://overpass-api.de/api/interpreter';
     private const CACHE_STATIONS = 'metro:stations';
     private const CACHE_LINES    = 'metro:lines';
     private const CACHE_TTL      = 86400; // 24h
 
-    // BCN bbox para Overpass
-    private const BBOX = '41.30,1.95,41.50,2.30';
-
     private const CACHE_DISRUPTIONS = 'metro:disruptions';
     private const CACHE_DISRUPTIONS_TTL = 300; // 5 min
 
+    // Lines covered by the TMB iMetro real-time API — only these have arrival data
+    private const IMETRO_LINES = ['L1', 'L2', 'L3', 'L4', 'L5', 'L11'];
+
     private const LINE_COLORS = [
-        'L1'   => 'CE1126',
-        'L2'   => '93248F',
-        'L3'   => '1EB53A',
-        'L4'   => 'F7A30E',
-        'L5'   => '005A97',
-        'L9N'  => 'FB712B',
-        'L9S'  => 'FB712B',
-        'L10N' => '00A6D6',
-        'L10S' => '00A6D6',
-        'L11'  => '89B94C',
-        'FM'   => '004C38',
-        'TM'   => '6D9B3A',
+        'L1'  => 'CE1126',
+        'L2'  => '93248F',
+        'L3'  => '1EB53A',
+        'L4'  => 'F7A30E',
+        'L5'  => '005A97',
+        'L11' => '89B94C',
     ];
 
     private function auth(): array
@@ -50,20 +43,51 @@ class MetroService
     public function fetch(): array
     {
         Cache::forget(self::CACHE_STATIONS);
-        return Cache::remember(self::CACHE_STATIONS, self::CACHE_TTL, function () {
-            // Asegurar que líneas están cacheadas — necesarias para el proximity matching
-            $lines = Cache::remember(self::CACHE_LINES, self::CACHE_TTL, fn() => $this->fetchLinesFromApi());
+        return Cache::remember(self::CACHE_STATIONS, self::CACHE_TTL, fn() => $this->fetchStations());
+    }
 
-            $metro = $this->fetchStations();
-            $tram  = $this->fetchTramStops($lines);
-            $fgc   = $this->fetchFgcStations($lines);
-            return array_merge($metro, $tram, $fgc);
-        });
+    /**
+     * Fetches /transit/linies/metro/{codi}/estacions for all metro lines in parallel.
+     * Returns map: [CODI_GRUP_ESTACIO(string) => [lineName => CODI_ESTACIO(int)]]
+     * CODI_ESTACIO here is the per-line iMetro ID — for interchange stations each line
+     * gets a different value even though they share the same CODI_GRUP_ESTACIO.
+     */
+    private function buildPerLineEstacioMap(): array
+    {
+        $lineCodes = [1, 2, 3, 4, 5, 11]; // iMetro-covered lines only
+
+        $responses = Http::pool(fn($pool) =>
+            array_map(
+                fn($codi) => $pool->timeout(15)->get(
+                    self::BASE . '/transit/linies/metro/' . $codi . '/estacions',
+                    $this->auth()
+                ),
+                $lineCodes
+            )
+        );
+
+        $map = [];
+        foreach ($responses as $response) {
+            if (!($response instanceof \Illuminate\Http\Client\Response) || !$response->successful()) continue;
+            foreach ($response->json('features') ?? [] as $f) {
+                $props      = $f['properties'] ?? [];
+                $grupCodi   = (string) ($props['CODI_GRUP_ESTACIO'] ?? '');
+                $lineName   = (string) ($props['NOM_LINIA']         ?? '');
+                $codiEstacio = (int)   ($props['CODI_ESTACIO']       ?? 0);
+                if (!$grupCodi || !$lineName || !$codiEstacio) continue;
+                $map[$grupCodi][$lineName] = $codiEstacio;
+            }
+        }
+
+        return $map;
     }
 
     private function fetchStations(): array
     {
         try {
+            // Build accurate per-line estacio_id lookup before processing features
+            $perLineMap = $this->buildPerLineEstacioMap();
+
             $response = Http::timeout(20)->get(self::BASE . '/transit/estacions/', $this->auth());
             if (!$response->successful()) {
                 Log::warning('TMB estacions error: ' . $response->status());
@@ -77,17 +101,18 @@ class MetroService
                 if (!isset($f['geometry']['coordinates'])) continue;
                 $props   = $f['properties'] ?? [];
                 $groupId = (string) ($props['CODI_GRUP_ESTACIO'] ?? '');
-                $picto   = (string) ($props['PICTO'] ?? '');
+                $codiSta = (int)   ($props['CODI_ESTACIO']       ?? 0);
+                $picto   = (string) ($props['PICTO']              ?? '');
                 if (!$groupId) continue;
 
-                // codi_estacio para imetro = CODI_GRUP_ESTACIO - 6660000
-                $estacioId = (int) $groupId - 6660000;
+                // Fallback estacio_id from the feature's own CODI_ESTACIO
+                $fallbackEstacioId = $codiSta > 0 ? $codiSta - 6660000 : (int) $groupId - 6660000;
 
                 if (!isset($byGroup[$groupId])) {
                     $coords = $f['geometry']['coordinates'];
                     $byGroup[$groupId] = [
                         'station_id'   => $groupId,
-                        'estacio_id'   => $estacioId,
+                        'estacio_id'   => (int) $groupId - 6660000,
                         'station_name' => $props['NOM_ESTACIO'] ?? '',
                         'lat'          => (float) $coords[1],
                         'lng'          => (float) $coords[0],
@@ -96,18 +121,35 @@ class MetroService
                     ];
                 }
 
-                foreach ($this->parsePicto($picto) as $lineName) {
-                    $already = array_column($byGroup[$groupId]['lines'], 'name');
-                    if (!in_array($lineName, $already, true)) {
+                // Only keep lines covered by iMetro real-time API
+                $lineNames   = array_filter($this->parsePicto($picto), fn($l) => in_array($l, self::IMETRO_LINES, true));
+                $isExclusive = count($lineNames) === 1;
+
+                foreach ($lineNames as $lineName) {
+                    // Per-line map gives the exact iMetro ID for this line at this group station
+                    $accurateId = $perLineMap[$groupId][$lineName] ?? null;
+                    $estacioId  = $accurateId ?? $fallbackEstacioId;
+
+                    $existingIdx = null;
+                    foreach ($byGroup[$groupId]['lines'] as $i => $entry) {
+                        if ($entry['name'] === $lineName) { $existingIdx = $i; break; }
+                    }
+
+                    if ($existingIdx === null) {
                         $byGroup[$groupId]['lines'][] = [
-                            'name'  => $lineName,
-                            'color' => self::LINE_COLORS[$lineName] ?? 'A855F7',
+                            'name'       => $lineName,
+                            'color'      => self::LINE_COLORS[$lineName] ?? 'A855F7',
+                            'estacio_id' => $estacioId,
                         ];
+                    } elseif ($accurateId !== null || $isExclusive) {
+                        // Prefer the accurate per-line ID; fall back to exclusive platform ID
+                        $byGroup[$groupId]['lines'][$existingIdx]['estacio_id'] = $estacioId;
                     }
                 }
             }
 
-            return array_values($byGroup);
+            // Drop stations that ended up with no covered lines
+            return array_values(array_filter($byGroup, fn($s) => !empty($s['lines'])));
 
         } catch (\Throwable $e) {
             Log::error('MetroService::fetchStations error: ' . $e->getMessage());
@@ -128,8 +170,7 @@ class MetroService
         return Cache::remember(self::CACHE_LINES, self::CACHE_TTL, fn() => $this->fetchLinesFromApi());
     }
 
-    // Operadores a incluir (excluye Rodalies de largo recorrido)
-    private const INCLUDE_OPERATORS = ['Metro', 'FGC', 'TRAM'];
+    private const INCLUDE_OPERATORS = ['Metro'];
 
     // Bbox de recorte para geometrías de línea — cubre el área metropolitana de BCN
     private const CLIP_BBOX = [1.97, 41.27, 2.27, 41.50]; // [minLng, minLat, maxLng, maxLat]
@@ -153,6 +194,7 @@ class MetroService
                 $operator = $props['NOM_OPERADOR']  ?? '';
 
                 if (!$name || !in_array($operator, self::INCLUDE_OPERATORS, true)) continue;
+                if (!in_array($name, self::IMETRO_LINES, true)) continue;
 
                 $color = $props['COLOR_LINIA'] ?? (self::LINE_COLORS[$name] ?? null);
                 if (!$color) continue;
@@ -189,6 +231,58 @@ class MetroService
      * Próximos trenes para una estación via /imetro/estacions/{estacioId}
      * Devuelve array de { line, color, dest, arrivals: [min, min, ...] }
      */
+    /**
+     * Fetch arrivals for all line-specific estacioIds in parallel and merge results.
+     */
+    public function getArrivalsForLines(array $estacioIds): array
+    {
+        if (count($estacioIds) === 1) {
+            return $this->getArrivalsForStation($estacioIds[0]);
+        }
+
+        $responses = Http::pool(fn($pool) =>
+            array_map(
+                fn($id) => $pool->timeout(8)->get(self::BASE . '/imetro/estacions/' . $id, $this->auth()),
+                $estacioIds
+            )
+        );
+
+        $result = [];
+        foreach ($responses as $response) {
+            if (!($response instanceof \Illuminate\Http\Client\Response) || !$response->successful()) continue;
+            $entries = $response->json() ?? [];
+            foreach ($entries as $entry) {
+                $codiLinia = (int) ($entry['codi_linia'] ?? 0);
+                $lineName  = $this->codiLiniaToName($codiLinia);
+                $trains    = $entry['propers_trens'] ?? [];
+                if (empty($trains)) continue;
+
+                $byDest = [];
+                foreach ($trains as $t) {
+                    $dest = $t['desti_trajecte'] ?? '';
+                    if (!$dest) continue;
+                    $secs = (int) ($t['temps_restant'] ?? 0);
+                    $mins = $secs < 60 ? 0 : (int) ceil($secs / 60);
+                    if (!isset($byDest[$dest])) {
+                        $byDest[$dest] = ['dest' => $dest, 'arrivals' => []];
+                    }
+                    $byDest[$dest]['arrivals'][] = $mins;
+                }
+                foreach ($byDest as $data) {
+                    $result[] = [
+                        'line'     => $lineName,
+                        'color'    => self::LINE_COLORS[$lineName] ?? 'A855F7',
+                        'dest'     => $data['dest'],
+                        'arrivals' => $data['arrivals'],
+                    ];
+                }
+            }
+        }
+
+        usort($result, fn($a, $b) => ($a['arrivals'][0] ?? 999) <=> ($b['arrivals'][0] ?? 999));
+        return $result;
+    }
+
     public function getArrivalsForStation(int $estacioId): array
     {
         try {
@@ -251,149 +345,8 @@ class MetroService
             4  => 'L4',
             5  => 'L5',
             11 => 'L11',
-            91 => 'L9S',
-            94 => 'L9N',
-            99 => 'FM',
-            101 => 'L10S',
-            104 => 'L10N',
             default => 'L' . $codi,
         };
-    }
-
-    // ── Paradas Tram + Estaciones FGC (Overpass/OSM) ─────────────────────────
-
-    private function fetchTramStops(array $lines): array
-    {
-        try {
-            $query = '[out:json][timeout:25];'
-                   . 'node["railway"="tram_stop"](' . self::BBOX . ');'
-                   . 'out body;';
-
-            $response = Http::timeout(30)
-                ->withHeaders(['User-Agent' => 'BcnMap/1.0', 'Accept' => 'application/json'])
-                ->get(self::OVERPASS, ['data' => $query]);
-
-            if (!$response->successful()) return [];
-
-            $elements = $response->json('elements') ?? [];
-
-            // Deduplicar por nombre (misma parada, dos nodos por sentido)
-            $byName = [];
-            foreach ($elements as $el) {
-                $name = trim($el['tags']['name'] ?? $el['tags']['name:ca'] ?? '');
-                if (!$name) continue;
-                $byName[$name]['lats'][] = (float) $el['lat'];
-                $byName[$name]['lngs'][] = (float) $el['lon'];
-            }
-
-            $tramLines = array_filter($lines, fn($l) => ($l['operator'] ?? '') === 'TRAM');
-
-            $stops = [];
-            foreach ($byName as $name => $coords) {
-                $lat = round(array_sum($coords['lats']) / count($coords['lats']), 7);
-                $lng = round(array_sum($coords['lngs']) / count($coords['lngs']), 7);
-
-                $matched = $this->matchStopToLines($lat, $lng, $tramLines, 0.20);
-                // Fallback si no hay match (parada fuera del bbox exacto de la línea)
-                if (empty($matched)) {
-                    $matched = [['name' => 'Tram', 'color' => '008272']];
-                }
-
-                $stops[] = [
-                    'station_id'   => 'tram_' . md5($name),
-                    'estacio_id'   => null,
-                    'station_name' => $name,
-                    'lat'          => $lat,
-                    'lng'          => $lng,
-                    'type'         => 'tram',
-                    'lines'        => $matched,
-                ];
-            }
-
-            return $stops;
-
-        } catch (\Throwable $e) {
-            Log::warning('MetroService tram stops error: ' . $e->getMessage());
-            return [];
-        }
-    }
-
-    private function fetchFgcStations(array $lines): array
-    {
-        try {
-            $query = '[out:json][timeout:25];'
-                   . 'node["railway"="station"]["operator:short"="FGC"](' . self::BBOX . ');'
-                   . 'out body;';
-
-            $response = Http::timeout(30)
-                ->withHeaders(['User-Agent' => 'BcnMap/1.0', 'Accept' => 'application/json'])
-                ->get(self::OVERPASS, ['data' => $query]);
-
-            if (!$response->successful()) return [];
-
-            $elements = $response->json('elements') ?? [];
-            $fgcLines  = array_filter($lines, fn($l) => ($l['operator'] ?? '') === 'FGC');
-
-            $stations = [];
-            foreach ($elements as $el) {
-                $name = trim($el['tags']['name'] ?? $el['tags']['name:ca'] ?? '');
-                if (!$name) continue;
-
-                $lat = (float) $el['lat'];
-                $lng = (float) $el['lon'];
-
-                $matched = $this->matchStopToLines($lat, $lng, $fgcLines, 0.25);
-                if (empty($matched)) {
-                    $matched = [['name' => 'FGC', 'color' => '797FBC']];
-                }
-
-                $stations[] = [
-                    'station_id'   => 'fgc_' . $el['id'],
-                    'estacio_id'   => null,
-                    'station_name' => $name,
-                    'lat'          => $lat,
-                    'lng'          => $lng,
-                    'type'         => 'fgc',
-                    'lines'        => $matched,
-                ];
-            }
-
-            return $stations;
-
-        } catch (\Throwable $e) {
-            Log::warning('MetroService FGC stations error: ' . $e->getMessage());
-            return [];
-        }
-    }
-
-    /**
-     * Para cada línea del array, comprueba si algún vértice de su geometría
-     * está a menos de $thresholdKm del punto dado. Devuelve las líneas que hacen match.
-     */
-    private function matchStopToLines(float $lat, float $lng, array $lines, float $thresholdKm): array
-    {
-        $matched = [];
-        foreach ($lines as $line) {
-            $geometry = $line['geometry'] ?? null;
-            if (!$geometry) continue;
-
-            $linestrings = $geometry['type'] === 'MultiLineString'
-                ? $geometry['coordinates']
-                : [$geometry['coordinates']];
-
-            $found = false;
-            foreach ($linestrings as $linestring) {
-                if ($found) break;
-                foreach ($linestring as $coord) {
-                    if ($this->haversineKm($lat, $lng, (float)$coord[1], (float)$coord[0]) < $thresholdKm) {
-                        $matched[] = ['name' => $line['name'], 'color' => $line['color']];
-                        $found = true;
-                        break;
-                    }
-                }
-            }
-        }
-        return $matched;
     }
 
     /**
@@ -489,7 +442,9 @@ class MetroService
     private function parsePicto(string $picto): array
     {
         if (!$picto) return [];
-        $known     = ['L10N', 'L10S', 'L9N', 'L9S', 'L11', 'L1', 'L2', 'L3', 'L4', 'L5', 'FM', 'TM'];
+        // Longer tokens MUST come before shorter ones — L10N before L1, L11 before L1, etc.
+        // All known lines are listed so partial matches are never made.
+        $known     = ['L10N', 'L10S', 'L9N', 'L9S', 'L11', 'L1', 'L2', 'L3', 'L4', 'L5', 'FM'];
         $lines     = [];
         $remaining = $picto;
         while ($remaining !== '') {
@@ -504,6 +459,6 @@ class MetroService
             }
             if (!$matched) break;
         }
-        return $lines ?: [$picto];
+        return $lines;
     }
 }
