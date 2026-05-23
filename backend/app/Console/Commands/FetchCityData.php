@@ -11,7 +11,6 @@ use App\Models\TrafficSnapshot;
 use App\Services\AirQualityService;
 use App\Services\BicingService;
 use App\Services\BusService;
-use App\Services\EventsService;
 use App\Services\MetroService;
 use App\Services\TrafficService;
 use App\Services\WeatherService;
@@ -30,7 +29,6 @@ class FetchCityData extends Command
         private AirQualityService $air,
         private BusService        $bus,
         private MetroService      $metro,
-        private EventsService     $events,
     ) {
         parent::__construct();
     }
@@ -51,9 +49,6 @@ class FetchCityData extends Command
         $metroData   = $this->metro->fetch();
         $metroLines  = $this->metro->fetchLines();
         $this->info('Metro: ' . count($metroData) . ' estacions, ' . count($metroLines) . ' línies');
-
-        $eventsData = $this->events->fetch();
-        $this->info('Events: ' . count($eventsData) . ' events');
 
         // Guardar snapshot de tráfico
         if (!empty($trafficData)) {

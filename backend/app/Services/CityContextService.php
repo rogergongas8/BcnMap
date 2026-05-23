@@ -11,7 +11,7 @@ class CityContextService
         private BicingService     $bicing,
         private WeatherService    $weather,
         private AirQualityService $air,
-        private EventsService     $events,
+        private EventsEnrichmentService $events,
         private MetroService      $metro,
     ) {}
 

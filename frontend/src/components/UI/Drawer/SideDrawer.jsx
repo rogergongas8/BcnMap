@@ -5,6 +5,7 @@ import { Icons } from '../icons'
 import NearbyView from './NearbyView'
 import PlaceView from './PlaceView'
 import SavedView from './SavedView'
+import EventsView from './EventsView'
 
 // Drawer padding — top: 56 always to account for TopBar height
 // right/left managed centrally in App.jsx; this component no longer calls setMapPadding directly
@@ -12,7 +13,7 @@ import SavedView from './SavedView'
 export default function SideDrawer() {
   const { view, close } = useDrawerStore()
 
-  const title = view === 'nearby' ? 'Qué hay cerca' : view === 'saved' ? 'Guardats' : null
+  const title = view === 'nearby' ? 'A prop' : view === 'saved' ? 'Guardats' : view === 'events' ? 'Esdeveniments' : null
 
   return (
     <AnimatePresence>
@@ -28,11 +29,11 @@ export default function SideDrawer() {
             shadow-[0_4px_32px_rgba(0,0,0,0.5)]"
           style={{ maxHeight: 'calc(100vh - 56px)', background: '#141414', border: '1px solid #262626', borderRadius: 8 }}
         >
-          {(view === 'nearby' || view === 'saved') && (
+          {(view === 'nearby' || view === 'saved' || view === 'events') && (
             <header className="flex items-center justify-between px-4 py-3 flex-shrink-0" style={{ borderBottom: '1px solid #262626' }}>
               <div className="flex items-center gap-2.5">
                 <span style={{ color: '#555' }}>
-                  {view === 'nearby' ? <Icons.search size={13} /> : <Icons.pin size={13} />}
+                  {view === 'nearby' ? <Icons.search size={13} /> : view === 'events' ? <Icons.calendar size={13} /> : <Icons.pin size={13} />}
                 </span>
                 <h2 className="font-syne text-[13px] font-medium" style={{ color: '#EBEBEB' }}>{title}</h2>
               </div>
@@ -47,9 +48,10 @@ export default function SideDrawer() {
             </header>
           )}
 
-          {view === 'nearby' && <NearbyView />}
-          {view === 'saved'  && <SavedView />}
-          {view === 'place'  && <PlaceView />}
+          {view === 'nearby'  && <NearbyView />}
+          {view === 'saved'   && <SavedView />}
+          {view === 'events'  && <EventsView />}
+          {view === 'place'   && <PlaceView />}
         </motion.aside>
       )}
     </AnimatePresence>

@@ -195,7 +195,7 @@ function ProfileBtn() {
 // ── TopBar ────────────────────────────────────────────────────────────────────
 
 export default function TopBar({ children }) {
-  const { view, openNearby, openSaved, close } = useDrawerStore()
+  const { view, openNearby, openSaved, openEvents, close } = useDrawerStore()
   const { activeLayers } = useMapStore()
   const { showBeaches }  = useLeisureStore()
   const { isOpen: chatOpen, toggleChat, hasUnread } = useChatStore()
@@ -216,6 +216,7 @@ export default function TopBar({ children }) {
 
   const nearbyActive = view === 'nearby'
   const savedActive  = view === 'saved'
+  const eventsActive = view === 'events'
   const hasLayersOn  = showBeaches || activeLayers.length > 0
 
   return (
@@ -229,8 +230,9 @@ export default function TopBar({ children }) {
 
       {/* ── Left: action buttons ── */}
       <div className="flex items-center gap-1 px-1.5 flex-shrink-0 pointer-events-auto" style={{ ...CARD_STYLE, height: 44 }}>
-        <IconBtn active={nearbyActive} onClick={() => nearbyActive ? close() : openNearby()} icon={Icons.search} label="Qué hay cerca" />
+        <IconBtn active={nearbyActive} onClick={() => nearbyActive ? close() : openNearby()} icon={Icons.search}   label="A prop" />
         <IconBtn active={savedActive}  onClick={() => savedActive  ? close() : openSaved()}  icon={Icons.bookmark} label="Guardats" />
+        <IconBtn active={eventsActive} onClick={() => eventsActive ? close() : openEvents()} icon={Icons.calendar} label="Esdeveniments" />
         <div ref={layersRef} className="relative">
           <IconBtn active={layersOpen} onClick={() => { const next = !layersOpen; if (next && view) close(); setLayersOpen(next) }} icon={Icons.layers} label="Capes" badge={hasLayersOn} />
           <AnimatePresence>

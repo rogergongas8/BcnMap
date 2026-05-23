@@ -1,0 +1,335 @@
+import React, { useMemo, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { Icons } from '../icons'
+import { useDataStore } from '../../../store/dataStore'
+import { useMapStore } from '../../../store/mapStore'
+import { useChatStore } from '../../../store/chatStore'
+
+const CATEGORIES = [
+  { id: null,          label: 'Tots' },
+  { id: 'musica',      label: 'Música' },
+  { id: 'cultura',     label: 'Cultura' },
+  { id: 'esport',      label: 'Esport' },
+  { id: 'gastronomia', label: 'Gastro' },
+  { id: 'familia',     label: 'Família' },
+]
+
+const CAT_COLOR = {
+  musica:      '#C98E2E',
+  esport:      '#3CB887',
+  cultura:     '#8B6AD4',
+  gastronomia: '#E8622A',
+  familia:     '#4D84D4',
+  altres:      '#5A5248',
+}
+
+const CAT_LABELS = {
+  musica: 'Música', esport: 'Esport', cultura: 'Cultura',
+  gastronomia: 'Gastro', familia: 'Família', altres: 'Altres',
+}
+
+function formatDate(start, end) {
+  if (!start) return null
+  const s = new Date(start + 'T00:00:00')
+  const today = new Date(); today.setHours(0,0,0,0)
+  const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1)
+
+  const label = s.getTime() === today.getTime()   ? 'Avui'
+              : s.getTime() === tomorrow.getTime() ? 'Demà'
+              : s.toLocaleDateString('ca', { day: 'numeric', month: 'short' })
+
+  if (end && end !== start) {
+    const e = new Date(end + 'T00:00:00')
+    return `${label} → ${e.toLocaleDateString('ca', { day: 'numeric', month: 'short' })}`
+  }
+  return label
+}
+
+function CategoryRail({ active, onChange }) {
+  return (
+    <div className="px-3 py-2.5" style={{ borderBottom: '1px solid #262626' }}>
+      <div className="flex gap-1.5 overflow-x-auto pb-1 -mb-1" style={{ scrollbarWidth: 'none' }}>
+        {CATEGORIES.map(cat => {
+          const isActive = active === cat.id
+          const color = cat.id ? CAT_COLOR[cat.id] : '#E8622A'
+          return (
+            <button
+              key={String(cat.id)}
+              onClick={() => onChange(cat.id)}
+              className="flex-shrink-0 px-2.5 py-1.5 whitespace-nowrap font-syne text-[11px] transition-all"
+              style={{
+                borderRadius: 6,
+                fontWeight: isActive ? 600 : 400,
+                border: `1px solid ${isActive ? color : '#262626'}`,
+                background: isActive ? color + '18' : '#1C1C1C',
+                color: isActive ? color : '#888',
+              }}
+            >
+              {cat.label}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function EventRow({ event, expanded, onToggle }) {
+  const flyTo = useMapStore(s => s.flyTo)
+  const openChatWithPrompt = useChatStore(s => s.openChatWithPrompt)
+  const color = CAT_COLOR[event.category] ?? CAT_COLOR.altres
+
+  const handleClick = () => {
+    onToggle()
+    if (event.lat && event.lng) {
+      flyTo({ lat: event.lat, lng: event.lng, zoom: 16 })
+    }
+  }
+
+  const sourceLabel = event.source === 'ticketmaster' ? 'Ticketmaster' : null
+
+  return (
+    <li style={{ borderBottom: '1px solid #1A1A1A' }}>
+      {/* ── Row header ── */}
+      <div
+        onClick={handleClick}
+        className="flex cursor-pointer transition-colors"
+        style={{ background: expanded ? '#1C1C1C' : 'transparent' }}
+        onMouseEnter={e => { if (!expanded) e.currentTarget.style.background = '#181818' }}
+        onMouseLeave={e => { if (!expanded) e.currentTarget.style.background = 'transparent' }}
+      >
+        <div className="w-[3px] flex-shrink-0 self-stretch" style={{ background: color, opacity: expanded ? 1 : 0.5 }} />
+        <div className="px-3.5 py-3 flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <p className="font-syne text-[13px] font-medium leading-snug" style={{ color: '#EBEBEB' }}>
+              {event.title}
+            </p>
+            <span
+              className="flex-shrink-0 mt-0.5 transition-transform"
+              style={{ color: '#444', transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
+            >
+              <Icons.chevronDown size={11} />
+            </span>
+          </div>
+          {event.place && (
+            <p className="font-mono text-[10px] truncate mt-0.5" style={{ color: '#666' }}>
+              {event.place}{event.district ? ` · ${event.district}` : ''}
+            </p>
+          )}
+          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+            <span
+              className="font-mono text-[8px] uppercase tracking-[0.1em] px-1.5 py-0.5 rounded flex-shrink-0"
+              style={{ background: color + '18', color, border: `1px solid ${color}33` }}
+            >
+              {CAT_LABELS[event.category] ?? event.category}
+            </span>
+            {event.start && (
+              <span className="font-mono text-[9px]" style={{ color: '#555' }}>
+                {formatDate(event.start, event.end)}
+                {event.time && ` · ${event.time}`}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Expanded detail ── */}
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            style={{ overflow: 'hidden', background: '#161616', borderTop: '1px solid #222' }}
+          >
+            <div className="px-4 py-3 flex flex-col gap-2.5">
+
+              {/* Timetable */}
+              {event.timetable && (
+                <div className="flex items-start gap-2">
+                  <span style={{ color: '#555', flexShrink: 0, marginTop: 1 }}><Icons.clock size={11} /></span>
+                  <p className="font-mono text-[10px] leading-relaxed" style={{ color: '#888' }}>{event.timetable}</p>
+                </div>
+              )}
+
+              {/* Venue + district */}
+              {(event.place || event.district) && (
+                <div className="flex items-start gap-2">
+                  <span style={{ color: '#555', flexShrink: 0, marginTop: 1 }}><Icons.pin size={11} /></span>
+                  <p className="font-mono text-[10px]" style={{ color: '#888' }}>
+                    {[event.place, event.district].filter(Boolean).join(' · ')}
+                  </p>
+                </div>
+              )}
+
+              {/* Date range */}
+              {event.start && (
+                <div className="flex items-start gap-2">
+                  <span style={{ color: '#555', flexShrink: 0, marginTop: 1 }}><Icons.calendar size={11} /></span>
+                  <p className="font-mono text-[10px]" style={{ color: '#888' }}>
+                    {formatDate(event.start, event.end)}
+                    {event.time && ` · ${event.time}h`}
+                  </p>
+                </div>
+              )}
+
+              {/* Source */}
+              {sourceLabel && (
+                <p className="font-mono text-[9px] uppercase tracking-[0.1em]" style={{ color: '#3A3530' }}>
+                  via {sourceLabel}
+                </p>
+              )}
+
+              {/* Actions */}
+              <div className="flex gap-2 mt-1">
+                {event.url && (
+                  <a
+                    href={event.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 font-syne text-[11px] font-medium transition-colors"
+                    style={{ borderRadius: 6, background: color + '18', border: `1px solid ${color}44`, color }}
+                    onMouseEnter={e => e.currentTarget.style.background = color + '28'}
+                    onMouseLeave={e => e.currentTarget.style.background = color + '18'}
+                  >
+                    <Icons.forward size={11} />
+                    {event.source === 'ticketmaster' ? 'Entrades' : 'Més info'}
+                  </a>
+                )}
+                <button
+                  onClick={() => openChatWithPrompt(`Explica'm més sobre "${event.title}"${event.place ? ` a ${event.place}` : ''}`)}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2 font-syne text-[11px] font-medium transition-colors"
+                  style={{ borderRadius: 6, background: '#1C1C1C', border: '1px solid #2A2A2A', color: '#888' }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = '#E8622A'; e.currentTarget.style.color = '#E8622A' }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = '#2A2A2A'; e.currentTarget.style.color = '#888' }}
+                >
+                  <svg width="11" height="11" viewBox="0 0 16 16" fill="none">
+                    <path d="M8 1.5C4.41 1.5 1.5 4.02 1.5 7.12c0 1.64.73 3.11 1.9 4.14L3 14.5l3.88-1.94c.35.07.72.1 1.12.1 3.59 0 6.5-2.52 6.5-5.54S11.59 1.5 8 1.5Z"
+                      stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" fill="none"/>
+                    <circle cx="5.5" cy="7.5" r="0.8" fill="currentColor"/>
+                    <circle cx="8" cy="7.5" r="0.8" fill="currentColor"/>
+                    <circle cx="10.5" cy="7.5" r="0.8" fill="currentColor"/>
+                  </svg>
+                  Preguntar
+                </button>
+              </div>
+
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </li>
+  )
+}
+
+export default function EventsView() {
+  const events             = useDataStore(s => s.events)
+  const openChatWithPrompt = useChatStore(s => s.openChatWithPrompt)
+  const [activeCategory, setActiveCategory] = useState(null)
+  const [expandedId,     setExpandedId]     = useState(null)
+
+  const filtered = useMemo(() => {
+    const base = activeCategory
+      ? events.filter(e => e.category === activeCategory)
+      : events
+    // Sort: today first, then by start date, then by time
+    return [...base].sort((a, b) => {
+      if (a.today && !b.today) return -1
+      if (!a.today && b.today) return 1
+      if (a.start && b.start && a.start !== b.start) return a.start.localeCompare(b.start)
+      if (a.time && b.time) return a.time.localeCompare(b.time)
+      return 0
+    })
+  }, [events, activeCategory])
+
+  const activeMeta = CATEGORIES.find(c => c.id === activeCategory)
+
+  return (
+    <>
+      <CategoryRail active={activeCategory} onChange={setActiveCategory} />
+
+      <div className="flex-1 overflow-y-auto min-h-0">
+        {events.length === 0 && (
+          <div className="px-6 py-12 flex flex-col items-center text-center gap-2">
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: '#1C1C1C', color: '#555' }}>
+              <Icons.calendar size={15} />
+            </div>
+            <p className="font-syne text-[13px]" style={{ color: '#888' }}>Carregant esdeveniments…</p>
+          </div>
+        )}
+
+        {events.length > 0 && filtered.length === 0 && (
+          <div className="px-6 py-12 flex flex-col items-center text-center gap-2">
+            <p className="font-syne text-[13px]" style={{ color: '#888' }}>
+              Sense {activeMeta?.label.toLowerCase()} per avui
+            </p>
+            <button
+              onClick={() => setActiveCategory(null)}
+              className="font-mono text-[10px] underline"
+              style={{ color: '#555' }}
+            >
+              Veure tots
+            </button>
+          </div>
+        )}
+
+        {filtered.length > 0 && (
+          <>
+            <div className="px-4 py-2" style={{ borderBottom: '1px solid #1A1A1A' }}>
+              <span className="font-mono text-[9px] uppercase tracking-[0.12em]" style={{ color: '#3A3530' }}>
+                {filtered.length} esdeveniment{filtered.length !== 1 ? 's' : ''}
+                {activeCategory ? ` · ${activeMeta?.label}` : ''}
+              </span>
+            </div>
+
+            <ul>
+              {filtered.map((event, i) => {
+                const id = `${event.title}-${event.start}-${i}`
+                return (
+                  <EventRow
+                    key={id}
+                    event={event}
+                    expanded={expandedId === id}
+                    onToggle={() => setExpandedId(expandedId === id ? null : id)}
+                  />
+                )
+              })}
+            </ul>
+
+            <div className="px-4 py-3" style={{ borderTop: '1px solid #262626' }}>
+              <button
+                onClick={() => openChatWithPrompt(
+                  activeCategory
+                    ? `Quin esdeveniment de ${activeMeta?.label.toLowerCase()} recomanaries avui a Barcelona?`
+                    : `Quins esdeveniments destacats hi ha avui a Barcelona?`
+                )}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 transition-colors"
+                style={{
+                  fontFamily: 'Syne, sans-serif',
+                  fontSize: 12,
+                  fontWeight: 500,
+                  borderRadius: 6,
+                  border: '1px solid #262626',
+                  background: '#1C1C1C',
+                  color: '#888',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = '#E8622A'; e.currentTarget.style.color = '#E8622A' }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = '#262626'; e.currentTarget.style.color = '#888' }}
+              >
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+                  <path d="M8 1.5C4.41 1.5 1.5 4.02 1.5 7.12c0 1.64.73 3.11 1.9 4.14L3 14.5l3.88-1.94c.35.07.72.1 1.12.1 3.59 0 6.5-2.52 6.5-5.54S11.59 1.5 8 1.5Z"
+                    stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" fill="none"/>
+                  <circle cx="5.5" cy="7.5" r="0.8" fill="currentColor"/>
+                  <circle cx="8"   cy="7.5" r="0.8" fill="currentColor"/>
+                  <circle cx="10.5" cy="7.5" r="0.8" fill="currentColor"/>
+                </svg>
+                Preguntar a l'assistent
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </>
+  )
+}
