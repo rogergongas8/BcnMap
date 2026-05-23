@@ -10,15 +10,14 @@ export default function PinLayer() {
   const view        = useDrawerStore(s => s.view)
   const destination = useRouteStore(s => s.destination)
   const route       = useRouteStore(s => s.route)
-  const panelOpen   = useRouteStore(s => s.isOpen)
   const markerRef   = useRef(null)
 
   useEffect(() => {
     if (!mapInstance) return
 
-    // Show for: map-click pin OR pending destination while route panel is open
+    // Show for: map-click pin OR pending destination
     const isMapPin      = view === 'place' && place?.kind === 'pin'
-    const isPendingDest = panelOpen && destination && !route
+    const isPendingDest = destination && !route
 
     if (!isMapPin && !isPendingDest) {
       if (markerRef.current) {
@@ -41,7 +40,7 @@ export default function PinLayer() {
     } else {
       markerRef.current.setLngLat([lng, lat])
     }
-  }, [mapInstance, place, view, destination, route, panelOpen])
+  }, [mapInstance, place, view, destination, route])
 
   useEffect(() => () => {
     if (markerRef.current) markerRef.current.remove()
