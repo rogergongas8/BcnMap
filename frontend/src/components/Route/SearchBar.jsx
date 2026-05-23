@@ -3,8 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useRouteStore } from '../../store/routeStore'
 import { useMapStore } from '../../store/mapStore'
 import { useDataStore } from '../../store/dataStore'
-import { useDrawerStore } from '../../store/drawerStore'
-import { useChatStore } from '../../store/chatStore'
 import { useRoute } from '../../hooks/useRoute'
 import { fetchRoute, fetchMetroArrivals, addSavedRoute } from '../../services/api'
 import { useAuthStore } from '../../store/authStore'
@@ -1167,14 +1165,7 @@ export default function SearchBar({ embedded = false }) {
     })
   }, [originPoint, destPoint, mode])
 
-  /* ────────────────── Posición horizontal dinámica ────────────────── */
-  // Shift SearchBar center to avoid overlapping SideDrawer (left) or ChatPanel (right)
-  const drawerView = useDrawerStore(s => s.view)
-  const chatOpen   = useChatStore(s => s.isOpen)
-  // SideDrawer: left-[68px] + 340px wide = 408px. Shift right by half: +204px
-  // ChatPanel:  340px from right edge. Shift left by half: -170px
-  const hShift = (drawerView ? 204 : 0) - (chatOpen ? 170 : 0)
-  const centeredLeft = hShift === 0 ? '50%' : `calc(50% + ${hShift}px)`
+  const centeredLeft = '50%'
 
   /* ────────────────── Render embegut (TopBar) ────────────────── */
 

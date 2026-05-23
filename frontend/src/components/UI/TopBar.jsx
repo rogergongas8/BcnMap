@@ -219,7 +219,7 @@ export default function TopBar({ children }) {
 
   return (
     <div className="absolute top-0 left-0 right-0 z-50 flex items-center h-14 px-3 gap-2.5 overflow-visible pointer-events-none">
-      {/* ── SearchBar: absolutely centered in viewport, not flex-1 ── */}
+      {/* ── SearchBar: centered in viewport ── */}
       <div className="absolute inset-0 flex items-center justify-center overflow-visible pointer-events-none">
         <div className="pointer-events-auto overflow-visible">
           {children}

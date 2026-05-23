@@ -40,7 +40,7 @@ function useMapPadding() {
   useEffect(() => {
     setMapPadding({
       top:    56,
-      left:   view ? 400 : 0,
+      left:   0,
       right:  chatOpen ? 340 : 0,
       bottom: 0,
     })
