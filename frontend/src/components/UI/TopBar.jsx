@@ -196,7 +196,7 @@ function ProfileBtn() {
 
 export default function TopBar({ children }) {
   const { view, openNearby, openSaved, openEvents, close } = useDrawerStore()
-  const { activeLayers } = useMapStore()
+  const { activeLayers, toggleLayer } = useMapStore()
   const { showBeaches }  = useLeisureStore()
   const { isOpen: chatOpen, toggleChat, hasUnread } = useChatStore()
 
@@ -205,6 +205,9 @@ export default function TopBar({ children }) {
 
   useEffect(() => {
     if (view) setLayersOpen(false)
+    // Sync events layer with drawer: on when events drawer open, off otherwise
+    if (view === 'events' && !activeLayers.includes('events')) toggleLayer('events')
+    if (view !== 'events' &&  activeLayers.includes('events')) toggleLayer('events')
   }, [view])
 
   useEffect(() => {
@@ -217,7 +220,7 @@ export default function TopBar({ children }) {
   const nearbyActive = view === 'nearby'
   const savedActive  = view === 'saved'
   const eventsActive = view === 'events'
-  const hasLayersOn  = showBeaches || activeLayers.length > 0
+  const hasLayersOn  = showBeaches || activeLayers.filter(l => l !== 'events').length > 0
 
   return (
     <div className="absolute top-0 left-0 right-0 z-50 flex items-center h-14 px-3 gap-2.5 overflow-visible pointer-events-none">

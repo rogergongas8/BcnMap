@@ -17,6 +17,7 @@ class EventsEnrichmentService
     public function __construct(
         private EventsService       $events,
         private TicketmasterService $ticketmaster,
+        private SongkickService     $songkick,
     ) {}
 
     public function current(): array
@@ -104,26 +105,55 @@ class EventsEnrichmentService
         }
 
         $tm = $this->ticketmaster->getCurrent();
+        $sk = $this->songkick->getCurrent();
 
-        // Cross-source dedup: index BCN events by normalised title+date.
-        // If Ticketmaster has the same concert, prefer TM (has time, url, precise coords).
-        $bcnIndex = [];
+        // Cross-source dedup: index BCN events by normalised title+date AND by title alone.
+        // TM wins over BCN. Fallback: if TM has artist X on ANY date, remove all BCN "Concert X" entries
+        // (handles BCN/TM date mismatches that break exact title+date matching).
+        $bcnIndex      = [];   // title|date  → index
+        $bcnTitleIndex = [];   // title-only  → [indices]
         foreach ($bcn as $i => $e) {
-            $key = $this->dedupKey($e['title'] ?? '', $e['start'] ?? '');
+            $key      = $this->dedupKey($e['title'] ?? '', $e['start'] ?? '');
+            $titleKey = $this->dedupKey($e['title'] ?? '', '');
             $bcnIndex[$key] = $i;
+            $bcnTitleIndex[$titleKey][] = $i;
         }
 
-        $tmKeys = [];
+        // Ticketmaster wins over BCN for same event (exact or title-only fallback)
         foreach ($tm as $e) {
-            $key = $this->dedupKey($e['title'] ?? '', $e['start'] ?? '');
-            $tmKeys[$key] = true;
-            // Remove matching BCN event so TM version wins
+            $key      = $this->dedupKey($e['title'] ?? '', $e['start'] ?? '');
+            $titleKey = $this->dedupKey($e['title'] ?? '', '');
             if (isset($bcnIndex[$key])) {
                 unset($bcn[$bcnIndex[$key]]);
+            } elseif (isset($bcnTitleIndex[$titleKey])) {
+                foreach ($bcnTitleIndex[$titleKey] as $idx) {
+                    unset($bcn[$idx]);
+                }
             }
         }
 
-        $raw    = array_merge(array_values($bcn), $tm);
+        // Songkick wins over BCN for same event; TM beats Songkick on same venue+date
+        $tmVenueIndex = [];
+        foreach ($tm as $e) {
+            $vk = $this->dedupKey($e['place'] ?? '', $e['start'] ?? '', '');
+            $tmVenueIndex[$vk] = true;
+        }
+
+        $skFiltered = [];
+        foreach ($sk as $e) {
+            $titleKey = $this->dedupKey($e['title'] ?? '', $e['start'] ?? '');
+            // Remove BCN duplicate
+            if (isset($bcnIndex[$titleKey])) {
+                unset($bcn[$bcnIndex[$titleKey]]);
+            }
+            // Skip if TM already covers same venue+date
+            $vk = $this->dedupKey($e['place'] ?? '', $e['start'] ?? '', '');
+            if (!isset($tmVenueIndex[$vk])) {
+                $skFiltered[] = $e;
+            }
+        }
+
+        $raw = array_merge(array_values($bcn), $tm, $skFiltered);
         $today  = now()->format('Y-m-d');
         $cutoff = now()->addDays(self::MAX_FUTURE_DAYS)->format('Y-m-d');
 
@@ -142,17 +172,18 @@ class EventsEnrichmentService
 
             $enrichedEvent = [
                 'title'    => $event['title'] ?? '',
-                'category' => in_array($source, ['ticketmaster', 'eventbrite'], true)
+                'category' => in_array($source, ['ticketmaster', 'eventbrite', 'songkick'], true)
                     ? ($event['category'] ?? 'altres')
                     : $this->deriveCategory($event),
                 'place'    => $event['place']    ?? '',
                 'district' => $event['district'] ?? '',
                 'start'    => $start,
                 'end'      => $end,
-                'time'      => $event['time']      ?? null,
-                'timetable' => $event['timetable'] ?? null,
-                'url'       => $event['url']       ?? null,
-                'source'   => $source,
+                'time'        => $event['time']        ?? null,
+                'timetable'   => $event['timetable']   ?? null,
+                'url'         => $event['url']         ?? null,
+                'extra_dates' => $event['extra_dates'] ?? [],
+                'source'      => $source,
                 'lat'      => $lat,
                 'lng'      => $lng,
                 'today'    => $start === $today || ($start && $start <= $today && $end && $end >= $today),
@@ -184,12 +215,19 @@ class EventsEnrichmentService
      * Normalise title+date into a dedup key.
      * Strips accents, punctuation, "vip/package" suffixes so near-identical listings collapse.
      */
-    private function dedupKey(string $title, string $date): string
+    private function dedupKey(string $a, string $b, string $c = ''): string
     {
-        $t = iconv('UTF-8', 'ASCII//TRANSLIT', strtolower($title));
-        $t = preg_replace('/\s*(vip|package|hospitality|premium|suite)[^$]*/i', '', $t);
-        $t = preg_replace('/[^a-z0-9]/', '', (string) $t);
-        return $t . '|' . $date;
+        $norm = function (string $s): string {
+            // iconv first so accented UPPERCASE (Í, Á, É...) become plain ASCII before strtolower
+            $s = (string) iconv('UTF-8', 'ASCII//TRANSLIT', $s);
+            $s = strtolower($s);
+            // Strip leading event-type words that BCN data prepends
+            $s = preg_replace('/^\s*(concert|festival|espectacle|taller|exposici[o]|cicle|fira)\s+["\'\<>]?/', '', $s);
+            // Strip VIP/package suffixes
+            $s = preg_replace('/\s*(vip|package|hospitality|premium|suite)\b.*/', '', $s);
+            return preg_replace('/[^a-z0-9]/', '', $s);
+        };
+        return $norm($a) . '|' . $norm($b) . ($c !== '' ? '|' . $norm($c) : '');
     }
 
     private function deriveCategory(array $event): string

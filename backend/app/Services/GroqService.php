@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Log;
 class GroqService
 {
     private const API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-    private const MODEL   = 'gemma2-9b-it';
+    private const MODEL   = 'llama-3.1-8b-instant';
 
     public function chat(string $userMessage, string $cityContext, array $history = []): array
     {

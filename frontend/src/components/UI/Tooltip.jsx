@@ -204,39 +204,56 @@ const EVENT_CAT_LABELS = {
 }
 
 function EventTooltip({ object }) {
-  const color = EVENT_COLORS[object.category] ?? EVENT_COLORS.altres
+  const color    = EVENT_COLORS[object.category] ?? EVENT_COLORS.altres
   const catLabel = EVENT_CAT_LABELS[object.category] ?? object.category
 
   const formatDate = (iso) => {
     if (!iso) return null
-    const d = new Date(iso)
+    const d = new Date(iso + 'T00:00:00')
+    const today = new Date(); today.setHours(0,0,0,0)
+    const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1)
+    if (d.getTime() === today.getTime())    return 'Avui'
+    if (d.getTime() === tomorrow.getTime()) return 'Demà'
     return d.toLocaleDateString('ca', { day: 'numeric', month: 'short' })
   }
 
+  const dateStr = object.start
+    ? formatDate(object.start) + (object.end && object.end !== object.start ? ` → ${formatDate(object.end)}` : '')
+    : null
+
   return (
     <Card accent={color}>
-      <div className="flex items-center gap-1.5 mb-1.5">
+      <div className="flex items-center justify-between gap-2 mb-1.5">
         <span
           className="font-mono text-[8px] uppercase tracking-[0.12em] px-1.5 py-0.5 rounded"
           style={{ background: color + '22', color, border: `1px solid ${color}44` }}
         >
           {catLabel}
         </span>
+        {object.url && (
+          <span className="font-mono text-[8px]" style={{ color: '#3A3530' }}>↗</span>
+        )}
       </div>
-      <p className="font-syne text-[13px] font-medium leading-snug mb-1" style={{ color: '#EBEBEB' }}>
+
+      <p className="font-syne text-[13px] font-medium leading-snug" style={{ color: '#EBEBEB' }}>
         {object.title}
       </p>
+
       {object.place && (
-        <p className="font-mono text-[10px] truncate" style={{ color: '#666' }}>
+        <p className="font-mono text-[10px] truncate mt-0.5" style={{ color: '#666' }}>
           {object.place}
         </p>
       )}
-      {object.start && (
+
+      {(dateStr || object.time) && (
         <p className="font-mono text-[9px] mt-1.5" style={{ color: '#555' }}>
-          {formatDate(object.start)}
-          {object.end && object.end !== object.start && ` → ${formatDate(object.end)}`}
+          {dateStr}{object.time ? ` · ${object.time}h` : ''}
         </p>
       )}
+
+      <p className="font-mono text-[8px] mt-2" style={{ color: '#3A3530' }}>
+        Clica per veure detalls
+      </p>
     </Card>
   )
 }

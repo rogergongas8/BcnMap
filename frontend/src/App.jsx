@@ -19,6 +19,7 @@ import PinLayer from './components/Map/layers/PinLayer'
 import TopBar from './components/UI/TopBar'
 import SideDrawer from './components/UI/Drawer/SideDrawer'
 import Tooltip from './components/UI/Tooltip'
+import EventPopup from './components/UI/EventPopup'
 import ErrorBoundary from './components/UI/ErrorBoundary'
 
 import ChatPanel from './components/Chat/ChatPanel'
@@ -33,23 +34,24 @@ import { useChatStore } from './store/chatStore'
 import { useMapStore } from './store/mapStore'
 
 // Centralised map padding — single source of truth
+// Chat panel overlays the map without shifting the camera; only the drawer affects left padding.
 function useMapPadding() {
   const view     = useDrawerStore(s => s.view)
-  const chatOpen = useChatStore(s => s.isOpen)
   const setMapPadding = useMapStore(s => s.setMapPadding)
 
   useEffect(() => {
     setMapPadding({
       top:    56,
       left:   0,
-      right:  chatOpen ? 340 : 0,
+      right:  0,
       bottom: 0,
     })
-  }, [view, chatOpen, setMapPadding])
+  }, [view, setMapPadding])
 }
 
 function AppContent() {
-  const [hoverInfo, setHoverInfo] = useState(null)
+  const [hoverInfo,   setHoverInfo]   = useState(null)
+  const [eventPopup,  setEventPopup]  = useState(null)
 
   useMapData()
   useWebSocket()
@@ -71,7 +73,7 @@ function AppContent() {
       <BeachLayer />
       <NearbyPoiLayer />
       <RouteLayer />
-      <EventsLayer onHover={setHoverInfo} />
+      <EventsLayer onHover={setHoverInfo} onEventClick={setEventPopup} />
       <UserLocationLayer />
       <PinLayer />
 
@@ -93,6 +95,9 @@ function AppContent() {
 
       {/* ── Hover tooltips ── */}
       {hoverInfo && <Tooltip info={hoverInfo} />}
+
+      {/* ── Event popup ── */}
+      <EventPopup popup={eventPopup} onClose={() => setEventPopup(null)} />
     </div>
   )
 }

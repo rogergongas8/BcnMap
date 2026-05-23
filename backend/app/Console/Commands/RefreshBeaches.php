@@ -19,7 +19,7 @@ class RefreshBeaches extends Command
 
     public function handle(): int
     {
-        $data = $this->beaches->refresh();
+        $data = $this->beaches->all();
         $this->info('Beaches refreshed: ' . count($data) . ' platges at ' . now()->toTimeString());
 
         foreach ($data as $b) {

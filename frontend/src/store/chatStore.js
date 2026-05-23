@@ -1,11 +1,12 @@
 import { create } from 'zustand'
 
 export const useChatStore = create((set) => ({
-  messages:      [],
-  isLoading:     false,
-  isOpen:        false,
-  hasUnread:     false,
-  pendingPrompt: null,
+  messages:        [],
+  isLoading:       false,
+  isOpen:          false,
+  hasUnread:       false,
+  pendingPrompt:   null,
+  suppressMapMove: false,
 
   toggleChat:  () => set((s) => ({ isOpen: !s.isOpen, hasUnread: false })),
   openChat:    () => set({ isOpen: true, hasUnread: false }),
@@ -13,8 +14,11 @@ export const useChatStore = create((set) => ({
   clearChat:   () => set({ messages: [] }),
   clearPendingPrompt: () => set({ pendingPrompt: null }),
 
-  // Open chat and queue a message to be sent automatically
-  openChatWithPrompt: (msg) => set({ isOpen: true, hasUnread: false, pendingPrompt: msg }),
+  // Normal: opens chat and queues a prompt, AI can move the map
+  openChatWithPrompt: (msg) => set({ isOpen: true, hasUnread: false, pendingPrompt: msg, suppressMapMove: false }),
+  // Info-only: used from POI/event cards — AI reply won't fly the camera
+  openChatWithPromptNoFly: (msg) => set({ isOpen: true, hasUnread: false, pendingPrompt: msg, suppressMapMove: true }),
+  clearSuppressMapMove: () => set({ suppressMapMove: false }),
 
   addMessage: (role, text) => set((s) => ({
     messages: [

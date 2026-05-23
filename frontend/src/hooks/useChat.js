@@ -11,8 +11,13 @@ const BCN_HOME = { lat: 41.3851, lng: 2.1734, zoom: 13 }
 async function executeMapActions(actions) {
   if (!Array.isArray(actions)) return
   const { flyTo } = useMapStore.getState()
+  const { suppressMapMove, clearSuppressMapMove } = useChatStore.getState()
+  if (suppressMapMove) clearSuppressMapMove()
 
   for (const action of actions) {
+    // Skip camera-only actions when called from an info context (event/POI card "Preguntar")
+    if (suppressMapMove && (action.type === 'fly_to' || action.type === 'open_place')) continue
+
     if (action.type === 'fly_to') {
       flyTo({ lat: action.lat, lng: action.lng, zoom: action.zoom ?? 15 })
 

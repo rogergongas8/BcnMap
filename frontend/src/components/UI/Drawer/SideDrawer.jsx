@@ -27,7 +27,10 @@ export default function SideDrawer() {
           className="absolute top-14 left-[60px] z-30 w-[340px]
             flex flex-col overflow-hidden
             shadow-[0_4px_32px_rgba(0,0,0,0.5)]"
-          style={{ maxHeight: 'calc(100vh - 56px)', background: '#141414', border: '1px solid #262626', borderRadius: 8 }}
+          style={{
+            maxHeight: view === 'events' ? 'min(580px, calc(100dvh - 80px))' : 'calc(100dvh - 56px)',
+            background: '#141414', border: '1px solid #262626', borderRadius: 8,
+          }}
         >
           {(view === 'nearby' || view === 'saved' || view === 'events') && (
             <header className="flex items-center justify-between px-4 py-3 flex-shrink-0" style={{ borderBottom: '1px solid #262626' }}>

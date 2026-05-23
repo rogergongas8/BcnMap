@@ -1,9 +1,11 @@
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useState, useEffect, useRef } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Icons } from '../icons'
 import { useDataStore } from '../../../store/dataStore'
 import { useMapStore } from '../../../store/mapStore'
 import { useChatStore } from '../../../store/chatStore'
+import { useRouteStore } from '../../../store/routeStore'
+import { useDrawerStore } from '../../../store/drawerStore'
 
 const CATEGORIES = [
   { id: null,          label: 'Tots' },
@@ -45,39 +47,84 @@ function formatDate(start, end) {
   return label
 }
 
-function CategoryRail({ active, onChange }) {
+function SearchAndFilter({ search, onSearch, activeCategory, onCategory }) {
+  const inputRef = React.useRef(null)
   return (
-    <div className="px-3 py-2.5" style={{ borderBottom: '1px solid #262626' }}>
-      <div className="flex gap-1.5 overflow-x-auto pb-1 -mb-1" style={{ scrollbarWidth: 'none' }}>
-        {CATEGORIES.map(cat => {
-          const isActive = active === cat.id
-          const color = cat.id ? CAT_COLOR[cat.id] : '#E8622A'
-          return (
-            <button
-              key={String(cat.id)}
-              onClick={() => onChange(cat.id)}
-              className="flex-shrink-0 px-2.5 py-1.5 whitespace-nowrap font-syne text-[11px] transition-all"
-              style={{
-                borderRadius: 6,
-                fontWeight: isActive ? 600 : 400,
-                border: `1px solid ${isActive ? color : '#262626'}`,
-                background: isActive ? color + '18' : '#1C1C1C',
-                color: isActive ? color : '#888',
-              }}
-            >
-              {cat.label}
-            </button>
-          )
-        })}
+    <div className="flex flex-col gap-0" style={{ borderBottom: '1px solid #262626' }}>
+      {/* Text search */}
+      <div className="px-3 pt-2.5 pb-2 flex items-center gap-2"
+        style={{ borderBottom: '1px solid #1A1A1A' }}
+      >
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" style={{ color: '#555', flexShrink: 0 }}>
+          <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.4"/>
+          <line x1="10.7" y1="10.7" x2="14.5" y2="14.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+        </svg>
+        <input
+          ref={inputRef}
+          value={search}
+          onChange={e => onSearch(e.target.value)}
+          placeholder="Cerca per nom, lloc…"
+          className="flex-1 bg-transparent font-mono text-[11px] outline-none placeholder-[#3A3530]"
+          style={{ color: '#EBEBEB' }}
+        />
+        {search && (
+          <button onClick={() => { onSearch(''); inputRef.current?.focus() }}
+            style={{ color: '#555' }}
+            onMouseEnter={e => e.currentTarget.style.color = '#888'}
+            onMouseLeave={e => e.currentTarget.style.color = '#555'}
+          >
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+              <line x1="1.5" y1="1.5" x2="8.5" y2="8.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+              <line x1="8.5" y1="1.5" x2="1.5" y2="8.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+            </svg>
+          </button>
+        )}
+      </div>
+
+      {/* Category rail */}
+      <div className="px-3 py-2" >
+        <div className="flex gap-1.5 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+          {CATEGORIES.map(cat => {
+            const isActive = activeCategory === cat.id
+            const color = cat.id ? CAT_COLOR[cat.id] : '#E8622A'
+            return (
+              <button
+                key={String(cat.id)}
+                onClick={() => onCategory(cat.id)}
+                className="flex-shrink-0 px-2.5 py-1 whitespace-nowrap font-syne text-[10px] transition-all"
+                style={{
+                  borderRadius: 5,
+                  fontWeight: isActive ? 600 : 400,
+                  border: `1px solid ${isActive ? color : '#262626'}`,
+                  background: isActive ? color + '18' : 'transparent',
+                  color: isActive ? color : '#666',
+                }}
+              >
+                {cat.label}
+              </button>
+            )
+          })}
+        </div>
       </div>
     </div>
   )
 }
 
-function EventRow({ event, expanded, onToggle }) {
-  const flyTo = useMapStore(s => s.flyTo)
-  const openChatWithPrompt = useChatStore(s => s.openChatWithPrompt)
+function EventRow({ event, expanded, onToggle, rowRef }) {
+  const flyTo          = useMapStore(s => s.flyTo)
+  const openChatWithPromptNoFly = useChatStore(s => s.openChatWithPromptNoFly)
+  const setDestination = useRouteStore(s => s.setDestination)
+  const togglePanel    = useRouteStore(s => s.togglePanel)
+  const isOpen         = useRouteStore(s => s.isOpen)
   const color = CAT_COLOR[event.category] ?? CAT_COLOR.altres
+
+  const handleNavigate = () => {
+    if (!event.lat || !event.lng) return
+    const label = event.place || event.title
+    setDestination({ lat: event.lat, lng: event.lng, label })
+    if (!isOpen) togglePanel()
+    flyTo({ lat: event.lat, lng: event.lng, zoom: 15 })
+  }
 
   const handleClick = () => {
     onToggle()
@@ -86,10 +133,12 @@ function EventRow({ event, expanded, onToggle }) {
     }
   }
 
-  const sourceLabel = event.source === 'ticketmaster' ? 'Ticketmaster' : null
+  const sourceLabel = event.source === 'ticketmaster' ? 'Ticketmaster'
+    : event.source === 'songkick' ? 'Songkick'
+    : null
 
   return (
-    <li style={{ borderBottom: '1px solid #1A1A1A' }}>
+    <li ref={rowRef} style={{ borderBottom: '1px solid #1A1A1A' }}>
       {/* ── Row header ── */}
       <div
         onClick={handleClick}
@@ -167,10 +216,27 @@ function EventRow({ event, expanded, onToggle }) {
               {event.start && (
                 <div className="flex items-start gap-2">
                   <span style={{ color: '#555', flexShrink: 0, marginTop: 1 }}><Icons.calendar size={11} /></span>
-                  <p className="font-mono text-[10px]" style={{ color: '#888' }}>
-                    {formatDate(event.start, event.end)}
-                    {event.time && ` · ${event.time}h`}
-                  </p>
+                  <div>
+                    <p className="font-mono text-[10px]" style={{ color: '#888' }}>
+                      {formatDate(event.start, event.end)}
+                      {event.time && ` · ${event.time}h`}
+                    </p>
+                    {(() => {
+                      const extras = typeof event.extra_dates === 'string'
+                        ? JSON.parse(event.extra_dates || '[]')
+                        : (event.extra_dates ?? [])
+                      if (!extras.length) return null
+                      const labels = extras.slice(0, 4).map(d => {
+                        const dt = new Date(d + 'T00:00:00')
+                        return dt.toLocaleDateString('ca', { day: 'numeric', month: 'short' })
+                      })
+                      return (
+                        <p className="font-mono text-[9px] mt-0.5" style={{ color: '#555' }}>
+                          Tb: {labels.join(', ')}{extras.length > 4 ? '…' : ''}
+                        </p>
+                      )
+                    })()}
+                  </div>
                 </div>
               )}
 
@@ -182,37 +248,53 @@ function EventRow({ event, expanded, onToggle }) {
               )}
 
               {/* Actions */}
-              <div className="flex gap-2 mt-1">
-                {event.url && (
-                  <a
-                    href={event.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex-1 flex items-center justify-center gap-1.5 py-2 font-syne text-[11px] font-medium transition-colors"
-                    style={{ borderRadius: 6, background: color + '18', border: `1px solid ${color}44`, color }}
-                    onMouseEnter={e => e.currentTarget.style.background = color + '28'}
-                    onMouseLeave={e => e.currentTarget.style.background = color + '18'}
+              <div className="flex flex-col gap-1.5 mt-1">
+                {/* Primary: navigate */}
+                {event.lat && event.lng && (
+                  <button
+                    onClick={handleNavigate}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 font-syne text-[12px] font-semibold transition-colors"
+                    style={{ borderRadius: 6, background: '#E8622A', color: '#fff' }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#d4541f'}
+                    onMouseLeave={e => e.currentTarget.style.background = '#E8622A'}
                   >
-                    <Icons.forward size={11} />
-                    {event.source === 'ticketmaster' ? 'Entrades' : 'Més info'}
-                  </a>
+                    <Icons.navigation size={12} />
+                    Porta'm aquí
+                  </button>
                 )}
-                <button
-                  onClick={() => openChatWithPrompt(`Explica'm més sobre "${event.title}"${event.place ? ` a ${event.place}` : ''}`)}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2 font-syne text-[11px] font-medium transition-colors"
-                  style={{ borderRadius: 6, background: '#1C1C1C', border: '1px solid #2A2A2A', color: '#888' }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = '#E8622A'; e.currentTarget.style.color = '#E8622A' }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = '#2A2A2A'; e.currentTarget.style.color = '#888' }}
-                >
-                  <svg width="11" height="11" viewBox="0 0 16 16" fill="none">
-                    <path d="M8 1.5C4.41 1.5 1.5 4.02 1.5 7.12c0 1.64.73 3.11 1.9 4.14L3 14.5l3.88-1.94c.35.07.72.1 1.12.1 3.59 0 6.5-2.52 6.5-5.54S11.59 1.5 8 1.5Z"
-                      stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" fill="none"/>
-                    <circle cx="5.5" cy="7.5" r="0.8" fill="currentColor"/>
-                    <circle cx="8" cy="7.5" r="0.8" fill="currentColor"/>
-                    <circle cx="10.5" cy="7.5" r="0.8" fill="currentColor"/>
-                  </svg>
-                  Preguntar
-                </button>
+
+                <div className="flex gap-1.5">
+                  {event.url && (
+                    <a
+                      href={event.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 font-syne text-[11px] font-medium transition-colors"
+                      style={{ borderRadius: 6, background: color + '18', border: `1px solid ${color}44`, color }}
+                      onMouseEnter={e => e.currentTarget.style.background = color + '28'}
+                      onMouseLeave={e => e.currentTarget.style.background = color + '18'}
+                    >
+                      <Icons.forward size={11} />
+                      {event.source === 'ticketmaster' ? 'Entrades' : 'Més info'}
+                    </a>
+                  )}
+                  <button
+                    onClick={() => openChatWithPromptNoFly(`Explica'm més sobre "${event.title}"${event.place ? ` a ${event.place}` : ''}`)}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 font-syne text-[11px] font-medium transition-colors"
+                    style={{ borderRadius: 6, background: '#1C1C1C', border: '1px solid #2A2A2A', color: '#888' }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = '#E8622A'; e.currentTarget.style.color = '#E8622A' }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = '#2A2A2A'; e.currentTarget.style.color = '#888' }}
+                  >
+                    <svg width="11" height="11" viewBox="0 0 16 16" fill="none">
+                      <path d="M8 1.5C4.41 1.5 1.5 4.02 1.5 7.12c0 1.64.73 3.11 1.9 4.14L3 14.5l3.88-1.94c.35.07.72.1 1.12.1 3.59 0 6.5-2.52 6.5-5.54S11.59 1.5 8 1.5Z"
+                        stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" fill="none"/>
+                      <circle cx="5.5" cy="7.5" r="0.8" fill="currentColor"/>
+                      <circle cx="8" cy="7.5" r="0.8" fill="currentColor"/>
+                      <circle cx="10.5" cy="7.5" r="0.8" fill="currentColor"/>
+                    </svg>
+                    Preguntar
+                  </button>
+                </div>
               </div>
 
             </div>
@@ -226,14 +308,39 @@ function EventRow({ event, expanded, onToggle }) {
 export default function EventsView() {
   const events             = useDataStore(s => s.events)
   const openChatWithPrompt = useChatStore(s => s.openChatWithPrompt)
+  const focusedEventKey    = useDrawerStore(s => s.focusedEventKey)
+  const clearEventFocus    = useDrawerStore(s => s.clearEventFocus)
   const [activeCategory, setActiveCategory] = useState(null)
+  const [searchQuery,    setSearchQuery]    = useState('')
   const [expandedId,     setExpandedId]     = useState(null)
+  const rowRefs = useRef({})
+  const listRef = useRef(null)
+
+  useEffect(() => {
+    if (!focusedEventKey) return
+    const [focusTitle, focusStart] = focusedEventKey.split('|')
+    const idx = events.findIndex(e => e.title === focusTitle && (e.start ?? '') === (focusStart ?? ''))
+    if (idx === -1) { clearEventFocus(); return }
+    const e  = events[idx]
+    const id = `${e.title}-${e.start}-${idx}`
+    setActiveCategory(null)
+    setExpandedId(id)
+    clearEventFocus()
+    requestAnimationFrame(() => {
+      rowRefs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    })
+  }, [focusedEventKey])
 
   const filtered = useMemo(() => {
-    const base = activeCategory
-      ? events.filter(e => e.category === activeCategory)
-      : events
-    // Sort: today first, then by start date, then by time
+    const q = searchQuery.trim().toLowerCase()
+    const base = events.filter(e => {
+      if (activeCategory && e.category !== activeCategory) return false
+      if (q) {
+        const haystack = [e.title, e.place, e.district].join(' ').toLowerCase()
+        if (!haystack.includes(q)) return false
+      }
+      return true
+    })
     return [...base].sort((a, b) => {
       if (a.today && !b.today) return -1
       if (!a.today && b.today) return 1
@@ -241,13 +348,18 @@ export default function EventsView() {
       if (a.time && b.time) return a.time.localeCompare(b.time)
       return 0
     })
-  }, [events, activeCategory])
+  }, [events, activeCategory, searchQuery])
 
   const activeMeta = CATEGORIES.find(c => c.id === activeCategory)
 
   return (
     <>
-      <CategoryRail active={activeCategory} onChange={setActiveCategory} />
+      <SearchAndFilter
+        search={searchQuery}
+        onSearch={setSearchQuery}
+        activeCategory={activeCategory}
+        onCategory={setActiveCategory}
+      />
 
       <div className="flex-1 overflow-y-auto min-h-0">
         {events.length === 0 && (
@@ -262,10 +374,10 @@ export default function EventsView() {
         {events.length > 0 && filtered.length === 0 && (
           <div className="px-6 py-12 flex flex-col items-center text-center gap-2">
             <p className="font-syne text-[13px]" style={{ color: '#888' }}>
-              Sense {activeMeta?.label.toLowerCase()} per avui
+              {searchQuery ? `Sense resultats per "${searchQuery}"` : `Sense ${activeMeta?.label.toLowerCase()} per avui`}
             </p>
             <button
-              onClick={() => setActiveCategory(null)}
+              onClick={() => { setActiveCategory(null); setSearchQuery('') }}
               className="font-mono text-[10px] underline"
               style={{ color: '#555' }}
             >
@@ -278,8 +390,9 @@ export default function EventsView() {
           <>
             <div className="px-4 py-2" style={{ borderBottom: '1px solid #1A1A1A' }}>
               <span className="font-mono text-[9px] uppercase tracking-[0.12em]" style={{ color: '#3A3530' }}>
-                {filtered.length} esdeveniment{filtered.length !== 1 ? 's' : ''}
+                {filtered.length} de {events.length}
                 {activeCategory ? ` · ${activeMeta?.label}` : ''}
+                {searchQuery ? ` · "${searchQuery}"` : ''}
               </span>
             </div>
 
@@ -289,6 +402,7 @@ export default function EventsView() {
                 return (
                   <EventRow
                     key={id}
+                    rowRef={el => { rowRefs.current[id] = el }}
                     event={event}
                     expanded={expandedId === id}
                     onToggle={() => setExpandedId(expandedId === id ? null : id)}

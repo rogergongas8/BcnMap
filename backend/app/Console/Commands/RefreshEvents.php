@@ -6,6 +6,7 @@ namespace App\Console\Commands;
 
 use App\Services\EventsEnrichmentService;
 use App\Services\EventsService;
+use App\Services\SongkickService;
 use App\Services\TicketmasterService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
@@ -16,8 +17,9 @@ class RefreshEvents extends Command
     protected $description = 'Refresh BCN and Ticketmaster events (runs every 6 hours)';
 
     public function __construct(
-        private EventsService          $bcnEvents,
-        private TicketmasterService    $ticketmaster,
+        private EventsService           $bcnEvents,
+        private TicketmasterService     $ticketmaster,
+        private SongkickService         $songkick,
         private EventsEnrichmentService $enrichment,
     ) {
         parent::__construct();
@@ -32,6 +34,10 @@ class RefreshEvents extends Command
         $this->info('Refreshing Ticketmaster events...');
         $tm = $this->ticketmaster->fetch();
         $this->info('Ticketmaster: ' . count($tm) . ' events');
+
+        $this->info('Refreshing Songkick events...');
+        $sk = $this->songkick->fetch();
+        $this->info('Songkick: ' . count($sk) . ' events');
 
         // Clear enriched cache so next request rebuilds with fresh data
         Cache::forget('events:enriched:current');

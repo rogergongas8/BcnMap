@@ -65,7 +65,8 @@ class TicketmasterService
             }
 
             $raw    = $response->json('_embedded.events', []);
-            $seen   = [];   // dedup key → index
+            $seenVenueDate = [];   // venue|date      → index (prevents exact duplicates)
+            $seenTitleVenue = [];  // normTitle|venue → index (groups multi-night runs)
             $events = [];
 
             foreach ($raw as $e) {
@@ -88,41 +89,57 @@ class TicketmasterService
                     $lng = null;
                 }
 
-                $segment  = $e['classifications'][0]['segment']['name'] ?? '';
-                $genre    = $e['classifications'][0]['genre']['name']   ?? '';
-                $category = self::GENRE_MAP[$genre] ?? self::SEGMENT_MAP[$segment] ?? 'altres';
+                $segment   = $e['classifications'][0]['segment']['name'] ?? '';
+                $genre     = $e['classifications'][0]['genre']['name']   ?? '';
+                $category  = self::GENRE_MAP[$genre] ?? self::SEGMENT_MAP[$segment] ?? 'altres';
                 $venueName = $venue['name'] ?? '';
-
-                // Deduplicate: same venue + date → keep earliest time, skip VIP/package variants
-                $normalVenue = preg_replace('/[^a-z0-9]/i', '', iconv('UTF-8', 'ASCII//TRANSLIT', strtolower($venueName)));
-                $dedupKey = $normalVenue . '|' . $startDate;
-                if (isset($seen[$dedupKey])) {
-                    // Keep if this entry has an earlier time
-                    $existing = &$events[$seen[$dedupKey]];
-                    if ($startTime && (!$existing['time'] || $startTime < $existing['time'])) {
-                        $existing['time'] = $startTime;
-                    }
-                    continue;
-                }
 
                 // Skip obvious package/VIP listings
                 if (preg_match('/\b(VIP|Package|Hospitality|Premium|Suite)\b/i', $title)) {
                     continue;
                 }
 
-                $seen[$dedupKey] = count($events);
+                $normalVenue = preg_replace('/[^a-z0-9]/', '', strtolower((string) iconv('UTF-8', 'ASCII//TRANSLIT', $venueName)));
+                $normalTitle = preg_replace('/[^a-z0-9]/', '', strtolower((string) iconv('UTF-8', 'ASCII//TRANSLIT', $title)));
+
+                // Exact duplicate: same venue + date → keep earliest time only
+                $venueDateKey = $normalVenue . '|' . $startDate;
+                if (isset($seenVenueDate[$venueDateKey])) {
+                    $existing = &$events[$seenVenueDate[$venueDateKey]];
+                    if ($startTime && (!$existing['time'] || $startTime < $existing['time'])) {
+                        $existing['time'] = $startTime;
+                    }
+                    continue;
+                }
+
+                // Multi-night run: same title at same venue → extend date range, collect dates
+                $titleVenueKey = $normalTitle . '|' . $normalVenue;
+                if (isset($seenTitleVenue[$titleVenueKey])) {
+                    $existing = &$events[$seenTitleVenue[$titleVenueKey]];
+                    // Extend end date and accumulate dates for display
+                    if ($startDate > ($existing['end'] ?? $startDate)) {
+                        $existing['end'] = $startDate;
+                    }
+                    $existing['extra_dates'][] = $startDate;
+                    $seenVenueDate[$venueDateKey] = $seenTitleVenue[$titleVenueKey];
+                    continue;
+                }
+
+                $seenVenueDate[$venueDateKey]   = count($events);
+                $seenTitleVenue[$titleVenueKey] = count($events);
                 $events[] = [
-                    'title'    => $title,
-                    'category' => $category,
-                    'place'    => $venueName,
-                    'district' => '',
-                    'start'    => $startDate,
-                    'end'      => $startDate,
-                    'time'     => $startTime,
-                    'url'      => $e['url'] ?? null,
-                    'lat'      => $lat,
-                    'lng'      => $lng,
-                    'source'   => 'ticketmaster',
+                    'title'       => $title,
+                    'category'    => $category,
+                    'place'       => $venueName,
+                    'district'    => '',
+                    'start'       => $startDate,
+                    'end'         => $startDate,
+                    'time'        => $startTime,
+                    'extra_dates' => [],
+                    'url'         => $e['url'] ?? null,
+                    'lat'         => $lat,
+                    'lng'         => $lng,
+                    'source'      => 'ticketmaster',
                 ];
             }
 

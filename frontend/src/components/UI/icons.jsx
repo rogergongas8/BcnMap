@@ -25,6 +25,8 @@ export const Icons = {
   forward:     (p) => svg(p, <polyline points="9 6 15 12 9 18" />),
   arrow:       (p) => svg(p, <><line x1="5" y1="12" x2="19" y2="12" /><polyline points="13 6 19 12 13 18" /></>),
   chevronLeft: (p) => svg(p, <polyline points="15 6 9 12 15 18" />),
+  chevronDown: (p) => svg(p, <polyline points="6 9 12 15 18 9" />),
+  navigation:  (p) => svg(p, <polygon points="3 11 22 2 13 21 11 13 3 11" />),
   photo:       (p) => svg(p, <><rect x="3" y="5" width="18" height="14" rx="2" /><circle cx="12" cy="12" r="3" /><path d="M9 5l1.5-2h3L15 5" /></>),
   chevUp:      (p) => svg(p, <polyline points="6 15 12 9 18 15" />),
   filter:      (p) => svg(p, <polygon points="22 3 2 3 10 12.5 10 19 14 21 14 12.5 22 3" />),

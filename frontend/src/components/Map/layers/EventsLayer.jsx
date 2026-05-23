@@ -48,7 +48,7 @@ function buildGeojson(events) {
   }
 }
 
-export default function EventsLayer({ onHover }) {
+export default function EventsLayer({ onHover, onEventClick }) {
   const { mapInstance, isLoaded, styleKey, activeLayers } = useMapStore()
   const events  = useDataStore(s => s.events)
   const visible = activeLayers.includes('events')
@@ -100,7 +100,12 @@ export default function EventsLayer({ onHover }) {
           source: SOURCE_ID,
           minzoom: 14,
           layout: {
-            'text-field':           ['get', 'title'],
+            'text-field': [
+              'case',
+              ['>', ['length', ['get', 'title']], 22],
+              ['concat', ['slice', ['get', 'title'], 0, 22], '…'],
+              ['get', 'title'],
+            ],
             'text-font':            ['Noto Sans Regular'],
             'text-size':            11,
             'text-offset':          [0, 1.4],
@@ -129,6 +134,12 @@ export default function EventsLayer({ onHover }) {
         mapInstance.on('mouseleave', LAYER_HALO, () => {
           mapInstance.getCanvas().style.cursor = ''
           onHover?.(null)
+        })
+
+        mapInstance.on('click', LAYER_HALO, (e) => {
+          e.preventDefault()
+          const props = e.features[0]?.properties ?? {}
+          onEventClick?.({ event: props, x: e.point.x, y: e.point.y })
         })
       }
 

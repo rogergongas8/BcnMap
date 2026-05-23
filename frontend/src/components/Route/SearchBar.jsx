@@ -12,7 +12,6 @@ import { geocodeSearch } from '../../utils/geocode'
  * Constantes
  * ───────────────────────────────────────────────────────────────────── */
 
-const BCN_CENTER = { lat: 41.3851, lng: 2.1734, label: 'Centro de Barcelona' }
 
 const MODES = [
   { id: 'foot',   label: 'A pie',  color: '#ffffff' },
@@ -954,15 +953,14 @@ export default function SearchBar({ embedded = false }) {
 
   /* ────────────────── Inicialización del origen ────────────────── */
 
-  // Inicializa el origen con GPS si está disponible, sino con el centro de Barcelona.
+  // Inicializa el origen con GPS cuando está disponible. Sin fallback a BCN center
+  // para que el usuario pueda dejar el campo vacío y escribir manualmente.
   useEffect(() => {
     if (originPoint) return
     if (userLocation) {
       setOriginPoint({ lat: userLocation.lat, lng: userLocation.lng, label: 'Mi ubicación' })
-    } else {
-      setOriginPoint({ ...BCN_CENTER })
     }
-  }, [userLocation, originPoint])
+  }, [userLocation])
 
   // Sincroniza el texto del input de origen con originPoint (sólo si el usuario no está escribiendo)
   useEffect(() => {
