@@ -73,10 +73,12 @@ export const useMapStore = create((set) => ({
       return { pitch: newPitch }
     }),
 
-  // Ajusta el padding del mapa para que la ruta/contenido no quede tapado por paneles laterales
+  // Applies padding WITHOUT moving the camera (setPadding ≠ easeTo({ padding })).
+  // easeTo with padding re-centers the camera to keep the padded-center stationary,
+  // which is what causes the visible map drift. setPadding just updates the value.
   setMapPadding: (padding) =>
     set((state) => {
-      state.mapInstance?.easeTo({ padding, duration: 280 })
+      state.mapInstance?.setPadding(padding)
       return {}
     }),
 }))

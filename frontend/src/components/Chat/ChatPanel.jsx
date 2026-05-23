@@ -42,8 +42,8 @@ export default function ChatPanel() {
           className="absolute top-0 right-0 bottom-0 z-50 w-[340px] flex flex-col"
           style={{
             background: '#111111',
-            borderLeft: '1px solid #1e1e1e',
-            boxShadow: '-24px 0 80px rgba(0,0,0,0.75)',
+            borderLeft: '1px solid #262626',
+            boxShadow: '-4px 0 16px rgba(0,0,0,0.35)',
           }}
         >
           {/* ── Header (same height as TopBar: 56px) ── */}
@@ -72,7 +72,7 @@ export default function ChatPanel() {
                   BCN Live AI
                 </p>
                 <p className="font-mono text-[9px] leading-tight mt-0.5" style={{ color: '#444' }}>
-                  gemma2-9b · en línia
+                  llama-3.1-8b · en línia
                 </p>
               </div>
             </div>

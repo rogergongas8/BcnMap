@@ -111,18 +111,17 @@ function SearchAndFilter({ search, onSearch, activeCategory, onCategory }) {
 }
 
 function EventRow({ event, expanded, onToggle, rowRef }) {
-  const flyTo          = useMapStore(s => s.flyTo)
+  const flyTo               = useMapStore(s => s.flyTo)
+  const userLocation        = useMapStore(s => s.userLocation)
   const openChatWithPromptNoFly = useChatStore(s => s.openChatWithPromptNoFly)
-  const setDestination = useRouteStore(s => s.setDestination)
-  const togglePanel    = useRouteStore(s => s.togglePanel)
-  const isOpen         = useRouteStore(s => s.isOpen)
+  const setChatRequest      = useRouteStore(s => s.setChatRequest)
   const color = CAT_COLOR[event.category] ?? CAT_COLOR.altres
 
   const handleNavigate = () => {
     if (!event.lat || !event.lng) return
-    const label = event.place || event.title
-    setDestination({ lat: event.lat, lng: event.lng, label })
-    if (!isOpen) togglePanel()
+    const dest   = { lat: event.lat, lng: event.lng, label: event.place || event.title }
+    const origin = userLocation ? { lat: userLocation.lat, lng: userLocation.lng, label: 'Mi ubicación' } : null
+    setChatRequest({ origin, destination: dest, mode: 'foot' })
     flyTo({ lat: event.lat, lng: event.lng, zoom: 15 })
   }
 
@@ -327,7 +326,7 @@ export default function EventsView() {
     setExpandedId(id)
     clearEventFocus()
     requestAnimationFrame(() => {
-      rowRefs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+      rowRefs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     })
   }, [focusedEventKey])
 
@@ -405,7 +404,15 @@ export default function EventsView() {
                     rowRef={el => { rowRefs.current[id] = el }}
                     event={event}
                     expanded={expandedId === id}
-                    onToggle={() => setExpandedId(expandedId === id ? null : id)}
+                    onToggle={() => {
+                      const next = expandedId === id ? null : id
+                      setExpandedId(next)
+                      if (next === id) {
+                        setTimeout(() => {
+                          rowRefs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                        }, 160)
+                      }
+                    }}
                   />
                 )
               })}

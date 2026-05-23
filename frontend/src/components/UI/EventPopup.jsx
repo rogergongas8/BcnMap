@@ -37,10 +37,7 @@ export default function EventPopup({ popup, onClose }) {
   const { event, x, y } = popup ?? {}
   const userLocation       = useMapStore(s => s.userLocation)
   const flyTo              = useMapStore(s => s.flyTo)
-  const setOrigin          = useRouteStore(s => s.setOrigin)
-  const setDestination     = useRouteStore(s => s.setDestination)
-  const isOpen             = useRouteStore(s => s.isOpen)
-  const togglePanel        = useRouteStore(s => s.togglePanel)
+  const setChatRequest     = useRouteStore(s => s.setChatRequest)
   const openChatWithPromptNoFly = useChatStore(s => s.openChatWithPromptNoFly)
 
   useEffect(() => {
@@ -55,13 +52,10 @@ export default function EventPopup({ popup, onClose }) {
 
   const handleNavigate = () => {
     if (!event.lat || !event.lng) return
-    const dest = { lat: parseFloat(event.lat), lng: parseFloat(event.lng), label: event.place || event.title }
-    setDestination(dest)
-    if (userLocation) {
-      setOrigin({ lat: userLocation.lat, lng: userLocation.lng, label: 'Mi ubicación' })
-    }
-    if (!isOpen) togglePanel()
-    flyTo({ lat: parseFloat(event.lat), lng: parseFloat(event.lng), zoom: 16 })
+    const dest   = { lat: parseFloat(event.lat), lng: parseFloat(event.lng), label: event.place || event.title }
+    const origin = userLocation ? { lat: userLocation.lat, lng: userLocation.lng, label: 'Mi ubicación' } : null
+    setChatRequest({ origin, destination: dest, mode: 'foot' })
+    flyTo({ lat: parseFloat(event.lat), lng: parseFloat(event.lng), zoom: 15 })
     onClose()
   }
 

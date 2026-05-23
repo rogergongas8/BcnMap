@@ -33,20 +33,17 @@ import { useDrawerStore } from './store/drawerStore'
 import { useChatStore } from './store/chatStore'
 import { useMapStore } from './store/mapStore'
 
-// Centralised map padding — single source of truth
-// Chat panel overlays the map without shifting the camera; only the drawer affects left padding.
+// Centralised map padding.
+// Uses setPadding (not easeTo) so the camera never moves when panels open/close.
 function useMapPadding() {
-  const view     = useDrawerStore(s => s.view)
+  const view      = useDrawerStore(s => s.view)
+  const isLoaded  = useMapStore(s => s.isLoaded)
   const setMapPadding = useMapStore(s => s.setMapPadding)
 
   useEffect(() => {
-    setMapPadding({
-      top:    56,
-      left:   0,
-      right:  0,
-      bottom: 0,
-    })
-  }, [view, setMapPadding])
+    if (!isLoaded) return
+    setMapPadding({ top: 56, left: 0, right: 0, bottom: 0 })
+  }, [view, isLoaded, setMapPadding])
 }
 
 function AppContent() {
