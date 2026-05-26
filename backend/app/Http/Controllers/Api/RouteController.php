@@ -17,7 +17,8 @@ class RouteController extends Controller
             'from_lng' => 'required|numeric|between:-180,180',
             'to_lat'   => 'required|numeric|between:-90,90',
             'to_lng'   => 'required|numeric|between:-180,180',
-            'mode'     => 'required|in:car,foot,bike,bicing,bus',
+            'mode'     => 'required|in:car,foot,bike,bicing,metro,bus',
+            'lang'     => 'nullable|in:ca,es,en',
         ]);
 
         $result = $this->routeService->calculate(
@@ -26,6 +27,7 @@ class RouteController extends Controller
             (float) $request->input('to_lat'),
             (float) $request->input('to_lng'),
             $request->input('mode'),
+            $request->input('lang', 'ca'),
         );
 
         if (isset($result['error'])) {
@@ -43,6 +45,7 @@ class RouteController extends Controller
             'to_lat'     => 'required|numeric|between:-90,90',
             'to_lng'     => 'required|numeric|between:-180,180',
             'constraint' => 'nullable|string|max:200',
+            'lang'       => 'nullable|in:ca,es,en',
         ]);
 
         $result = $this->routeService->planMultimodal(
@@ -51,6 +54,7 @@ class RouteController extends Controller
             (float) $request->input('to_lat'),
             (float) $request->input('to_lng'),
             $request->input('constraint'),
+            $request->input('lang', 'ca'),
         );
 
         return response()->json($result);

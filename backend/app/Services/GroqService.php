@@ -12,17 +12,30 @@ class GroqService
     private const API_URL = 'https://api.groq.com/openai/v1/chat/completions';
     private const MODEL   = 'llama-3.1-8b-instant';
 
-    public function chat(string $userMessage, string $cityContext, array $history = []): array
+    public function chat(string $userMessage, string $cityContext, array $history = [], string $lang = 'ca'): array
     {
+        $langInstruction = match ($lang) {
+            'es'    => 'Responde siempre en español.',
+            'en'    => 'Always respond in English.',
+            default => 'Respon sempre en català.',
+        };
+
+        $replyExample = match ($lang) {
+            'es'    => 'respuesta conversacional en español (máx 3 frases)',
+            'en'    => 'conversational response in English (max 3 sentences)',
+            default => 'resposta conversacional en català (màx 3 frases)',
+        };
+
         $systemPrompt = <<<PROMPT
 Eres el asistente de BCN Live, app de monitorización en tiempo real de Barcelona. Ayudas a los usuarios a moverse por la ciudad usando datos en tiempo real.
+{$langInstruction}
 
 DATOS ACTUALES:
 {$cityContext}
 
 Responde SIEMPRE en JSON exacto con esta estructura:
 {
-  "reply": "respuesta conversacional en español (máx 3 frases)",
+  "reply": "{$replyExample}",
   "map_actions": []
 }
 

@@ -25,10 +25,11 @@ export const useRouteStore = create((set) => ({
   setOrigin:      (pt)   => set({ origin: pt, route: null }),
   setDestination: (pt)   => set({ destination: pt, route: null }),
   setPicking:     (p)    => set({ picking: p }),
-  setRoute:       (r)    => set({ route: r, error: null }),
+  setRoute:       (r)    => { console.log('setRoute', r); set({ route: r, error: null }) },
+  setFullRoute:   (m, o, d, r) => { console.log('setFullRoute', m, r); set({ mode: m, origin: o, destination: d, route: r, error: null }) },
   setLoading:     (b)    => set({ isLoading: b }),
   setError:       (e)    => set({ error: e, isLoading: false }),
-  clearRoute:     ()     => set({ origin: null, destination: null, route: null, picking: null, error: null, isNavigating: false, currentStepIndex: 0 }),
+  clearRoute:     ()     => { console.log('clearRoute'); set({ origin: null, destination: null, route: null, picking: null, error: null, isNavigating: false, currentStepIndex: 0 }) },
 
   startNavigation: () => set({ isNavigating: true, currentStepIndex: 0, offRoute: false }),
   stopNavigation:  () => set({ isNavigating: false, currentStepIndex: 0, offRoute: false }),

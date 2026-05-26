@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { useAuthStore } from '../store/authStore'
+import { useLangStore } from '../store/langStore'
 
 const api = axios.create({
   baseURL: (import.meta.env.VITE_API_URL ?? '') + '/api/v1',
@@ -25,6 +26,7 @@ export const sendChat = (message, history, userLocation = null, nearbyPois = [])
   api.post('/chat', {
     message,
     conversation_history: history,
+    lang:        useLangStore.getState().lang,
     user_lat:    userLocation?.lat ?? null,
     user_lng:    userLocation?.lng ?? null,
     nearby_pois: nearbyPois.slice(0, 12).map(p => ({
@@ -38,10 +40,14 @@ export const sendChat = (message, history, userLocation = null, nearbyPois = [])
   }).then(r => r.data)
 
 export const fetchRoute = (fromLat, fromLng, toLat, toLng, mode) =>
-  api.get('/route', { params: { from_lat: fromLat, from_lng: fromLng, to_lat: toLat, to_lng: toLng, mode } }).then(r => r.data)
+  api.get('/route', {
+    params: { from_lat: fromLat, from_lng: fromLng, to_lat: toLat, to_lng: toLng, mode, lang: useLangStore.getState().lang }
+  }).then(r => r.data)
 
 export const fetchRoutePlan = (fromLat, fromLng, toLat, toLng, constraint = null) =>
-  api.get('/route/plan', { params: { from_lat: fromLat, from_lng: fromLng, to_lat: toLat, to_lng: toLng, constraint } }).then(r => r.data)
+  api.get('/route/plan', {
+    params: { from_lat: fromLat, from_lng: fromLng, to_lat: toLat, to_lng: toLng, constraint, lang: useLangStore.getState().lang }
+  }).then(r => r.data)
 
 export const fetchBeaches = () => api.get('/beaches').then(r => r.data)
 

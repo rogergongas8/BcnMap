@@ -365,7 +365,8 @@ function HorarisTab({ place, enrich, enrichLoading }) {
 const ROUTE_MODES = [
   { id: 'foot',   label: 'A peu',  color: '#ffffff' },
   { id: 'bicing', label: 'Bicing', color: '#E8622A' },
-  { id: 'bus',    label: 'Metro',  color: '#8B6AD4' },
+  { id: 'metro',  label: 'Metro',  color: '#ff6b35' },
+  { id: 'bus',    label: 'Bus',    color: '#00b4ff' },
   { id: 'car',    label: 'Cotxe',  color: '#C98E2E' },
 ]
 
@@ -376,7 +377,7 @@ function RutaTab({ place, onRoute }) {
     <div className="flex-1 flex flex-col min-h-0">
       <div className="px-4 pt-3 pb-2 flex-shrink-0">
         <p className="font-mono text-[9px] uppercase tracking-[0.14em] mb-2.5" style={{ color: '#555' }}>Mode de transport</p>
-        <div className="grid grid-cols-4 gap-1">
+        <div className="grid grid-cols-5 gap-1">
           {ROUTE_MODES.map(m => (
             <button
               key={m.id}
@@ -612,15 +613,27 @@ export default function PlaceView() {
           <button onClick={() => showTabs ? setTab('ruta') : handleRoute()}
             className="flex-1 h-10 flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
             style={{ borderRadius: 6, background: '#E8622A', border: '1px solid #E8622A' }}>
-            <Icons.route size={13} style={{ color: '#fff' }} />
-            <span className="font-syne text-[12px] font-semibold" style={{ color: '#fff' }}>Com arribar-hi</span>
+            <Icons.navigation size={13} style={{ color: '#fff' }} />
+            <span className="font-syne text-[12px] font-semibold" style={{ color: '#fff' }}>Porta'm aquí</span>
           </button>
-          <button onClick={handleCopy}
-            className="h-10 px-3 flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]"
-            style={{ borderRadius: 6, background: '#1C1C1C', border: `1px solid ${copied ? '#E8622A' : '#262626'}`, color: copied ? '#E8622A' : '#555' }}>
-            <Icons.copy size={12} />
-            <span className="font-mono text-[9px] uppercase tracking-[0.08em]">{copied ? 'Copiat' : 'Coords'}</span>
-          </button>
+          
+          {(enrich?.website || place.meta?.website) && (
+            <a href={enrich?.website || place.meta?.website} target="_blank" rel="noopener noreferrer"
+              className="flex-1 h-10 flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]"
+              style={{ borderRadius: 6, background: '#1C1C1C', border: '1px solid #262626', color: '#EBEBEB' }}>
+              <Icons.external size={12} />
+              <span className="font-syne text-[12px] font-medium">Entrades / Web</span>
+            </a>
+          )}
+
+          {!(enrich?.website || place.meta?.website) && (
+            <button onClick={handleCopy}
+              className="h-10 px-3 flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]"
+              style={{ borderRadius: 6, background: '#1C1C1C', border: `1px solid ${copied ? '#E8622A' : '#262626'}`, color: copied ? '#E8622A' : '#555' }}>
+              <Icons.copy size={12} />
+              <span className="font-mono text-[9px] uppercase tracking-[0.08em]">{copied ? 'Copiat' : 'Coords'}</span>
+            </button>
+          )}
         </div>
       )}
     </div>

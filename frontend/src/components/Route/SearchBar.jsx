@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
 import { useRouteStore } from '../../store/routeStore'
 import { useMapStore } from '../../store/mapStore'
 import { useDataStore } from '../../store/dataStore'
@@ -14,10 +15,11 @@ import { geocodeSearch } from '../../utils/geocode'
 
 
 const MODES = [
-  { id: 'foot',   label: 'A pie',  color: '#ffffff' },
-  { id: 'bicing', label: 'Bicing', color: '#00ff88' },
-  { id: 'bus',    label: 'Metro',  color: '#ff6b35' },
-  { id: 'car',    label: 'Coche',  color: '#ffaa00' },
+  { id: 'foot',   color: '#ffffff' },
+  { id: 'bicing', color: '#00ff88' },
+  { id: 'metro',  color: '#ff6b35' },
+  { id: 'bus',    color: '#00b4ff' },
+  { id: 'car',    color: '#ffaa00' },
 ]
 
 const MODE_BY_ID = Object.fromEntries(MODES.map(m => [m.id, m]))
@@ -97,14 +99,25 @@ const Icon = {
       <circle cx="17" cy="14" r="1.2" fill="currentColor" />
     </svg>
   ),
-  // Modo: metro/tren
-  bus: (p) => (
+  // Modo: metro
+  metro: (p) => (
     <svg width={p.size ?? 18} height={p.size ?? 18} viewBox="0 0 24 24" fill="none" style={p.style}>
       <rect x="5" y="3" width="14" height="15" rx="3" stroke="currentColor" strokeWidth="1.5" fill="none" />
       <line x1="5" y1="11" x2="19" y2="11" stroke="currentColor" strokeWidth="1.3" />
       <circle cx="8.5" cy="14.5" r="1.1" fill="currentColor" />
       <circle cx="15.5" cy="14.5" r="1.1" fill="currentColor" />
       <path d="M7 18 L5 21 M17 18 L19 21" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  ),
+  // Modo: bus urbano
+  bus: (p) => (
+    <svg width={p.size ?? 18} height={p.size ?? 18} viewBox="0 0 24 24" fill="none" style={p.style}>
+      <rect x="3" y="5" width="18" height="12" rx="2.5" stroke="currentColor" strokeWidth="1.5" fill="none" />
+      <line x1="3" y1="10" x2="21" y2="10" stroke="currentColor" strokeWidth="1.3" />
+      <circle cx="7.5" cy="14.5" r="1.1" fill="currentColor" />
+      <circle cx="16.5" cy="14.5" r="1.1" fill="currentColor" />
+      <line x1="12" y1="5" x2="12" y2="17" stroke="currentColor" strokeWidth="1" strokeDasharray="1.5 1.5" />
+      <path d="M3 7 L1 7 M21 7 L23 7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
     </svg>
   ),
   // Segmento: paso a pie (huella)
@@ -132,8 +145,9 @@ const SEG_ICONS = {
 const MODE_ICONS = {
   foot:   Icon.foot,
   bicing: Icon.bicing,
-  car:    Icon.car,
+  metro:  Icon.metro,
   bus:    Icon.bus,
+  car:    Icon.car,
 }
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -287,6 +301,7 @@ function SegmentSequence({ segments, metroLines }) {
  * ───────────────────────────────────────────────────────────────────── */
 
 function ModeCard({ mode, state, isActive, onClick, metroLines }) {
+  const { t }    = useTranslation()
   const ModeIcon = MODE_ICONS[mode.id]
   const { color } = mode
   const data    = state?.data
@@ -307,13 +322,22 @@ function ModeCard({ mode, state, isActive, onClick, metroLines }) {
         </span>
       )
     }
-  } else if (mode.id === 'bus' && segs.length) {
-    const metroSegs = segs.filter(s => s.type === 'metro' || s.type === 'bus')
+  } else if (mode.id === 'metro' && segs.length) {
+    const metroSegs = segs.filter(s => s.type === 'metro')
     if (metroSegs.length > 1) {
       const lines = metroSegs.map(s => s.meta?.lines?.[0]).filter(Boolean)
       metaLine = <span>{lines.join(' → ')}</span>
     } else if (metroSegs[0]?.meta?.from_station) {
       const m = metroSegs[0].meta
+      metaLine = <span>{m.from_station} → {m.to_station}</span>
+    }
+  } else if (mode.id === 'bus' && segs.length) {
+    const busSegs = segs.filter(s => s.type === 'bus')
+    if (busSegs.length > 1) {
+      const lines = busSegs.map(s => s.meta?.lines?.[0]).filter(Boolean)
+      metaLine = <span>{[...new Set(lines)].join(' → ')}</span>
+    } else if (busSegs[0]?.meta?.from_station) {
+      const m = busSegs[0].meta
       metaLine = <span>{m.from_station} → {m.to_station}</span>
     }
   }
@@ -357,7 +381,7 @@ function ModeCard({ mode, state, isActive, onClick, metroLines }) {
           <div className="flex items-center justify-between gap-2">
             <span className="font-mono text-[10px] uppercase tracking-[0.1em]"
                   style={{ color: inefficient ? '#444' : isActive ? color : '#888' }}>
-              {mode.label}
+              {t(`modes.${mode.id}`)}
             </span>
 
             <div className="flex items-center gap-2">
@@ -419,21 +443,23 @@ function ModeCard({ mode, state, isActive, onClick, metroLines }) {
 
 function useMetroArrivals(stationId) {
   const [data, setData] = useState({ loading: false, trains: null })
+  const renderCount = useRef(0)
 
   useEffect(() => {
-    if (!stationId) { setData({ loading: false, trains: null }); return }
+    renderCount.current += 1
+    if (!stationId) { setData({ loading: false, trains: null, mounts: renderCount.current }); return }
     let cancelled = false
 
     const load = async () => {
-      setData(prev => ({ loading: prev.trains == null, trains: prev.trains }))
+      setData(prev => ({ loading: prev.trains == null, trains: prev.trains, mounts: renderCount.current }))
       try {
         const r = await fetchMetroArrivals(stationId)
         if (cancelled) return
         const trains = Array.isArray(r?.trains) ? r.trains : null
-        setData({ loading: false, trains })
+        setData({ loading: false, trains, mounts: renderCount.current })
       } catch {
         if (cancelled) return
-        setData({ loading: false, trains: null })
+        setData({ loading: false, trains: null, mounts: renderCount.current })
       }
     }
 
@@ -450,6 +476,7 @@ function useMetroArrivals(stationId) {
  * ───────────────────────────────────────────────────────────────────── */
 
 function MetroArrivalsLine({ stationId, lines }) {
+  const { t } = useTranslation()
   const { loading, trains } = useMetroArrivals(stationId)
 
   if (loading && !trains) {
@@ -468,21 +495,25 @@ function MetroArrivalsLine({ stationId, lines }) {
 
   if (!trains || trains.length === 0) return null
 
-  // Filtra a las líneas que nos interesan si están definidas
-  const filtered = lines?.length
-    ? trains.filter(t => lines.includes(t.line))
-    : trains
-  const pool = filtered.length ? filtered : trains
-  const upcoming = pool.slice(0, 2)
-  if (!upcoming.length) return null
+  // Flatten all individual train minutes, filtered by relevant lines
+  const relevant = lines?.length ? trains.filter(t => lines.includes(t.line)) : trains
+  const pool = relevant.length ? relevant : trains
 
-  const label = upcoming
-    .map(t => (t.minutes === 0 ? 'ahora' : `${t.minutes} min`))
+  const allMinutes = pool
+    .flatMap(t => (t.arrivals ?? []).map(m => m))
+    .filter(m => m !== undefined && m !== null)
+    .sort((a, b) => a - b)
+    .slice(0, 3)
+
+  if (!allMinutes.length) return null
+
+  const label = allMinutes
+    .map(m => (m === 0 ? t('metro.now') : t('metro.min', { n: m })))
     .join(' · ')
 
   return (
     <span className="text-cyan-400/70 text-[10px] font-mono">
-      Próximo: {label}
+      {label}
     </span>
   )
 }
@@ -549,6 +580,7 @@ function StepNodeBicing({ name, bikes, ebikes, docks }) {
 }
 
 function StepNodeMetro({ name, lineNames, lineColors, stationId, direction }) {
+  const { t } = useTranslation()
   const primary = lineNames?.[0]
   const primaryColor = primary && lineColors?.[primary] ? lineColors[primary] : '#A855F7'
   const bg = primaryColor.startsWith('#') ? primaryColor : '#' + primaryColor
@@ -567,7 +599,7 @@ function StepNodeMetro({ name, lineNames, lineColors, stationId, direction }) {
         <p className="text-[12px] font-mono text-white/80 truncate">{name}</p>
         {direction && (
           <p className="text-[10px] font-mono truncate" style={{ color: bg + 'cc' }}>
-            dir. {direction}
+            {t('search.dir')} {direction}
           </p>
         )}
         {stationId && (
@@ -581,6 +613,7 @@ function StepNodeMetro({ name, lineNames, lineColors, stationId, direction }) {
 }
 
 function StepNodeTransfer({ name, fromLine, fromColor, toLine, toColor, toDirection, stationId }) {
+  const { t } = useTranslation()
   const toClr = toColor ?? '#888'
   return (
     <div className="flex items-start gap-2.5">
@@ -603,9 +636,9 @@ function StepNodeTransfer({ name, fromLine, fromColor, toLine, toColor, toDirect
       </span>
       <div className="flex-1 min-w-0">
         <p className="text-[12px] font-mono text-white/80 truncate">{name}</p>
-        <p className="text-[10px] font-mono text-white/35">Transbordo
+        <p className="text-[10px] font-mono text-white/35">{t('search.transfer')}
           {toDirection && (
-            <span style={{ color: toClr + 'cc' }}> · dir. {toDirection}</span>
+            <span style={{ color: toClr + 'cc' }}> · {t('search.dir')} {toDirection}</span>
           )}
         </p>
         {stationId && (
@@ -634,7 +667,7 @@ function StepSegment({ seg }) {
     const ln = seg.meta?.lines?.[0]
     label = ln ? `Metro ${ln}` : 'Metro'
   }
-  else if (isBus) label = 'Bus'
+  else if (isBus) { const ln = seg.meta?.line; label = ln ? `Bus ${ln}` : 'Bus' }
 
   const color = seg.color ?? '#ffffff'
 
@@ -703,6 +736,7 @@ function NumberedSteps({ steps, currentStep }) {
 }
 
 function RouteStepPanel({ segments, origin, destination, mode }) {
+  const { t } = useTranslation()
   const { isNavigating, startNavigation, stopNavigation, currentStepIndex } = useRouteStore()
   const canNavigate = (mode === 'foot' || mode === 'bicing') && segments?.[0]?.steps?.length > 0
   const isSimpleRoute = segments?.length <= 2 && (mode === 'foot' || mode === 'bicing')
@@ -764,11 +798,13 @@ function RouteStepPanel({ segments, origin, destination, mode }) {
         style={{ borderBottom: '1px solid #262626' }}>
         <div className="flex items-center gap-2">
           <p className="font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color: '#555' }}>
-            {isSimpleRoute && allSteps.length > 0 ? 'Instruccions' : 'Pas a pas'}
+            {isSimpleRoute && allSteps.length > 0 ? t('search.steps') : t('search.stepByStep')}
           </p>
           {isSimpleRoute && totalSteps > 0 && (
             <span className="font-mono text-[9px]" style={{ color: '#555' }}>
-              {isNavigating ? `${currentStepIndex + 1} de ${totalSteps}` : `${totalSteps} passos`}
+              {isNavigating
+                ? t('search.stepOf', { current: currentStepIndex + 1, total: totalSteps })
+                : t('search.steps_count', { count: totalSteps })}
             </span>
           )}
         </div>
@@ -783,7 +819,7 @@ function RouteStepPanel({ segments, origin, destination, mode }) {
               color: isNavigating ? '#D45555' : '#fff',
             }}
           >
-            {isNavigating ? 'Aturar' : 'Inici de navegació →'}
+            {isNavigating ? t('search.stopNav') : t('search.navigate')}
           </button>
         )}
       </div>
@@ -918,6 +954,7 @@ function SaveRouteButton({ originPoint, destPoint, mode }) {
  * ───────────────────────────────────────────────────────────────────── */
 
 export default function SearchBar({ embedded = false }) {
+  const { t } = useTranslation()
   useRoute()
 
   const { mapInstance, userLocation, flyTo } = useMapStore()
@@ -981,6 +1018,7 @@ export default function SearchBar({ embedded = false }) {
       setPreviews({
         foot:   options.foot   ? { data: options.foot   } : { error: true },
         bicing: options.bicing ? { data: options.bicing } : { error: true },
+        metro:  options.metro  ? { data: options.metro  } : { error: true },
         bus:    options.bus    ? { data: options.bus    } : { error: true },
         car:    options.car    ? { data: options.car    } : { error: true },
       })
@@ -1011,6 +1049,7 @@ export default function SearchBar({ embedded = false }) {
     setPreviews({
       foot:   { loading: true },
       bicing: { loading: true },
+      metro:  { loading: true },
       bus:    { loading: true },
       car:    { loading: true },
     })
@@ -1107,27 +1146,36 @@ export default function SearchBar({ embedded = false }) {
 
   const handleActivateMode = async (modeId) => {
     if (!originPoint || !destPoint) return
-    setMode(modeId)
-    setOrigin(originPoint)
-    setDestination(destPoint)
 
-    // Reuse preview data to avoid a redundant OSRM call (the public server rate-limits).
+    // Si ya tenemos los datos, los usamos de inmediato
     const previewData = previews[modeId]?.data
     if (previewData) {
-      setRoute(previewData)
+      useRouteStore.getState().setFullRoute(modeId, originPoint, destPoint, previewData)
       return
     }
 
-    // Preview not yet ready (still loading or errored): fetch directly.
-    setLoading(true)
+    // Si se están calculando ahora mismo en computePreviews, solo actualizamos el modo y esperamos.
+    // El useEffect de hidratación inyectará la ruta cuando termine computePreviews.
+    const isLoadingPreview = previews[modeId]?.loading
+    const store = useRouteStore.getState()
+    
+    if (isLoadingPreview) {
+      store.setFullRoute(modeId, originPoint, destPoint, null)
+      store.setLoading(true)
+      return // No hacemos fetch manual para no pisar el resultado
+    }
+
+    // Si falló el preview o no estaba, hacemos fetch manual
+    store.setFullRoute(modeId, originPoint, destPoint, null)
+    store.setLoading(true)
     try {
       const result = await fetchRoute(originPoint.lat, originPoint.lng, destPoint.lat, destPoint.lng, modeId)
-      if (result.error) setError(result.error)
-      else setRoute(result)
+      if (result.error) store.setError(result.error)
+      else store.setRoute(result)
     } catch {
-      setError('No se pudo calcular la ruta. Intenta de nuevo.')
+      store.setError('No se pudo calcular la ruta. Intenta de nuevo.')
     } finally {
-      setLoading(false)
+      store.setLoading(false)
     }
   }
 
@@ -1191,11 +1239,11 @@ export default function SearchBar({ embedded = false }) {
         <div className="px-3 pt-3 pb-2 flex flex-col gap-2" style={{ borderBottom: '1px solid #1A1A1A' }}>
           <PointField value={originQuery} onChange={v => { setOriginQuery(v); if (!v) setOriginPoint(null) }}
             onPickSuggestion={handlePickOriginSuggestion} onMyLocation={handleMyLocationOrigin}
-            placeholder="Origen" dot="#00b4ff"
+            placeholder={t('search.origin')} dot="#00b4ff"
           />
           <div className="flex items-center gap-2 px-1">
             <div className="flex-1 h-px" style={{ background: '#262626' }} />
-            <button onClick={handleSwap} title="Intercanviar" className="transition-colors" style={{ color: '#555' }}
+            <button onClick={handleSwap} title={t('search.swap')} className="transition-colors" style={{ color: '#555' }}
               onMouseEnter={e => { e.currentTarget.style.color = '#EBEBEB' }}
               onMouseLeave={e => { e.currentTarget.style.color = '#555' }}
             ><Icon.swap size={14} /></button>
@@ -1203,7 +1251,7 @@ export default function SearchBar({ embedded = false }) {
           </div>
           <PointField value={destQuery} onChange={v => { setDestQuery(v); if (!v) setDestPoint(null) }}
             onPickSuggestion={handlePickDestSuggestionInOptions}
-            placeholder="Destí" dot="#ff6b35"
+            placeholder={t('search.destination')} dot="#ff6b35"
           />
         </div>
         {/* Mode cards */}
@@ -1219,19 +1267,17 @@ export default function SearchBar({ embedded = false }) {
           ))}
         </div>
         {/* Step panel */}
-        <AnimatePresence>
-          {route?.segments?.length > 0 && (
-            <motion.div key="steps" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-              <RouteStepPanel segments={route.segments} origin={originPoint} destination={destPoint} mode={mode} />
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {route?.segments?.length > 0 && (
+          <div className="overflow-hidden">
+            <RouteStepPanel segments={route.segments} origin={originPoint} destination={destPoint} mode={mode} />
+          </div>
+        )}
         {/* Loading */}
         {isLoading && (
           <div className="px-3 pb-3">
             <div className="flex items-center gap-2 px-3 py-2" style={{ borderRadius: 6, background: '#1C1C1C' }}>
               {[0, 150, 300].map(d => <span key={d} className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: '#E8622A', animationDelay: `${d}ms` }} />)}
-              <span className="font-mono text-[10px] uppercase tracking-[0.1em] ml-1" style={{ color: '#555' }}>Calculant ruta…</span>
+              <span className="font-mono text-[10px] uppercase tracking-[0.1em] ml-1" style={{ color: '#555' }}>{t('search.calculating')}</span>
             </div>
           </div>
         )}
@@ -1277,7 +1323,7 @@ export default function SearchBar({ embedded = false }) {
               ) : (
                 <>
                   <Icon.search size={14} style={{ color: '#444', flexShrink: 0 }} />
-                  <span className="font-syne text-[13px]" style={{ color: '#555' }}>On vols anar?</span>
+                  <span className="font-syne text-[13px]" style={{ color: '#555' }}>{t('search.placeholder')}</span>
                 </>
               )}
             </button>
@@ -1308,7 +1354,7 @@ export default function SearchBar({ embedded = false }) {
                 ref={destInputRef}
                 className="flex-1 bg-transparent outline-none font-syne text-[13px] min-w-0"
                 style={{ color: '#EBEBEB' }}
-                placeholder="On vols anar?"
+                placeholder={t('search.placeholder')}
                 value={destQuery}
                 onChange={e => setDestQuery(e.target.value)}
                 onKeyDown={e => {
@@ -1411,7 +1457,7 @@ export default function SearchBar({ embedded = false }) {
               ) : (
                 <>
                   <span style={{ color: '#555' }}><Icon.search /></span>
-                  <span className="font-syne text-[12px]" style={{ color: '#888' }}>On vols anar?</span>
+                  <span className="font-syne text-[12px]" style={{ color: '#888' }}>{t('search.placeholder')}</span>
                 </>
               )}
             </button>
@@ -1478,7 +1524,7 @@ export default function SearchBar({ embedded = false }) {
                     ref={destInputRef}
                     className="flex-1 bg-transparent outline-none min-w-0 font-mono text-[13px]"
                     style={{ color: '#EBEBEB' }}
-                    placeholder="On vols anar?"
+                    placeholder={t('search.placeholder')}
                     value={destQuery}
                     onChange={e => setDestQuery(e.target.value)}
                     onKeyDown={e => {
@@ -1564,7 +1610,7 @@ export default function SearchBar({ embedded = false }) {
                   }}
                   onPickSuggestion={handlePickOriginSuggestion}
                   onMyLocation={handleMyLocationOrigin}
-                  placeholder="Origen"
+                  placeholder={t('search.origin')}
                   dot="#00b4ff"
                 />
 
@@ -1587,7 +1633,7 @@ export default function SearchBar({ embedded = false }) {
                     if (!v) setDestPoint(null)
                   }}
                   onPickSuggestion={handlePickDestSuggestionInOptions}
-                  placeholder="Destino"
+                  placeholder={t('search.destination')}
                   dot="#ff6b35"
                 />
               </div>
@@ -1634,7 +1680,7 @@ export default function SearchBar({ embedded = false }) {
                     {[0, 150, 300].map(d => (
                       <span key={d} className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: '#E8622A', animationDelay: `${d}ms` }} />
                     ))}
-                    <span className="font-mono text-[10px] uppercase tracking-[0.1em] ml-1" style={{ color: '#555' }}>Calculant ruta…</span>
+                    <span className="font-mono text-[10px] uppercase tracking-[0.1em] ml-1" style={{ color: '#555' }}>{t('search.calculating')}</span>
                   </div>
                 </div>
               )}

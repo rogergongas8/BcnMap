@@ -67,7 +67,7 @@ function RouteRow({ route, onDelete, onLoad }) {
       <div className="w-[3px] flex-shrink-0 self-stretch group-hover:bg-[#E8622A] transition-colors" />
       <div className="flex items-start gap-3 px-3.5 py-3 flex-1 min-w-0">
         <div className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0 font-mono text-[9px] font-bold" style={{ background: color + '18', color, border: `1px solid ${color}33` }}>
-          {route.mode === 'foot' ? '🚶' : route.mode === 'bicing' ? '🚲' : route.mode === 'bus' ? '🚇' : '🚗'}
+          {route.mode === 'foot' ? '🚶' : route.mode === 'bicing' ? '🚲' : route.mode === 'metro' ? '🚇' : route.mode === 'bus' ? '🚌' : '🚗'}
         </div>
         <div className="min-w-0 flex-1">
           <p className="font-syne text-[13px] font-medium truncate" style={{ color: '#EBEBEB' }}>{route.name ?? route.to_label}</p>

@@ -242,7 +242,7 @@ class MetroService
 
         $responses = Http::pool(fn($pool) =>
             array_map(
-                fn($id) => $pool->timeout(8)->get(self::BASE . '/imetro/estacions/' . $id, $this->auth()),
+                fn($id) => $pool->timeout(8)->get(self::BASE . '/imetro/estacions/' . $id . '/trens', $this->auth()),
                 $estacioIds
             )
         );
@@ -287,7 +287,7 @@ class MetroService
     {
         try {
             $response = Http::timeout(8)->get(
-                self::BASE . '/imetro/estacions/' . $estacioId,
+                self::BASE . '/imetro/estacions/' . $estacioId . '/trens',
                 $this->auth()
             );
 

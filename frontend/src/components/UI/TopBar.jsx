@@ -1,27 +1,24 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
 import { Icons } from './icons'
 import { useDrawerStore } from '../../store/drawerStore'
 import { useMapStore } from '../../store/mapStore'
 import { useLeisureStore } from '../../store/leisureStore'
 import { useChatStore } from '../../store/chatStore'
 import { useAuthStore } from '../../store/authStore'
+import { useLangStore } from '../../store/langStore'
 import { useAuth } from '../../hooks/useAuth'
 import LoginModal from './LoginModal'
 import CityHud from './CityHud'
 
-const THEMES = [
-  { id: 'dark',    label: 'Fosc' },
-  { id: 'voyager', label: 'Estàndard' },
-  { id: 'minimal', label: 'Minimal' },
-]
-
-const DATA_LAYERS = [
-  { id: 'traffic', label: 'Trànsit', color: '#27AE60' },
-  { id: 'bicing',  label: 'Bicing',  color: '#00aaff' },
-  { id: 'bus',     label: 'Bus',     color: '#FF6B35' },
-  { id: 'metro',   label: 'Metro',   color: '#A855F7' },
-  { id: 'events',  label: 'Esdeveniments', color: '#C98E2E' },
+const THEME_IDS  = ['dark', 'voyager', 'minimal']
+const LAYER_DEFS = [
+  { id: 'traffic', color: '#27AE60' },
+  { id: 'bicing',  color: '#00aaff' },
+  { id: 'bus',     color: '#FF6B35' },
+  { id: 'metro',   color: '#A855F7' },
+  { id: 'events',  color: '#C98E2E' },
 ]
 
 const CARD_STYLE = {
@@ -56,6 +53,7 @@ function IconBtn({ active, onClick, icon: Icon, label, badge }) {
 }
 
 function LayersDropdown({ onClose }) {
+  const { t } = useTranslation()
   const { mapTheme, setMapTheme, activeLayers, toggleLayer } = useMapStore()
   const { showBeaches, toggleBeaches } = useLeisureStore()
 
@@ -69,33 +67,33 @@ function LayersDropdown({ onClose }) {
       style={{ background: '#141414', border: '1px solid #262626', borderRadius: 8, boxShadow: '0 8px 32px rgba(0,0,0,0.7)' }}
     >
       <header className="px-3.5 py-2.5 flex items-center justify-between" style={{ borderBottom: '1px solid #1A1A1A' }}>
-        <p className="font-syne text-[12px] font-medium" style={{ color: '#EBEBEB' }}>Capes i estil</p>
+        <p className="font-syne text-[12px] font-medium" style={{ color: '#EBEBEB' }}>{t('topbar.layersTitle')}</p>
         <button onClick={onClose} style={{ color: '#555' }}>
           <Icons.close size={10} />
         </button>
       </header>
 
       <section className="px-3 py-2.5" style={{ borderBottom: '1px solid #1A1A1A' }}>
-        <p className="font-mono text-[9px] uppercase tracking-[0.15em] mb-2" style={{ color: '#555' }}>Estil del mapa</p>
+        <p className="font-mono text-[9px] uppercase tracking-[0.15em] mb-2" style={{ color: '#555' }}>{t('topbar.mapStyle')}</p>
         <div className="grid grid-cols-3 gap-1">
-          {THEMES.map(t => (
-            <button key={t.id} onClick={() => setMapTheme(t.id)}
+          {THEME_IDS.map(id => (
+            <button key={id} onClick={() => setMapTheme(id)}
               className="py-1.5 font-syne text-[10px] font-medium transition-colors"
               style={{
                 borderRadius: 6,
-                background: mapTheme === t.id ? '#E8622A' : '#1C1C1C',
-                border: `1px solid ${mapTheme === t.id ? '#E8622A' : '#262626'}`,
-                color: mapTheme === t.id ? '#fff' : '#888',
+                background: mapTheme === id ? '#E8622A' : '#1C1C1C',
+                border: `1px solid ${mapTheme === id ? '#E8622A' : '#262626'}`,
+                color: mapTheme === id ? '#fff' : '#888',
               }}
-            >{t.label}</button>
+            >{t(`topbar.themes.${id}`)}</button>
           ))}
         </div>
       </section>
 
       <section className="px-3 py-2.5" style={{ borderBottom: '1px solid #1A1A1A' }}>
-        <p className="font-mono text-[9px] uppercase tracking-[0.15em] mb-2" style={{ color: '#555' }}>Dades en temps real</p>
+        <p className="font-mono text-[9px] uppercase tracking-[0.15em] mb-2" style={{ color: '#555' }}>{t('topbar.liveData')}</p>
         <div className="flex flex-col gap-0.5">
-          {DATA_LAYERS.map(layer => {
+          {LAYER_DEFS.map(layer => {
             const on = activeLayers.includes(layer.id)
             return (
               <button key={layer.id} onClick={() => toggleLayer(layer.id)}
@@ -103,7 +101,7 @@ function LayersDropdown({ onClose }) {
                 style={{ borderRadius: 6, background: on ? '#1C1C1C' : 'transparent' }}
               >
                 <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: layer.color, opacity: on ? 1 : 0.35 }} />
-                <span className="font-syne text-[11px] flex-1 text-left" style={{ color: on ? '#EBEBEB' : '#888' }}>{layer.label}</span>
+                <span className="font-syne text-[11px] flex-1 text-left" style={{ color: on ? '#EBEBEB' : '#888' }}>{t(`topbar.layers.${layer.id}`)}</span>
                 <span className="font-mono text-[9px]" style={{ color: on ? '#E8622A' : 'transparent' }}>on</span>
               </button>
             )
@@ -117,7 +115,7 @@ function LayersDropdown({ onClose }) {
           style={{ borderRadius: 6, background: showBeaches ? '#1C1C1C' : 'transparent' }}
         >
           <Icons.beach size={12} style={{ color: showBeaches ? '#4D84D4' : '#555', flexShrink: 0 }} />
-          <span className="font-syne text-[11px] flex-1 text-left" style={{ color: showBeaches ? '#EBEBEB' : '#888' }}>Platges</span>
+          <span className="font-syne text-[11px] flex-1 text-left" style={{ color: showBeaches ? '#EBEBEB' : '#888' }}>{t('topbar.beaches')}</span>
           <span className="font-mono text-[9px]" style={{ color: showBeaches ? '#E8622A' : 'transparent' }}>on</span>
         </button>
       </section>
@@ -127,7 +125,30 @@ function LayersDropdown({ onClose }) {
 
 // ── Profile ───────────────────────────────────────────────────────────────────
 
+function LangToggle() {
+  const { t }           = useTranslation()
+  const { lang, langs, setLang } = useLangStore()
+
+  return (
+    <div className="flex items-center gap-0.5">
+      {langs.map(l => (
+        <button
+          key={l.id}
+          onClick={() => setLang(l.id)}
+          className="px-1.5 py-0.5 font-mono text-[9px] font-bold rounded transition-all"
+          style={{
+            background: lang === l.id ? '#E8622A' : 'transparent',
+            color:      lang === l.id ? '#fff' : '#555',
+            border:     `1px solid ${lang === l.id ? '#E8622A' : 'transparent'}`,
+          }}
+        >{l.label}</button>
+      ))}
+    </div>
+  )
+}
+
 function ProfileBtn() {
+  const { t }              = useTranslation()
   const { isLogged, user } = useAuthStore()
   const { logout }         = useAuth()
   const [open, setOpen]    = useState(false)
@@ -144,7 +165,7 @@ function ProfileBtn() {
   if (!isLogged) {
     return (
       <>
-        <IconBtn onClick={() => setShowLogin(true)} icon={Icons.user} label="Iniciar sessió" />
+        <IconBtn onClick={() => setShowLogin(true)} icon={Icons.user} label={t('topbar.login')} />
         {showLogin && <LoginModal onClose={() => setShowLogin(false)} />}
       </>
     )
@@ -184,7 +205,7 @@ function ProfileBtn() {
               style={{ color: '#888' }}
               onMouseEnter={e => { e.currentTarget.style.color = '#EBEBEB'; e.currentTarget.style.background = '#1C1C1C' }}
               onMouseLeave={e => { e.currentTarget.style.color = '#888'; e.currentTarget.style.background = 'transparent' }}
-            >Tancar sessió</button>
+            >{t('topbar.logout')}</button>
           </motion.div>
         )}
       </AnimatePresence>
@@ -195,6 +216,7 @@ function ProfileBtn() {
 // ── TopBar ────────────────────────────────────────────────────────────────────
 
 export default function TopBar({ children }) {
+  const { t } = useTranslation()
   const { view, openNearby, openSaved, openEvents, close } = useDrawerStore()
   const { activeLayers, toggleLayer } = useMapStore()
   const { showBeaches }  = useLeisureStore()
@@ -205,7 +227,6 @@ export default function TopBar({ children }) {
 
   useEffect(() => {
     if (view) setLayersOpen(false)
-    // Sync events layer with drawer: on when events drawer open, off otherwise
     if (view === 'events' && !activeLayers.includes('events')) toggleLayer('events')
     if (view !== 'events' &&  activeLayers.includes('events')) toggleLayer('events')
   }, [view])
@@ -233,11 +254,11 @@ export default function TopBar({ children }) {
 
       {/* ── Left: action buttons ── */}
       <div className="flex items-center gap-1 px-1.5 flex-shrink-0 pointer-events-auto" style={{ ...CARD_STYLE, height: 44 }}>
-        <IconBtn active={nearbyActive} onClick={() => nearbyActive ? close() : openNearby()} icon={Icons.search}   label="A prop" />
-        <IconBtn active={savedActive}  onClick={() => savedActive  ? close() : openSaved()}  icon={Icons.bookmark} label="Guardats" />
-        <IconBtn active={eventsActive} onClick={() => eventsActive ? close() : openEvents()} icon={Icons.calendar} label="Esdeveniments" />
+        <IconBtn active={nearbyActive} onClick={() => nearbyActive ? close() : openNearby()} icon={Icons.search}   label={t('topbar.nearby')} />
+        <IconBtn active={savedActive}  onClick={() => savedActive  ? close() : openSaved()}  icon={Icons.bookmark} label={t('topbar.saved')} />
+        <IconBtn active={eventsActive} onClick={() => eventsActive ? close() : openEvents()} icon={Icons.calendar} label={t('topbar.events')} />
         <div ref={layersRef} className="relative">
-          <IconBtn active={layersOpen} onClick={() => { const next = !layersOpen; if (next && view) close(); setLayersOpen(next) }} icon={Icons.layers} label="Capes" badge={hasLayersOn} />
+          <IconBtn active={layersOpen} onClick={() => { const next = !layersOpen; if (next && view) close(); setLayersOpen(next) }} icon={Icons.layers} label={t('topbar.layers')} badge={hasLayersOn} />
           <AnimatePresence>
             {layersOpen && <LayersDropdown onClose={() => setLayersOpen(false)} />}
           </AnimatePresence>
@@ -247,14 +268,16 @@ export default function TopBar({ children }) {
       {/* ── Center: truly centered in viewport ── */}
       <div className="flex-1 pointer-events-none" />
 
-      {/* ── Right: HUD + Profile + Chat ── */}
+      {/* ── Right: HUD + Lang + Profile + Chat ── */}
       <div className="flex items-center gap-1 px-1.5 flex-shrink-0 pointer-events-auto" style={{ ...CARD_STYLE, height: 44 }}>
         <CityHud />
+        <div style={{ width: 1, height: 16, background: '#262626', flexShrink: 0, margin: '0 2px' }} />
+        <LangToggle />
         <div style={{ width: 1, height: 16, background: '#262626', flexShrink: 0, margin: '0 2px' }} />
         <ProfileBtn />
         <button
           onClick={toggleChat}
-          title="Chat IA"
+          title={t('topbar.chat')}
           className="relative w-9 h-9 flex items-center justify-center rounded-lg transition-all flex-shrink-0"
           style={{
             background: chatOpen ? '#E8622A1A' : 'transparent',

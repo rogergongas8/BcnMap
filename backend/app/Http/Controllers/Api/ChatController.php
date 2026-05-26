@@ -26,6 +26,7 @@ class ChatController extends Controller
         $request->validate([
             'message'              => 'required|string|max:500',
             'conversation_history' => 'nullable|array|max:20',
+            'lang'                 => 'nullable|in:ca,es,en',
             'user_lat'             => 'nullable|numeric',
             'user_lng'             => 'nullable|numeric',
             'nearby_pois'          => 'nullable|array|max:12',
@@ -34,6 +35,7 @@ class ChatController extends Controller
         $userLat    = $request->input('user_lat') !== null ? (float) $request->input('user_lat') : null;
         $userLng    = $request->input('user_lng') !== null ? (float) $request->input('user_lng') : null;
         $nearbyPois = $request->input('nearby_pois', []);
+        $lang       = $request->input('lang', 'ca');
 
         $baseContext = Cache::remember('chat:city_base_context', self::CONTEXT_TTL, fn () =>
             $this->context->buildBaseContext()
@@ -45,6 +47,7 @@ class ChatController extends Controller
             userMessage: $request->input('message'),
             cityContext:  $cityContext,
             history:      $request->input('conversation_history', []),
+            lang:         $lang,
         );
 
         return response()->json($result);
