@@ -5,6 +5,7 @@ import { useDrawerStore } from '../../store/drawerStore'
 import { useNearbyStore } from '../../store/nearbyStore'
 import { useLeisureStore } from '../../store/leisureStore'
 import { useMapStore } from '../../store/mapStore'
+import { useDataStore } from '../../store/dataStore'
 import { useAuthStore } from '../../store/authStore'
 import { useAuth } from '../../hooks/useAuth'
 import LoginModal from './LoginModal'
@@ -22,7 +23,8 @@ const DATA_LAYERS = [
   { id: 'metro',   label: 'Metro',   color: '#A855F7' },
 ]
 
-function ToolButton({ active, onClick, icon: Icon, label, badge }) {
+function ToolButton({ active, onClick, icon: Icon, label, badge, badgeColor = 'sky' }) {
+  const badgeBg = badgeColor === 'red' ? '#D45555' : '#38bdf8'
   return (
     <button
       onClick={onClick}
@@ -35,7 +37,10 @@ function ToolButton({ active, onClick, icon: Icon, label, badge }) {
     >
       <Icon size={16} />
       {badge && (
-        <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-sky-400 rounded-full ring-2 ring-[#0a0c10]" />
+        <span
+          className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full ring-2 ring-[#0a0c10]"
+          style={{ background: badgeBg }}
+        />
       )}
     </button>
   )
@@ -44,6 +49,7 @@ function ToolButton({ active, onClick, icon: Icon, label, badge }) {
 function LayersPopover({ onClose }) {
   const { mapTheme, setMapTheme, activeLayers, toggleLayer } = useMapStore()
   const { showBeaches, toggleBeaches } = useLeisureStore()
+  const disruptions = useDataStore(s => s.disruptions)
 
   return (
     <motion.div
@@ -106,7 +112,16 @@ function LayersPopover({ onClose }) {
                   }}
                 />
                 <span className="flex-1 text-left">{layer.label}</span>
-                {isActive && <span className="text-white/40 text-[10px]">on</span>}
+                {layer.id === 'metro' && disruptions.length > 0 && (
+                  <span
+                    className="font-mono text-[9px] px-1.5 py-0.5 rounded-full flex-shrink-0"
+                    style={{ background: '#D4555522', color: '#D45555', border: '1px solid #D4555540' }}
+                  >
+                    {disruptions.length}
+                  </span>
+                )}
+                {isActive && layer.id !== 'metro' && <span className="text-white/40 text-[10px]">on</span>}
+                {isActive && layer.id === 'metro' && disruptions.length === 0 && <span className="text-white/40 text-[10px]">on</span>}
               </button>
             )
           })}
@@ -205,14 +220,15 @@ function ProfileButton() {
 }
 
 export default function FloatingToolbar() {
-  const { view, openNearby, openSaved, close } = useDrawerStore()
+  const { view, openNearby, openSaved, openDisruptions, close } = useDrawerStore()
   const { activeCategory } = useNearbyStore()
   const { showBeaches, activeLayers } = (() => ({
     showBeaches:  useLeisureStore.getState().showBeaches,
     activeLayers: useMapStore.getState().activeLayers,
   }))()
-  const showBeachesLive = useLeisureStore(s => s.showBeaches)
+  const showBeachesLive  = useLeisureStore(s => s.showBeaches)
   const activeLayersLive = useMapStore(s => s.activeLayers)
+  const disruptions      = useDataStore(s => s.disruptions)
 
   const [layersOpen, setLayersOpen] = useState(false)
   const containerRef = useRef(null)
@@ -233,9 +249,11 @@ export default function FloatingToolbar() {
     return () => window.removeEventListener('mousedown', handler)
   }, [layersOpen])
 
-  const nearbyActive = view === 'nearby'
-  const savedActive  = view === 'saved'
-  const hasLayersOn  = showBeachesLive || activeLayersLive.length > 0
+  const nearbyActive       = view === 'nearby'
+  const savedActive        = view === 'saved'
+  const disruptionsActive  = view === 'disruptions'
+  const hasLayersOn        = showBeachesLive || activeLayersLive.length > 0
+  const hasDisruptions     = disruptions.length > 0
 
   return (
     <motion.div
@@ -264,6 +282,18 @@ export default function FloatingToolbar() {
         }}
         icon={Icons.bookmark}
         label="Guardats"
+      />
+
+      <ToolButton
+        active={disruptionsActive}
+        onClick={() => {
+          setLayersOpen(false)
+          disruptionsActive ? close() : openDisruptions()
+        }}
+        icon={Icons.alert}
+        label="Incidencies metro"
+        badge={hasDisruptions}
+        badgeColor="red"
       />
 
       <div className="relative">

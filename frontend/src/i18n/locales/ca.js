@@ -9,10 +9,11 @@ export default {
   },
   // TopBar
   topbar: {
-    nearby:     'A prop',
-    saved:      'Guardats',
-    events:     'Esdeveniments',
-    layers:     'Capes',
+    nearby:       'A prop',
+    saved:        'Guardats',
+    events:       'Esdeveniments',
+    disruptions:  'Incidències metro',
+    layers:       'Capes',
     chat:       'Xat IA',
     login:      'Iniciar sessió',
     logout:     'Tancar sessió',

@@ -6,6 +6,7 @@ import NearbyView from './NearbyView'
 import PlaceView from './PlaceView'
 import SavedView from './SavedView'
 import EventsView from './EventsView'
+import DisruptionsView from './DisruptionsView'
 
 // Drawer padding — top: 56 always to account for TopBar height
 // right/left managed centrally in App.jsx; this component no longer calls setMapPadding directly
@@ -13,7 +14,7 @@ import EventsView from './EventsView'
 export default function SideDrawer() {
   const { view, close } = useDrawerStore()
 
-  const title = view === 'nearby' ? 'A prop' : view === 'saved' ? 'Guardats' : view === 'events' ? 'Esdeveniments' : null
+  const title = view === 'nearby' ? 'A prop' : view === 'saved' ? 'Guardats' : view === 'events' ? 'Esdeveniments' : view === 'disruptions' ? 'Incidencies metro' : null
 
   return (
     <AnimatePresence>
@@ -28,15 +29,18 @@ export default function SideDrawer() {
             flex flex-col overflow-hidden
             shadow-[0_4px_32px_rgba(0,0,0,0.5)]"
           style={{
-            maxHeight: view === 'events' ? 'min(580px, calc(100dvh - 80px))' : 'calc(100dvh - 56px)',
+            maxHeight: (view === 'events' || view === 'disruptions') ? 'min(580px, calc(100dvh - 80px))' : 'calc(100dvh - 56px)',
             background: '#141414', border: '1px solid #262626', borderRadius: 8,
           }}
         >
-          {(view === 'nearby' || view === 'saved' || view === 'events') && (
+          {(view === 'nearby' || view === 'saved' || view === 'events' || view === 'disruptions') && (
             <header className="flex items-center justify-between px-4 py-3 flex-shrink-0" style={{ borderBottom: '1px solid #262626' }}>
               <div className="flex items-center gap-2.5">
-                <span style={{ color: '#555' }}>
-                  {view === 'nearby' ? <Icons.search size={13} /> : view === 'events' ? <Icons.calendar size={13} /> : <Icons.pin size={13} />}
+                <span style={{ color: view === 'disruptions' ? '#D45555' : '#555' }}>
+                  {view === 'nearby'       ? <Icons.search   size={13} />
+                  : view === 'events'      ? <Icons.calendar size={13} />
+                  : view === 'disruptions' ? <Icons.alert    size={13} />
+                  :                          <Icons.pin      size={13} />}
                 </span>
                 <h2 className="font-syne text-[13px] font-medium" style={{ color: '#EBEBEB' }}>{title}</h2>
               </div>
@@ -51,10 +55,11 @@ export default function SideDrawer() {
             </header>
           )}
 
-          {view === 'nearby'  && <NearbyView />}
-          {view === 'saved'   && <SavedView />}
-          {view === 'events'  && <EventsView />}
-          {view === 'place'   && <PlaceView />}
+          {view === 'nearby'       && <NearbyView />}
+          {view === 'saved'        && <SavedView />}
+          {view === 'events'       && <EventsView />}
+          {view === 'disruptions'  && <DisruptionsView />}
+          {view === 'place'        && <PlaceView />}
         </motion.aside>
       )}
     </AnimatePresence>

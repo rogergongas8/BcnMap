@@ -5,6 +5,7 @@ import { useDrawerStore } from '../../../store/drawerStore'
 import { useMapStore } from '../../../store/mapStore'
 import { useRouteStore } from '../../../store/routeStore'
 import { fetchPlaceEnrich } from '../../../services/api'
+import { sharePlaceUrl } from '../../../hooks/useDeepLink'
 
 /* ── Skeleton ───────────────────────────────────────────────────────────── */
 
@@ -501,6 +502,7 @@ export default function PlaceView() {
   const userLocation = useMapStore(s => s.userLocation)
   const [tab,    setTab]    = useState('info')
   const [copied, setCopied] = useState(false)
+  const [shared, setShared] = useState(false)
 
   const { data: enrich, loading: enrichLoading } = usePlaceEnrich(place)
 
@@ -524,6 +526,17 @@ export default function PlaceView() {
     navigator.clipboard?.writeText(`${place.lat.toFixed(6)}, ${place.lng.toFixed(6)}`)
     setCopied(true)
     setTimeout(() => setCopied(false), 1500)
+  }
+
+  const handleShare = () => {
+    const url = sharePlaceUrl(place.name, place.lat, place.lng, place.category?.id ?? '')
+    if (navigator.share) {
+      navigator.share({ title: place.name, url }).catch(() => {})
+    } else {
+      navigator.clipboard?.writeText(url)
+    }
+    setShared(true)
+    setTimeout(() => setShared(false), 1800)
   }
 
   const catId  = place.category?.id ?? 'attraction'
@@ -636,6 +649,15 @@ export default function PlaceView() {
               style={{ borderRadius: 6, background: '#1C1C1C', border: `1px solid ${copied ? '#E8622A' : '#262626'}`, color: copied ? '#E8622A' : '#555' }}>
               <Icons.copy size={12} />
               <span className="font-mono text-[9px] uppercase tracking-[0.08em]">{copied ? 'Copiat' : 'Coords'}</span>
+            </button>
+          )}
+
+          {place.kind === 'poi' && (
+            <button onClick={handleShare}
+              className="h-10 px-3 flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]"
+              style={{ borderRadius: 6, background: '#1C1C1C', border: `1px solid ${shared ? '#4D84D4' : '#262626'}`, color: shared ? '#4D84D4' : '#555' }}>
+              <Icons.external size={12} />
+              <span className="font-mono text-[9px] uppercase tracking-[0.08em]">{shared ? 'Copiat!' : 'Compartir'}</span>
             </button>
           )}
         </div>

@@ -20,6 +20,7 @@ import TopBar from './components/UI/TopBar'
 import SideDrawer from './components/UI/Drawer/SideDrawer'
 import Tooltip from './components/UI/Tooltip'
 import EventPopup from './components/UI/EventPopup'
+import DisruptionToast from './components/UI/DisruptionToast'
 import ErrorBoundary from './components/UI/ErrorBoundary'
 
 import ChatPanel from './components/Chat/ChatPanel'
@@ -95,6 +96,9 @@ function AppContent() {
 
       {/* ── Event popup ── */}
       <EventPopup popup={eventPopup} onClose={() => setEventPopup(null)} />
+
+      {/* ── Metro disruption toast ── */}
+      <DisruptionToast />
     </div>
   )
 }

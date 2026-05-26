@@ -6,6 +6,7 @@ import { useDrawerStore } from '../../store/drawerStore'
 import { useMapStore } from '../../store/mapStore'
 import { useLeisureStore } from '../../store/leisureStore'
 import { useChatStore } from '../../store/chatStore'
+import { useDataStore } from '../../store/dataStore'
 import { useAuthStore } from '../../store/authStore'
 import { useLangStore } from '../../store/langStore'
 import { useAuth } from '../../hooks/useAuth'
@@ -30,7 +31,7 @@ const CARD_STYLE = {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function IconBtn({ active, onClick, icon: Icon, label, badge }) {
+function IconBtn({ active, onClick, icon: Icon, label, badge, badgeColor = '#E8622A' }) {
   return (
     <button
       onClick={onClick}
@@ -46,7 +47,7 @@ function IconBtn({ active, onClick, icon: Icon, label, badge }) {
     >
       <Icon size={14} />
       {badge && (
-        <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full" style={{ background: '#E8622A' }} />
+        <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full" style={{ background: badgeColor }} />
       )}
     </button>
   )
@@ -56,6 +57,7 @@ function LayersDropdown({ onClose }) {
   const { t } = useTranslation()
   const { mapTheme, setMapTheme, activeLayers, toggleLayer } = useMapStore()
   const { showBeaches, toggleBeaches } = useLeisureStore()
+  const disruptions = useDataStore(s => s.disruptions)
 
   return (
     <motion.div
@@ -102,7 +104,15 @@ function LayersDropdown({ onClose }) {
               >
                 <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: layer.color, opacity: on ? 1 : 0.35 }} />
                 <span className="font-syne text-[11px] flex-1 text-left" style={{ color: on ? '#EBEBEB' : '#888' }}>{t(`topbar.layers.${layer.id}`)}</span>
-                <span className="font-mono text-[9px]" style={{ color: on ? '#E8622A' : 'transparent' }}>on</span>
+                {layer.id === 'metro' && disruptions.length > 0 && (
+                  <span className="font-mono text-[9px] px-1.5 py-0.5 rounded-full flex-shrink-0"
+                    style={{ background: '#D4555220', color: '#D45555', border: '1px solid #D4555240' }}>
+                    {disruptions.length}
+                  </span>
+                )}
+                {!(layer.id === 'metro' && disruptions.length > 0) && (
+                  <span className="font-mono text-[9px]" style={{ color: on ? '#E8622A' : 'transparent' }}>on</span>
+                )}
               </button>
             )
           })}
@@ -217,7 +227,8 @@ function ProfileBtn() {
 
 export default function TopBar({ children }) {
   const { t } = useTranslation()
-  const { view, openNearby, openSaved, openEvents, close } = useDrawerStore()
+  const { view, openNearby, openSaved, openEvents, openDisruptions, close } = useDrawerStore()
+  const disruptions = useDataStore(s => s.disruptions)
   const { activeLayers, toggleLayer } = useMapStore()
   const { showBeaches }  = useLeisureStore()
   const { isOpen: chatOpen, toggleChat, hasUnread } = useChatStore()
@@ -238,10 +249,12 @@ export default function TopBar({ children }) {
     return () => window.removeEventListener('mousedown', handler)
   }, [layersOpen])
 
-  const nearbyActive = view === 'nearby'
-  const savedActive  = view === 'saved'
-  const eventsActive = view === 'events'
-  const hasLayersOn  = showBeaches || activeLayers.filter(l => l !== 'events').length > 0
+  const nearbyActive       = view === 'nearby'
+  const savedActive        = view === 'saved'
+  const eventsActive       = view === 'events'
+  const disruptionsActive  = view === 'disruptions'
+  const hasLayersOn        = showBeaches || activeLayers.filter(l => l !== 'events').length > 0
+  const hasDisruptions     = disruptions.length > 0
 
   return (
     <div className="absolute top-0 left-0 right-0 z-50 flex items-center h-14 px-3 gap-2.5 overflow-visible pointer-events-none">
@@ -254,9 +267,10 @@ export default function TopBar({ children }) {
 
       {/* ── Left: action buttons ── */}
       <div className="flex items-center gap-1 px-1.5 flex-shrink-0 pointer-events-auto" style={{ ...CARD_STYLE, height: 44 }}>
-        <IconBtn active={nearbyActive} onClick={() => nearbyActive ? close() : openNearby()} icon={Icons.search}   label={t('topbar.nearby')} />
-        <IconBtn active={savedActive}  onClick={() => savedActive  ? close() : openSaved()}  icon={Icons.bookmark} label={t('topbar.saved')} />
-        <IconBtn active={eventsActive} onClick={() => eventsActive ? close() : openEvents()} icon={Icons.calendar} label={t('topbar.events')} />
+        <IconBtn active={nearbyActive}      onClick={() => nearbyActive      ? close() : openNearby()}      icon={Icons.search}   label={t('topbar.nearby')} />
+        <IconBtn active={savedActive}       onClick={() => savedActive       ? close() : openSaved()}       icon={Icons.bookmark} label={t('topbar.saved')} />
+        <IconBtn active={eventsActive}      onClick={() => eventsActive      ? close() : openEvents()}      icon={Icons.calendar} label={t('topbar.events')} />
+        <IconBtn active={disruptionsActive} onClick={() => disruptionsActive ? close() : openDisruptions()} icon={Icons.alert}    label={t('topbar.disruptions')} badge={hasDisruptions} badgeColor="#D45555" />
         <div ref={layersRef} className="relative">
           <IconBtn active={layersOpen} onClick={() => { const next = !layersOpen; if (next && view) close(); setLayersOpen(next) }} icon={Icons.layers} label={t('topbar.layers')} badge={hasLayersOn} />
           <AnimatePresence>
