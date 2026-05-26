@@ -14,6 +14,7 @@ export const NEARBY_CATEGORIES = [
   { id: 'attraction',  label: 'Atracciones',  icon: Icons.star },
   { id: 'monument',    label: 'Monumentos',   icon: Icons.monument },
   { id: 'hotel',       label: 'Hoteles',      icon: Icons.hotel },
+  { id: 'events',      label: 'Esdeveniments', icon: Icons.calendar, isEvents: true },
 ]
 
 export const useNearbyStore = create((set) => ({

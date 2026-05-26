@@ -6,6 +6,26 @@ import { useMapStore } from '../../../store/mapStore'
 import { useRouteStore } from '../../../store/routeStore'
 import { fetchPlaceEnrich } from '../../../services/api'
 
+/* ── Skeleton ───────────────────────────────────────────────────────────── */
+
+function Sk({ w = 'w-full', h = 'h-3', rounded = 'rounded' }) {
+  return <div className={`${w} ${h} ${rounded} animate-pulse`} style={{ background: '#262626' }} />
+}
+
+function PlaceSkeleton() {
+  return (
+    <div className="px-4 pt-3 pb-4 flex flex-col gap-3">
+      <div className="flex items-center gap-3">
+        <Sk w="w-16" h="h-4" />
+        <Sk w="w-12" h="h-5" rounded="rounded-full" />
+      </div>
+      <Sk w="w-full" h="h-3" />
+      <Sk w="w-4/5" h="h-3" />
+      <Sk w="w-3/5" h="h-3" />
+    </div>
+  )
+}
+
 /* ── Constants ─────────────────────────────────────────────────────────── */
 
 const C = {
@@ -201,13 +221,7 @@ function InfoTab({ place, enrich, enrichLoading }) {
 
       {/* Rating + status */}
       {enrichLoading ? (
-        <div className="px-4 pt-3 pb-2 flex items-center gap-2">
-          {[0, 100, 200].map(d => (
-            <span key={d} className="w-1.5 h-1.5 rounded-full animate-bounce"
-              style={{ background: '#333', animationDelay: `${d}ms` }} />
-          ))}
-          <span className="font-mono text-[10px]" style={{ color: '#555' }}>Buscant informació…</span>
-        </div>
+        <PlaceSkeleton />
       ) : enrich && (enrich.rating != null || enrich.is_open_now != null || enrich.price) ? (
         <motion.div
           initial={{ opacity: 0, y: 4 }}
@@ -293,18 +307,8 @@ function HorarisTab({ place, enrich, enrichLoading }) {
 
   if (enrichLoading) {
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="flex gap-1.5">
-            {[0, 140, 280].map(d => (
-              <span key={d} className="w-1.5 h-1.5 rounded-full animate-bounce"
-                style={{ background: '#E8622A', animationDelay: `${d}ms` }} />
-            ))}
-          </div>
-          <span className="font-mono text-[10px] uppercase tracking-[0.1em]" style={{ color: '#555' }}>
-            Buscant horaris…
-          </span>
-        </div>
+      <div className="flex-1 px-4 pt-3 flex flex-col gap-3">
+        {['w-full', 'w-4/5', 'w-3/5', 'w-full', 'w-2/3'].map((w, i) => <Sk key={i} w={w} h="h-3" />)}
       </div>
     )
   }

@@ -46,6 +46,59 @@ function CategoryRail() {
   )
 }
 
+const EVT_COLORS = {
+  musica: '#C98E2E', esport: '#3CB887', cultura: '#8B6AD4',
+  gastronomia: '#E8622A', familia: '#4D84D4', altres: '#5A5248',
+}
+
+function formatEvtDate(start) {
+  if (!start) return null
+  const d = new Date(start + 'T00:00:00')
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1)
+  if (d.getTime() === today.getTime()) return 'Avui'
+  if (d.getTime() === tomorrow.getTime()) return 'Demà'
+  return d.toLocaleDateString('ca', { day: 'numeric', month: 'short' })
+}
+
+function EventRow({ evt, onSelect, isHovered, onHover }) {
+  const color = EVT_COLORS[evt.category] ?? '#5A5248'
+  return (
+    <li
+      onClick={() => onSelect(evt)}
+      onMouseEnter={() => onHover(evt.id)}
+      onMouseLeave={() => onHover(null)}
+      className="flex cursor-pointer transition-colors"
+      style={{ borderBottom: '1px solid #1A1A1A', background: isHovered ? '#1C1C1C' : 'transparent' }}
+    >
+      <div className="w-[3px] flex-shrink-0 self-stretch transition-colors" style={{ background: isHovered ? color : 'transparent' }} />
+      <div className="flex items-start gap-3 px-3.5 py-3 flex-1 min-w-0">
+        <div className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0 font-mono text-[8px] font-bold uppercase"
+          style={{ background: color + '18', color, border: `1px solid ${color}33` }}>
+          {(evt.category ?? 'ev').slice(0, 2).toUpperCase()}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-baseline justify-between gap-2">
+            <p className="font-syne text-[13px] font-medium leading-tight truncate" style={{ color: '#EBEBEB' }}>{evt.name}</p>
+            {evt.distance_m != null && (
+              <span className="font-mono text-[10px] flex-shrink-0" style={{ color: '#555' }}>{formatDistance(evt.distance_m)}</span>
+            )}
+          </div>
+          <div className="flex items-center gap-2 mt-0.5">
+            {evt.place && <p className="font-mono text-[10px] truncate" style={{ color: '#555' }}>{evt.place}</p>}
+            {evt.date_start && (
+              <span className="font-mono text-[9px] px-1.5 py-0.5 rounded flex-shrink-0"
+                style={{ background: color + '18', color }}>
+                {formatEvtDate(evt.date_start)}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    </li>
+  )
+}
+
 function PoiRow({ poi, categoryIcon, onSelect, onHover, isHovered }) {
   const Icon = categoryIcon
 
@@ -103,17 +156,19 @@ export default function NearbyView() {
   const openChatWithPrompt = useChatStore(s => s.openChatWithPrompt)
 
   const activeMeta = NEARBY_CATEGORIES.find(c => c.id === activeCategory)
+  const isEventsMode = activeCategory === 'events'
 
-  const handleSelect = (poi) => {
-    flyTo({ lat: poi.lat, lng: poi.lng, zoom: 16 })
+  const handleSelect = (item) => {
+    flyTo({ lat: item.lat, lng: item.lng, zoom: 16 })
+    if (isEventsMode) return  // just fly — events have no PlaceView
     openPlace({
-      kind:    'poi',
-      id:      poi.id,
-      name:    poi.name,
-      lat:     poi.lat,
-      lng:     poi.lng,
-      address: poi.address,
-      meta:    poi,
+      kind:     'poi',
+      id:       item.id,
+      name:     item.name,
+      lat:      item.lat,
+      lng:      item.lng,
+      address:  item.address,
+      meta:     item,
       category: activeMeta,
     })
   }
@@ -138,16 +193,21 @@ export default function NearbyView() {
         )}
 
         {activeCategory && isLoading && (
-          <div className="px-6 py-12 flex flex-col items-center gap-3">
-            <div className="flex gap-1.5">
-              {[0, 140, 280].map(d => (
-                <span key={d} className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: '#E8622A', animationDelay: `${d}ms` }} />
-              ))}
-            </div>
-            <p className="font-mono text-[10px] uppercase tracking-[0.1em]" style={{ color: '#555' }}>
-              Cercant {activeMeta?.label.toLowerCase()}…
-            </p>
-          </div>
+          <ul>
+            {Array.from({ length: 6 }).map((_, i) => (
+              <li key={i} className="flex" style={{ borderBottom: '1px solid #1A1A1A' }}>
+                <div className="w-[3px] flex-shrink-0" />
+                <div className="flex items-center gap-3 px-3.5 py-3 flex-1">
+                  <div className="w-7 h-7 rounded-md flex-shrink-0 animate-pulse" style={{ background: '#262626' }} />
+                  <div className="flex-1 flex flex-col gap-2">
+                    <div className="h-3 rounded animate-pulse" style={{ background: '#262626', width: `${55 + (i % 3) * 15}%` }} />
+                    <div className="h-2.5 rounded animate-pulse" style={{ background: '#1C1C1C', width: `${35 + (i % 4) * 12}%` }} />
+                  </div>
+                  <div className="w-8 h-2.5 rounded animate-pulse flex-shrink-0" style={{ background: '#1C1C1C' }} />
+                </div>
+              </li>
+            ))}
+          </ul>
         )}
 
         {activeCategory && !isLoading && pois.length === 0 && (
@@ -163,16 +223,10 @@ export default function NearbyView() {
         {activeCategory && !isLoading && pois.length > 0 && (
           <>
             <ul>
-              {pois.map(poi => (
-                <PoiRow
-                  key={poi.id}
-                  poi={poi}
-                  categoryIcon={activeMeta?.icon ?? Icons.pin}
-                  onSelect={handleSelect}
-                  onHover={setHovered}
-                  isHovered={hoveredId === poi.id}
-                />
-              ))}
+              {pois.map(item => isEventsMode
+                ? <EventRow key={item.id} evt={item} onSelect={handleSelect} onHover={setHovered} isHovered={hoveredId === item.id} />
+                : <PoiRow   key={item.id} poi={item} categoryIcon={activeMeta?.icon ?? Icons.pin} onSelect={handleSelect} onHover={setHovered} isHovered={hoveredId === item.id} />
+              )}
             </ul>
             <div className="px-4 py-3" style={{ borderTop: '1px solid #262626' }}>
               <button
