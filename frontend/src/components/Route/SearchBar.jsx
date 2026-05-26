@@ -397,8 +397,9 @@ function ModeCard({ mode, state, isActive, onClick, metroLines }) {
                 </span>
               )}
               {data && inefficient && (
-                <span className="font-mono text-[9px] uppercase tracking-[0.08em]" style={{ color: '#C98E2E' }}>
-                  ⚠ No eficient
+                <span className="font-mono text-[9px] uppercase tracking-[0.08em] flex items-center gap-1" style={{ color: '#C98E2E' }}>
+                  <svg width="9" height="9" viewBox="0 0 10 10" fill="none"><path d="M5 1L9.3 8.5H0.7L5 1Z" stroke="currentColor" strokeWidth="1" fill="none"/><line x1="5" y1="4" x2="5" y2="6.5" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/><circle cx="5" cy="7.5" r="0.5" fill="currentColor"/></svg>
+                  No eficient
                 </span>
               )}
               {loading && (

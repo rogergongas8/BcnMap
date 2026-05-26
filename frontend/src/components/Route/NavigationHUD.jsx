@@ -72,7 +72,7 @@ export default function NavigationHUD() {
                 className="px-4 py-2 flex items-center gap-2"
                 style={{ background: '#C98E2E18', borderBottom: '1px solid #C98E2E44' }}
               >
-                <span className="text-[12px]" style={{ color: '#C98E2E' }}>⚠</span>
+                <svg width="12" height="12" viewBox="0 0 10 10" fill="none" style={{ color: '#C98E2E', flexShrink: 0 }}><path d="M5 1L9.3 8.5H0.7L5 1Z" stroke="currentColor" strokeWidth="1" fill="none"/><line x1="5" y1="4" x2="5" y2="6.5" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/><circle cx="5" cy="7.5" r="0.5" fill="currentColor"/></svg>
                 <span className="font-mono text-[10px] uppercase tracking-[0.1em]" style={{ color: '#C98E2E' }}>
                   Fora de ruta — recalculant
                 </span>
