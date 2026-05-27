@@ -287,36 +287,56 @@ class RouteService
             return $this->singleSegment('pedestrian', $fromLat, $fromLng, $toLat, $toLng, 'walk');
         }
 
-        $bestLegs      = null;
+        $bestResult    = null;
         $bestTransfers = PHP_INT_MAX;
-        $bestDest      = $destCandidates[0];
         $bestOrigin    = $originCandidates[0];
+        $bestDest      = null;
 
+        // Try each origin candidate; A* finds the optimal alighting stop automatically
         foreach ($originCandidates as $orig) {
-            foreach (array_slice($destCandidates, 0, 3) as $dest) {
-                $legs = $router->route($orig, $dest);
-                if (!$legs) continue;
-                $transfers = count($legs) - 1;
-                if ($transfers < $bestTransfers) {
-                    $bestLegs      = $legs;
-                    $bestTransfers = $transfers;
-                    $bestOrigin    = $orig;
-                    $bestDest      = $dest;
-                }
+            $result = $router->route($orig, $toLat, $toLng);
+            if (!$result) continue;
+            $transfers = count($result['legs']) - 1;
+            if ($transfers < $bestTransfers) {
+                $bestResult    = $result;
+                $bestTransfers = $transfers;
+                $bestOrigin    = $orig;
+                $bestDest      = $result['alight_stop'];
             }
         }
 
-        if (!$bestLegs) {
+        if (!$bestResult) {
             return $this->singleSegment('pedestrian', $fromLat, $fromLng, $toLat, $toLng, 'walk');
         }
+
+        $bestLegs = $bestResult['legs'];
 
         $oLat = (float)$bestOrigin['lat']; $oLng = (float)$bestOrigin['lng'];
         $dLat = (float)$bestDest['lat'];   $dLng = (float)$bestDest['lng'];
 
-        $responses = Http::pool(fn($pool) => [
-            $pool->as('walk1')->timeout(self::VALHALLA_TIMEOUT)->post($this->valhallaBase() . '/route', $this->walkBody($fromLat, $fromLng, $oLat, $oLng)),
-            $pool->as('walk2')->timeout(self::VALHALLA_TIMEOUT)->post($this->valhallaBase() . '/route', $this->walkBody($dLat, $dLng, $toLat, $toLng)),
-        ]);
+        // Pre-compute stop sequences for each leg (used for Valhalla through-stop requests)
+        $legStopCoords = [];
+        foreach ($bestLegs as $i => $leg) {
+            $legStopCoords[$i] = $router->getStopsBetween(
+                $leg['from_stop'], $leg['to_stop'], $leg['rec_key'] ?? ''
+            );
+        }
+
+        // Fire walk segments + road-following bus leg geometry in one parallel pool
+        $responses = Http::pool(function ($pool) use ($fromLat, $fromLng, $oLat, $oLng, $dLat, $dLng, $toLat, $toLng, $legStopCoords) {
+            $requests = [
+                $pool->as('walk1')->timeout(self::VALHALLA_TIMEOUT)->post($this->valhallaBase() . '/route', $this->walkBody($fromLat, $fromLng, $oLat, $oLng)),
+                $pool->as('walk2')->timeout(self::VALHALLA_TIMEOUT)->post($this->valhallaBase() . '/route', $this->walkBody($dLat, $dLng, $toLat, $toLng)),
+            ];
+            foreach ($legStopCoords as $i => $stops) {
+                if (count($stops) >= 2) {
+                    $requests[] = $pool->as('bus_' . $i)
+                        ->timeout(self::VALHALLA_TIMEOUT)
+                        ->post($this->valhallaBase() . '/route', $this->busLegBody($stops));
+                }
+            }
+            return $requests;
+        });
 
         $walk1 = $this->parseValhalla($responses['walk1'], 'walk');
         $walk2 = $this->parseValhalla($responses['walk2'], 'walk');
@@ -339,16 +359,30 @@ class RouteService
             ];
         }
 
-        foreach ($bestLegs as $leg) {
+        foreach ($bestLegs as $i => $leg) {
             $from     = $leg['from_stop'];
             $to       = $leg['to_stop'];
+            $recKey   = $leg['rec_key'] ?? '';
             $lineName = $leg['line_name'] ?? $leg['line'];
-            $dist     = $this->haversine((float)$from['lat'], (float)$from['lng'], (float)$to['lat'], (float)$to['lng']);
-            $dur      = ($dist / BusRouter::BUS_SPEED_MS) + 60;
+
+            // Prefer road-following Valhalla geometry; fall back to stop-sequence polyline
+            $busGeo = isset($responses['bus_' . $i])
+                ? $this->parseValhalla($responses['bus_' . $i], 'bus')
+                : null;
+
+            if ($busGeo) {
+                $geo  = $busGeo['geometry'];
+                $dist = $busGeo['distance'];
+                $dur  = $busGeo['duration'];
+            } else {
+                $geo  = $router->legGeometry($from, $to, $recKey);
+                $dist = $router->legDistance($from, $to, $recKey);
+                $dur  = ($dist / BusRouter::BUS_SPEED_MS) + 60;
+            }
 
             $segments[] = [
                 'type'     => 'bus',
-                'geometry' => $router->legGeometry($from, $to),
+                'geometry' => $geo,
                 'distance' => $dist,
                 'duration' => $dur,
                 'color'    => self::COLORS['bus'],
@@ -638,6 +672,44 @@ class RouteService
 
         if ($alternates > 0) $body['alternates'] = $alternates;
         return $body;
+    }
+
+    /**
+     * Build a Valhalla `auto` request that threads through bus stop coordinates
+     * to produce road-following geometry for a bus leg.
+     * Intermediate stops become `through` locations; endpoints are `break_through`.
+     * When there are more than 10 intermediate stops, we sample evenly to cap the
+     * request size and stay within Valhalla's location limits.
+     *
+     * @param  array $stopCoords  [{lat, lng}, ...] in route order (at least 2 entries)
+     */
+    private function busLegBody(array $stopCoords): array
+    {
+        $n = count($stopCoords);
+
+        // Sample intermediate stops if there are too many (keep ≤8 through-stops)
+        if ($n > 10) {
+            $step         = (int) ceil(($n - 2) / 8);
+            $intermediate = [];
+            for ($i = 1; $i < $n - 1; $i += $step) {
+                $intermediate[] = $stopCoords[$i];
+            }
+        } else {
+            $intermediate = array_slice($stopCoords, 1, $n - 2);
+        }
+
+        $locations = [['lon' => $stopCoords[0]['lng'], 'lat' => $stopCoords[0]['lat'], 'type' => 'break_through']];
+        foreach ($intermediate as $coord) {
+            $locations[] = ['lon' => $coord['lng'], 'lat' => $coord['lat'], 'type' => 'through'];
+        }
+        $locations[] = ['lon' => $stopCoords[$n - 1]['lng'], 'lat' => $stopCoords[$n - 1]['lat'], 'type' => 'break_through'];
+
+        return [
+            'locations'          => $locations,
+            'costing'            => 'auto',
+            'costing_options'    => ['auto' => ['use_highways' => 0.3, 'use_tolls' => 0.0]],
+            'directions_options' => ['units' => 'kilometers'],
+        ];
     }
 
     /**

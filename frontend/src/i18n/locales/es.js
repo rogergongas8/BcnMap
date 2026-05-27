@@ -53,6 +53,7 @@ export default {
     transfer:      'Transbordo',
     dir:           'dir.',
     arrive:        'Llegar',
+    retry:         'Reintentar',
   },
   drawer: {
     placeView: {

@@ -11,20 +11,22 @@ class BusRouter
     private const BASE             = 'https://api.tmb.cat/v1';
     private const CACHE_KEY        = 'bus:router:graph';
     private const CACHE_TTL        = 86400;  // 24h
-    private const TRANSFER_PENALTY = 180;    // 3 min per line change
+    private const TRANSFER_PENALTY = 480;    // 8 min per line change (realistic wait)
     public  const BUS_SPEED_MS     = 4.2;    // ~15 km/h average BCN
 
-    private array $stopMap   = [];   // stop_id => stop data
-    private array $adjacency = [];   // stop_id => [neighbor_id => [line_id => line_id]]
-    private array $lineData  = [];   // line_id => {name, id}
+    private array $stopMap       = [];   // stop_id => stop data
+    private array $adjacency     = [];   // stop_id => [neighbor_id => [recKey => recKey]]
+    private array $lineData      = [];   // recKey => {name, id}
+    private array $stopSequences = [];   // recKey => [stop_id, ...] in route order
 
     public function __construct()
     {
         $graph = Cache::get(self::CACHE_KEY);
         if ($graph !== null) {
-            $this->stopMap   = $graph['stopMap']   ?? [];
-            $this->adjacency = $graph['adjacency'] ?? [];
-            $this->lineData  = $graph['lineData']  ?? [];
+            $this->stopMap       = $graph['stopMap']       ?? [];
+            $this->adjacency     = $graph['adjacency']     ?? [];
+            $this->lineData      = $graph['lineData']      ?? [];
+            $this->stopSequences = $graph['stopSequences'] ?? [];
         }
         // If cache is empty the router will be marked empty — caller should check isEmpty().
         // Run `php artisan bus:warm-graph` or wait for scheduler to pre-warm.
@@ -84,10 +86,13 @@ class BusRouter
             return ['stopMap' => [], 'adjacency' => [], 'lineData' => []];
         }
 
-        // 2. Fetch stops for all lines in parallel batches
-        $lineIds    = array_keys($lines);
-        $batchSize  = 15;
-        $lineStops  = [];   // line_id => [stops in order]
+        // 2. Fetch stops for all lines in parallel batches.
+        //    Each API response contains stops for ALL recorreguts (directions) of a line.
+        //    We group by ID_RECORREGUT so each direction becomes its own unidirectional sequence.
+        $lineIds   = array_keys($lines);
+        $batchSize = 15;
+        // recorregutId => ['lineId' => ..., 'lineName' => ..., 'stops' => [...ordered...]]
+        $recorreguts = [];
 
         for ($i = 0; $i < count($lineIds); $i += $batchSize) {
             $batch = array_slice($lineIds, $i, $batchSize);
@@ -95,7 +100,6 @@ class BusRouter
             $responses = Http::pool(function ($pool) use ($batch) {
                 $requests = [];
                 foreach ($batch as $id) {
-                    // Prefix with 'L' so PHP does not coerce numeric string keys to integers
                     $requests[] = $pool->as('L' . $id)->timeout(12)->get(
                         self::BASE . '/transit/linies/bus/' . $id . '/parades',
                         $this->auth()
@@ -105,59 +109,74 @@ class BusRouter
             });
 
             foreach ($responses as $key => $response) {
-                $lineId = substr((string)$key, 1); // strip 'L' prefix
+                $lineId = substr((string)$key, 1);
                 if (!($response instanceof \Illuminate\Http\Client\Response) || !$response->successful()) continue;
 
-                $stops = [];
+                // Group stops by recorregut (direction)
+                $byRecorregut = [];
                 foreach ($response->json('features') ?? [] as $f) {
                     $props  = $f['properties'] ?? [];
                     $coords = $f['geometry']['coordinates'] ?? null;
                     if (!$coords || count($coords) < 2) continue;
-                    $stopId = (string)($props['CODI_PARADA'] ?? '');
+                    $stopId     = (string)($props['CODI_PARADA'] ?? '');
+                    $recorregut = (string)($props['ID_RECORREGUT'] ?? $props['ID_SENTIT'] ?? '1');
                     if (!$stopId) continue;
-                    $stops[] = [
+
+                    $byRecorregut[$recorregut][] = [
                         'stop_id'   => $stopId,
                         'stop_name' => $props['NOM_PARADA'] ?? '',
                         'lat'       => (float)$coords[1],
                         'lng'       => (float)$coords[0],
-                        'order'     => (int)($props['ORDRE_PARADA'] ?? $props['ORDRE'] ?? count($stops)),
+                        'order'     => (int)($props['ORDRE'] ?? $props['ORDRE_PARADA'] ?? 0),
                     ];
                 }
 
-                usort($stops, fn($a, $b) => $a['order'] <=> $b['order']);
-
-                if (count($stops) >= 2) {
-                    $lineStops[$lineId] = $stops;
+                foreach ($byRecorregut as $recId => $stops) {
+                    usort($stops, fn($a, $b) => $a['order'] <=> $b['order']);
+                    if (count($stops) >= 2) {
+                        $recKey = $lineId . '_' . $recId;
+                        $recorreguts[$recKey] = [
+                            'lineId'   => $lineId,
+                            'lineName' => $lines[$lineId]['name'] ?? $lineId,
+                            'stops'    => $stops,
+                        ];
+                    }
                 }
             }
         }
 
-        // 3. Build adjacency graph
-        $stopMap   = [];
-        $adjacency = [];
-        $lineData  = [];
+        // 3. Build adjacency graph — unidirectional per recorregut
+        $stopMap       = [];
+        $adjacency     = [];
+        $lineData      = [];
+        $stopSequences = [];   // recKey => [stop_id, ...]
 
-        foreach ($lineStops as $lineId => $stops) {
-            $lineData[$lineId] = $lines[$lineId];
+        foreach ($recorreguts as $recKey => $rec) {
+            $lineData[$recKey] = ['id' => $rec['lineId'], 'name' => $rec['lineName']];
 
-            foreach ($stops as $stop) {
+            $sequence = [];
+            foreach ($rec['stops'] as $stop) {
                 $sid = $stop['stop_id'];
                 if (!isset($stopMap[$sid])) {
                     $stopMap[$sid] = $stop;
                 }
+                $sequence[] = $sid;
             }
+            $stopSequences[$recKey] = $sequence;
 
-            for ($i = 0; $i < count($stops) - 1; $i++) {
-                $aId = $stops[$i]['stop_id'];
-                $bId = $stops[$i + 1]['stop_id'];
-                // Bidirectional — real-world bus lines have separate inbound/outbound routes
-                // but this approximation gives good routing results
-                $adjacency[$aId][$bId][$lineId] = $lineId;
-                $adjacency[$bId][$aId][$lineId] = $lineId;
+            for ($i = 0; $i < count($sequence) - 1; $i++) {
+                $aId = $sequence[$i];
+                $bId = $sequence[$i + 1];
+                $adjacency[$aId][$bId][$recKey] = $recKey;
             }
         }
 
-        return ['stopMap' => $stopMap, 'adjacency' => $adjacency, 'lineData' => $lineData];
+        return [
+            'stopMap'       => $stopMap,
+            'adjacency'     => $adjacency,
+            'lineData'      => $lineData,
+            'stopSequences' => $stopSequences,
+        ];
     }
 
     // ── Spatial helpers ───────────────────────────────────────────────────────
@@ -193,49 +212,74 @@ class BusRouter
     // ── Routing ───────────────────────────────────────────────────────────────
 
     /**
-     * Dijkstra from fromStop to toStop.
-     * Returns [{line, line_name, from_stop, to_stop}] legs or null if unreachable.
+     * A* from $fromStop toward ($destLat, $destLng).
+     *
+     * The alighting stop is chosen dynamically: any stop within $maxWalkToExit
+     * metres of the destination qualifies. The algorithm picks the stop that
+     * minimises total cost = bus_travel + transfers + walk_to_destination.
+     *
+     * Returns ['legs' => [...], 'alight_stop' => [...]] or null if unreachable.
      */
-    public function route(array $fromStop, array $toStop): ?array
-    {
+    public function route(
+        array $fromStop,
+        float $destLat,
+        float $destLng,
+        float $maxWalkToExit = 700.0
+    ): ?array {
         $srcId = $fromStop['stop_id'];
-        $dstId = $toStop['stop_id'];
+        if (!isset($this->stopMap[$srcId])) return null;
 
-        if ($srcId === $dstId) return null;
-        if (!isset($this->stopMap[$srcId]) || !isset($this->stopMap[$dstId])) return null;
-
-        // Bounding box pruning: skip stops that are too far from the corridor
         $straightDist = $this->haversine(
             (float)$fromStop['lat'], (float)$fromStop['lng'],
-            (float)$toStop['lat'],   (float)$toStop['lng']
+            $destLat, $destLng
         );
-        $maxCost = ($straightDist / self::BUS_SPEED_MS) * 3.0 + 600; // 3× direct time + 10 min buffer
+        // Budget: 4× direct bus time + 10 min. Capped at 50 min.
+        $maxGCost = min(($straightDist / self::BUS_SPEED_MS) * 4.0 + 600, 3000.0);
 
-        $INF  = PHP_FLOAT_MAX;
+        $INF = PHP_FLOAT_MAX;
         $cost = [];
         $prev = [];
 
+        // A* priority queue ordered by f = g + h
         $pq = new \SplMinHeap();
-        $pq->insert([0.0, $srcId, null]);
+        $h0 = $this->haversine((float)$fromStop['lat'], (float)$fromStop['lng'], $destLat, $destLng) / self::BUS_SPEED_MS;
+        $pq->insert([$h0, 0.0, $srcId, null]);
         $cost[$srcId]['__start__'] = 0.0;
 
-        while (!$pq->isEmpty()) {
-            [$curCost, $curId, $curLine] = $pq->extract();
+        $bestTotalCost  = $INF;
+        $bestAlightId   = null;
+        $bestAlightLine = null;
 
-            if ($curId === $dstId) break;
-            if ($curCost > $maxCost) continue;
+        while (!$pq->isEmpty()) {
+            [$fCost, $gCost, $curId, $curLine] = $pq->extract();
+
+            // Early exit: nothing in the queue can beat our best solution
+            if ($fCost >= $bestTotalCost) break;
+            if ($gCost > $maxGCost) continue;
 
             $lineKey   = $curLine ?? '__start__';
             $bestSoFar = $cost[$curId][$lineKey] ?? $INF;
-            if ($curCost > $bestSoFar + 0.01) continue;
+            if ($gCost > $bestSoFar + 0.01) continue;
+
+            // Check if alighting here is better than our current best
+            $curStop  = $this->stopMap[$curId];
+            $walkDist = $this->haversine((float)$curStop['lat'], (float)$curStop['lng'], $destLat, $destLng);
+            if ($walkDist <= $maxWalkToExit) {
+                $totalCost = $gCost + ($walkDist / 1.25); // walk at 1.25 m/s
+                if ($totalCost < $bestTotalCost) {
+                    $bestTotalCost  = $totalCost;
+                    $bestAlightId   = $curId;
+                    $bestAlightLine = $lineKey;
+                }
+            }
 
             foreach ($this->adjacency[$curId] ?? [] as $nextId => $lines) {
                 $nextStop = $this->stopMap[$nextId] ?? null;
                 if (!$nextStop) continue;
 
                 $dist       = $this->haversine(
-                    (float)$this->stopMap[$curId]['lat'], (float)$this->stopMap[$curId]['lng'],
-                    (float)$nextStop['lat'],              (float)$nextStop['lng']
+                    (float)$curStop['lat'], (float)$curStop['lng'],
+                    (float)$nextStop['lat'], (float)$nextStop['lng']
                 );
                 $travelTime = $dist / self::BUS_SPEED_MS;
 
@@ -243,35 +287,36 @@ class BusRouter
                     $transfer = ($curLine !== null && $curLine !== $edgeLine)
                         ? self::TRANSFER_PENALTY
                         : 0.0;
-                    $newCost  = $curCost + $travelTime + $transfer;
+                    $newGCost = $gCost + $travelTime + $transfer;
+
+                    if ($newGCost > $maxGCost) continue;
 
                     $prevBest = $cost[$nextId][$edgeLine] ?? $INF;
-                    if ($newCost < $prevBest) {
-                        $cost[$nextId][$edgeLine] = $newCost;
+                    if ($newGCost < $prevBest) {
+                        $cost[$nextId][$edgeLine] = $newGCost;
                         $prev[$nextId][$edgeLine] = [$curId, $curLine, $edgeLine];
-                        $pq->insert([$newCost, $nextId, $edgeLine]);
+                        // A* heuristic: haversine to destination / bus speed
+                        $h = $this->haversine((float)$nextStop['lat'], (float)$nextStop['lng'], $destLat, $destLng) / self::BUS_SPEED_MS;
+                        $pq->insert([$newGCost + $h, $newGCost, $nextId, $edgeLine]);
                     }
                 }
             }
         }
 
-        if (empty($cost[$dstId])) return null;
+        if ($bestAlightId === null) return null;
 
-        $bestLine = null;
-        $bestCost = $INF;
-        foreach ($cost[$dstId] as $line => $c) {
-            if ($c < $bestCost) { $bestCost = $c; $bestLine = $line; }
-        }
-        if ($bestLine === null) return null;
-
-        // Reconstruct path
+        // Reconstruct path to best alighting stop
         $path    = [];
-        $curId   = $dstId;
-        $curLine = $bestLine;
-        while (isset($prev[$curId][$curLine])) {
-            [$prevId, $prevLine, $edgeLine] = $prev[$curId][$curLine];
+        $curId   = $bestAlightId;
+        $curLine = $bestAlightLine === '__start__' ? null : $bestAlightLine;
+
+        // Walk back through prev[] — keys use line or '__start__'
+        $walkKey = $curLine ?? '__start__';
+        while (isset($prev[$curId][$walkKey])) {
+            [$prevId, $prevLine, $edgeLine] = $prev[$curId][$walkKey];
             $path[]  = [$prevId, $curId, $edgeLine];
             $curId   = $prevId;
+            $walkKey = $prevLine ?? '__start__';
             $curLine = $prevLine;
         }
         $path = array_reverse($path);
@@ -294,24 +339,103 @@ class BusRouter
             $legs[] = [
                 'line'      => $line,
                 'line_name' => $this->lineData[$line]['name'] ?? $line,
+                'rec_key'   => $line,   // same as line (= recorregut key)
                 'from_stop' => $this->stopMap[$legFrom],
                 'to_stop'   => $this->stopMap[$legTo],
             ];
             $i = $j;
         }
 
-        return $legs;
+        return [
+            'legs'        => $legs,
+            'alight_stop' => $this->stopMap[$bestAlightId],
+        ];
     }
 
     /**
-     * Straight-line geometry for a bus leg (no actual route shape available from TMB).
+     * Build geometry for a bus leg by threading through all real stops between
+     * from_stop and to_stop on the given recorregut.
+     * Falls back to straight line if the sequence cannot be found.
      */
-    public function legGeometry(array $from, array $to): array
+    public function legGeometry(array $from, array $to, string $recKey = ''): array
     {
+        $sequence = $this->stopSequences[$recKey] ?? [];
+        if (!empty($sequence)) {
+            $fromIdx = array_search($from['stop_id'], $sequence, true);
+            $toIdx   = array_search($to['stop_id'],   $sequence, true);
+
+            if ($fromIdx !== false && $toIdx !== false && $fromIdx < $toIdx) {
+                $coords = [];
+                for ($i = $fromIdx; $i <= $toIdx; $i++) {
+                    $stop = $this->stopMap[$sequence[$i]] ?? null;
+                    if ($stop) {
+                        $coords[] = [(float)$stop['lng'], (float)$stop['lat']];
+                    }
+                }
+                if (count($coords) >= 2) {
+                    return ['type' => 'LineString', 'coordinates' => $coords];
+                }
+            }
+        }
+
+        // Fallback: straight line
         return ['type' => 'LineString', 'coordinates' => [
             [(float)$from['lng'], (float)$from['lat']],
             [(float)$to['lng'],   (float)$to['lat']],
         ]];
+    }
+
+    /**
+     * Real distance along the stop sequence for a leg (sum of haversine between consecutive stops).
+     */
+    public function legDistance(array $from, array $to, string $recKey = ''): float
+    {
+        $sequence = $this->stopSequences[$recKey] ?? [];
+        if (empty($sequence)) {
+            return $this->haversine((float)$from['lat'], (float)$from['lng'], (float)$to['lat'], (float)$to['lng']);
+        }
+
+        $fromIdx = array_search($from['stop_id'], $sequence, true);
+        $toIdx   = array_search($to['stop_id'],   $sequence, true);
+
+        if ($fromIdx === false || $toIdx === false || $fromIdx >= $toIdx) {
+            return $this->haversine((float)$from['lat'], (float)$from['lng'], (float)$to['lat'], (float)$to['lng']);
+        }
+
+        $total = 0.0;
+        for ($i = $fromIdx; $i < $toIdx; $i++) {
+            $a = $this->stopMap[$sequence[$i]]     ?? null;
+            $b = $this->stopMap[$sequence[$i + 1]] ?? null;
+            if ($a && $b) {
+                $total += $this->haversine((float)$a['lat'], (float)$a['lng'], (float)$b['lat'], (float)$b['lng']);
+            }
+        }
+        return $total ?: $this->haversine((float)$from['lat'], (float)$from['lng'], (float)$to['lat'], (float)$to['lng']);
+    }
+
+    /**
+     * Returns the ordered stop coordinates (as [{lat, lng}]) for the
+     * sub-sequence between $from and $to on the given recorregut.
+     * Used by RouteService to request road-following geometry from Valhalla.
+     */
+    public function getStopsBetween(array $from, array $to, string $recKey): array
+    {
+        $sequence = $this->stopSequences[$recKey] ?? [];
+        if (empty($sequence)) return [];
+
+        $fromIdx = array_search($from['stop_id'], $sequence, true);
+        $toIdx   = array_search($to['stop_id'],   $sequence, true);
+
+        if ($fromIdx === false || $toIdx === false || $fromIdx >= $toIdx) return [];
+
+        $stops = [];
+        for ($i = $fromIdx; $i <= $toIdx; $i++) {
+            $stop = $this->stopMap[$sequence[$i]] ?? null;
+            if ($stop) {
+                $stops[] = ['lat' => (float)$stop['lat'], 'lng' => (float)$stop['lng']];
+            }
+        }
+        return $stops;
     }
 
     public function lineColor(): string

@@ -56,6 +56,7 @@ export default {
     transfer:      'Transbord',
     dir:           'dir.',
     arrive:        'Arribar',
+    retry:         'Reintentar',
   },
   // Drawer
   drawer: {

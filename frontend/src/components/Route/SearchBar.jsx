@@ -1043,8 +1043,16 @@ export default function SearchBar({ embedded = false }) {
 
   /* ────────────────── Cálculo de las 4 previews en paralelo ────────────────── */
 
+  const abortControllerRef = useRef(null)
+
   const computePreviews = useCallback(async (orig, dest) => {
     if (!orig || !dest) return
+
+    // Cancel any in-flight requests from the previous call
+    abortControllerRef.current?.abort()
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+
     const version = ++previewVersionRef.current
 
     setPreviews({
@@ -1065,6 +1073,7 @@ export default function SearchBar({ embedded = false }) {
 
     // Aborta si llegó una versión más nueva mientras tanto
     if (version !== previewVersionRef.current) return
+    if (controller.signal.aborted) return
 
     setPreviews(prev => {
       const next = { ...prev }
@@ -1214,14 +1223,13 @@ export default function SearchBar({ embedded = false }) {
 
   const centeredLeft = '50%'
 
+  // Detect when all previews have loaded with errors → show retry button (used in both embedded and floating)
+  const allFailed = Object.keys(previews).length === MODES.length &&
+    MODES.every(m => previews[m.id]?.error === true)
+
   /* ────────────────── Render embegut (TopBar) ────────────────── */
 
   if (embedded) {
-    // Shared share icon helper
-    const ShareIcon = () => shareToast
-      ? <path d="M3 8L6.5 11.5L13 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-      : <><circle cx="12.5" cy="3.5" r="2" stroke="currentColor" strokeWidth="1.3"/><circle cx="12.5" cy="12.5" r="2" stroke="currentColor" strokeWidth="1.3"/><circle cx="3.5" cy="8" r="2" stroke="currentColor" strokeWidth="1.3"/><line x1="5.4" y1="7" x2="10.6" y2="4.4" stroke="currentColor" strokeWidth="1.3"/><line x1="5.4" y1="9" x2="10.6" y2="11.6" stroke="currentColor" strokeWidth="1.3"/></>
-
     // Absolute dropdown anchored 56px below the TopBar's top edge
     const dropdownStyle = {
       position: 'absolute',
@@ -1231,13 +1239,23 @@ export default function SearchBar({ embedded = false }) {
       zIndex: 60,
     }
 
-    // Reusable options dropdown content
-    const OptionsContent = () => (
-      <div className="overflow-hidden shadow-[0_8px_40px_rgba(0,0,0,0.7)]"
-        style={{ background: '#141414', border: '1px solid #262626', borderRadius: 8 }}
+    // Share icon paths (not a component — avoids remount on every render)
+    const shareIconContent = shareToast
+      ? <path d="M3 8L6.5 11.5L13 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      : <><circle cx="12.5" cy="3.5" r="2" stroke="currentColor" strokeWidth="1.3"/><circle cx="12.5" cy="12.5" r="2" stroke="currentColor" strokeWidth="1.3"/><circle cx="3.5" cy="8" r="2" stroke="currentColor" strokeWidth="1.3"/><line x1="5.4" y1="7" x2="10.6" y2="4.4" stroke="currentColor" strokeWidth="1.3"/><line x1="5.4" y1="9" x2="10.6" y2="11.6" stroke="currentColor" strokeWidth="1.3"/></>
+
+    // Options dropdown content — inlined, NOT a sub-component, to avoid remount on every keystroke.
+    // Uses flex-column layout: fixed PointFields header + scrollable body + sticky CTA footer.
+    const optionsDropdownJSX = (
+      <div className="shadow-[0_8px_40px_rgba(0,0,0,0.7)]"
+        style={{ background: '#141414', border: '1px solid #262626', borderRadius: 8,
+                 maxHeight: 'calc(100dvh - 80px)', display: 'flex', flexDirection: 'column' }}
       >
-        {/* Origin / dest fields */}
-        <div className="px-3 pt-3 pb-2 flex flex-col gap-2" style={{ borderBottom: '1px solid #1A1A1A' }}>
+        {/* ── HEADER: PointFields — always visible, suggestions can overflow below ── */}
+        <div className="px-3 pt-3 pb-2 flex flex-col gap-2"
+          style={{ borderBottom: '1px solid #1A1A1A', flexShrink: 0,
+                   position: 'relative', zIndex: 5, background: '#141414' }}
+        >
           <PointField value={originQuery} onChange={v => { setOriginQuery(v); if (!v) setOriginPoint(null) }}
             onPickSuggestion={handlePickOriginSuggestion} onMyLocation={handleMyLocationOrigin}
             placeholder={t('search.origin')} dot="#00b4ff"
@@ -1255,36 +1273,57 @@ export default function SearchBar({ embedded = false }) {
             placeholder={t('search.destination')} dot="#ff6b35"
           />
         </div>
-        {/* Mode cards */}
-        <div className="px-3 py-3 flex flex-col gap-1.5">
-          {MODES.map(m => (
-            <ModeCard key={m.id}
-              mode={{ ...m, isRecommended: iaPlanRecommended === m.id }}
-              state={previews[m.id]}
-              isActive={mode === m.id && route?.segments?.length > 0}
-              onClick={() => handleActivateMode(m.id)}
-              metroLines={metroLines}
-            />
-          ))}
-        </div>
-        {/* Step panel */}
-        {route?.segments?.length > 0 && (
-          <div className="overflow-hidden">
+
+        {/* ── BODY: scrollable mode cards + step panel ── */}
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+          <div className="px-3 py-3 flex flex-col gap-1.5">
+            {MODES.map(m => (
+              <ModeCard key={m.id}
+                mode={{ ...m, isRecommended: iaPlanRecommended === m.id }}
+                state={previews[m.id]}
+                isActive={mode === m.id && route?.segments?.length > 0}
+                onClick={() => handleActivateMode(m.id)}
+                onPickAlternative={(alt) => useRouteStore.getState().setFullRoute(m.id, originPoint, destPoint, alt)}
+                metroLines={metroLines}
+              />
+            ))}
+            {/* Retry button when all modes fail */}
+            {allFailed && originPoint && destPoint && (
+              <button
+                onClick={() => computePreviews(originPoint, destPoint)}
+                className="w-full flex items-center justify-center gap-2 py-2 mt-1 font-mono text-[10px] uppercase tracking-[0.08em] transition-colors"
+                style={{ borderRadius: 6, border: '1px solid #333', color: '#888', background: 'transparent' }}
+                onMouseEnter={e => { e.currentTarget.style.color = '#EBEBEB'; e.currentTarget.style.borderColor = '#555' }}
+                onMouseLeave={e => { e.currentTarget.style.color = '#888'; e.currentTarget.style.borderColor = '#333' }}
+              >
+                <svg width="11" height="11" viewBox="0 0 16 16" fill="none">
+                  <path d="M13.5 8A5.5 5.5 0 1 1 8 2.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                  <path d="M8 0.5L10.5 2.5L8 4.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                {t('search.retry') ?? 'Reintentar'}
+              </button>
+            )}
+          </div>
+          {/* Step panel */}
+          {route?.segments?.length > 0 && (
             <RouteStepPanel segments={route.segments} origin={originPoint} destination={destPoint} mode={mode} />
-          </div>
-        )}
-        {/* Loading */}
-        {isLoading && (
-          <div className="px-3 pb-3">
-            <div className="flex items-center gap-2 px-3 py-2" style={{ borderRadius: 6, background: '#1C1C1C' }}>
-              {[0, 150, 300].map(d => <span key={d} className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: '#E8622A', animationDelay: `${d}ms` }} />)}
-              <span className="font-mono text-[10px] uppercase tracking-[0.1em] ml-1" style={{ color: '#555' }}>{t('search.calculating')}</span>
+          )}
+          {/* Loading */}
+          {isLoading && (
+            <div className="px-3 pb-3">
+              <div className="flex items-center gap-2 px-3 py-2" style={{ borderRadius: 6, background: '#1C1C1C' }}>
+                {[0, 150, 300].map(d => <span key={d} className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: '#E8622A', animationDelay: `${d}ms` }} />)}
+                <span className="font-mono text-[10px] uppercase tracking-[0.1em] ml-1" style={{ color: '#555' }}>{t('search.calculating')}</span>
+              </div>
             </div>
-          </div>
-        )}
-        {/* CTA */}
+          )}
+        </div>
+
+        {/* ── FOOTER: CTA — always visible at bottom ── */}
         {route?.segments?.length > 0 && !isLoading && (
-          <div className="px-3 pb-3 flex gap-2">
+          <div className="px-3 py-2.5 flex gap-2"
+            style={{ flexShrink: 0, borderTop: '1px solid #1A1A1A' }}
+          >
             <button onClick={() => setPhase('pill')}
               className="flex-1 px-3 py-2.5 font-syne text-[12px] font-semibold"
               style={{ borderRadius: 6, color: '#fff', background: '#E8622A', border: '1px solid #E8622A' }}
@@ -1335,7 +1374,7 @@ export default function SearchBar({ embedded = false }) {
                   className="w-8 h-8 flex items-center justify-center rounded-md transition-all flex-shrink-0"
                   style={{ color: shareToast ? '#E8622A' : '#555', background: shareToast ? '#E8622A1A' : 'transparent' }}
                 >
-                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><ShareIcon /></svg>
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none">{shareIconContent}</svg>
                 </button>
               </>
             )}
@@ -1402,7 +1441,7 @@ export default function SearchBar({ embedded = false }) {
                 className="w-8 h-8 flex items-center justify-center flex-shrink-0 rounded-md transition-colors"
                 style={{ color: shareToast ? '#E8622A' : '#555', background: shareToast ? '#E8622A1A' : 'transparent' }}
               >
-                <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><ShareIcon /></svg>
+                <svg width="11" height="11" viewBox="0 0 16 16" fill="none">{shareIconContent}</svg>
               </button>
               <button onClick={exitToPill} className="w-8 h-8 flex items-center justify-center flex-shrink-0 transition-colors rounded-md" style={{ color: '#555' }}
                 onMouseEnter={e => { e.currentTarget.style.color = '#EBEBEB' }} onMouseLeave={e => { e.currentTarget.style.color = '#555' }}
@@ -1410,7 +1449,7 @@ export default function SearchBar({ embedded = false }) {
             </div>
             {/* Options dropdown */}
             <div style={{ ...dropdownStyle, width: 440, maxWidth: '94vw' }}>
-              <OptionsContent />
+              {optionsDropdownJSX}
             </div>
           </>
         )}
@@ -1574,119 +1613,135 @@ export default function SearchBar({ embedded = false }) {
             className="absolute top-4 -translate-x-1/2 z-40 w-[440px] max-w-[94vw]"
             style={{ left: centeredLeft }}
           >
-            <div className="overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.5)]"
-              style={{ background: '#141414', border: '1px solid #262626', borderRadius: 8 }}
+            <div className="shadow-[0_4px_24px_rgba(0,0,0,0.5)]"
+              style={{ background: '#141414', border: '1px solid #262626', borderRadius: 8,
+                       maxHeight: 'calc(100dvh - 80px)', display: 'flex', flexDirection: 'column' }}
             >
-              {/* Header: destino */}
-              <div className="flex items-center gap-2 px-3 py-2.5" style={{ borderBottom: '1px solid #262626' }}>
-                <button
-                  onClick={() => setPhase('search')}
-                  title="Volver a la búsqueda"
-                  className="w-7 h-7 flex items-center justify-center transition-colors flex-shrink-0"
-                  style={{ borderRadius: 6, color: '#555' }}
-                >
-                  <Icon.back />
-                </button>
-                <div className="flex-1 min-w-0">
-                  <p className="font-mono text-[8px] uppercase tracking-[0.14em]" style={{ color: '#555' }}>Destí</p>
-                  <p className="font-syne text-[13px] font-medium truncate" style={{ color: '#EBEBEB' }}>{destPoint?.label ?? '—'}</p>
-                </div>
-                <button
-                  onClick={exitToPill}
-                  title="Cerrar"
-                  className="w-7 h-7 flex items-center justify-center transition-colors flex-shrink-0"
-                  style={{ borderRadius: 6, color: '#555' }}
-                >
-                  <Icon.close />
-                </button>
-              </div>
-
-              {/* Inputs origen / destino editables + swap */}
-              <div className="px-3 pt-3 pb-2 flex flex-col gap-2">
-                <PointField
-                  value={originQuery}
-                  onChange={(v) => {
-                    setOriginQuery(v)
-                    if (!v) setOriginPoint(null)
-                  }}
-                  onPickSuggestion={handlePickOriginSuggestion}
-                  onMyLocation={handleMyLocationOrigin}
-                  placeholder={t('search.origin')}
-                  dot="#00b4ff"
-                />
-
-                <div className="flex items-center gap-2 px-1">
-                  <div className="flex-1 h-px bg-white/[0.05]" />
+              {/* ── HEADER: fixed — back/close + PointFields, suggestions overflow below ── */}
+              <div style={{ flexShrink: 0, position: 'relative', zIndex: 5, background: '#141414' }}>
+                {/* Destination label row */}
+                <div className="flex items-center gap-2 px-3 py-2.5" style={{ borderBottom: '1px solid #262626' }}>
                   <button
-                    onClick={handleSwap}
-                    title="Intercambiar origen y destino"
-                    className="text-white/30 hover:text-white/80 transition-colors"
+                    onClick={() => setPhase('search')}
+                    title="Volver a la búsqueda"
+                    className="w-7 h-7 flex items-center justify-center transition-colors flex-shrink-0"
+                    style={{ borderRadius: 6, color: '#555' }}
                   >
-                    <Icon.swap />
+                    <Icon.back />
                   </button>
-                  <div className="flex-1 h-px bg-white/[0.05]" />
-                </div>
-
-                <PointField
-                  value={destQuery}
-                  onChange={(v) => {
-                    setDestQuery(v)
-                    if (!v) setDestPoint(null)
-                  }}
-                  onPickSuggestion={handlePickDestSuggestionInOptions}
-                  placeholder={t('search.destination')}
-                  dot="#ff6b35"
-                />
-              </div>
-
-              {/* Tarjetas de modo */}
-              <div className="px-3 pb-3 pt-1 flex flex-col gap-1.5">
-                {MODES.map(m => (
-                  <ModeCard
-                    key={m.id}
-                    mode={{ ...m, isRecommended: iaPlanRecommended === m.id }}
-                    state={previews[m.id]}
-                    isActive={mode === m.id && route?.segments?.length > 0}
-                    onClick={() => handleActivateMode(m.id)}
-                    metroLines={metroLines}
-                  />
-                ))}
-              </div>
-
-              {/* Panel detallado paso a paso */}
-              <AnimatePresence>
-                {route?.segments?.length > 0 && (
-                  <motion.div
-                    key="route-step-panel"
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.22, ease: [0.2, 0.7, 0.2, 1] }}
-                    className="overflow-hidden"
-                  >
-                    <RouteStepPanel
-                      segments={route.segments}
-                      origin={originPoint}
-                      destination={destPoint}
-                      mode={mode}
-                    />
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              {/* Estado de ruta activa */}
-              {isLoading && (
-                <div className="px-3 pb-3">
-                  <div className="flex items-center gap-2 px-3 py-2" style={{ borderRadius: 6, background: '#1C1C1C' }}>
-                    {[0, 150, 300].map(d => (
-                      <span key={d} className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: '#E8622A', animationDelay: `${d}ms` }} />
-                    ))}
-                    <span className="font-mono text-[10px] uppercase tracking-[0.1em] ml-1" style={{ color: '#555' }}>{t('search.calculating')}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-mono text-[8px] uppercase tracking-[0.14em]" style={{ color: '#555' }}>Destí</p>
+                    <p className="font-syne text-[13px] font-medium truncate" style={{ color: '#EBEBEB' }}>{destPoint?.label ?? '—'}</p>
                   </div>
+                  <button
+                    onClick={exitToPill}
+                    title="Cerrar"
+                    className="w-7 h-7 flex items-center justify-center transition-colors flex-shrink-0"
+                    style={{ borderRadius: 6, color: '#555' }}
+                  >
+                    <Icon.close />
+                  </button>
                 </div>
-              )}
+
+                {/* Inputs origen / destino editables + swap */}
+                <div className="px-3 pt-3 pb-2 flex flex-col gap-2" style={{ borderBottom: '1px solid #1A1A1A' }}>
+                  <PointField
+                    value={originQuery}
+                    onChange={(v) => {
+                      setOriginQuery(v)
+                      if (!v) setOriginPoint(null)
+                    }}
+                    onPickSuggestion={handlePickOriginSuggestion}
+                    onMyLocation={handleMyLocationOrigin}
+                    placeholder={t('search.origin')}
+                    dot="#00b4ff"
+                  />
+
+                  <div className="flex items-center gap-2 px-1">
+                    <div className="flex-1 h-px bg-white/[0.05]" />
+                    <button
+                      onClick={handleSwap}
+                      title="Intercambiar origen y destino"
+                      className="text-white/30 hover:text-white/80 transition-colors"
+                    >
+                      <Icon.swap />
+                    </button>
+                    <div className="flex-1 h-px bg-white/[0.05]" />
+                  </div>
+
+                  <PointField
+                    value={destQuery}
+                    onChange={(v) => {
+                      setDestQuery(v)
+                      if (!v) setDestPoint(null)
+                    }}
+                    onPickSuggestion={handlePickDestSuggestionInOptions}
+                    placeholder={t('search.destination')}
+                    dot="#ff6b35"
+                  />
+                </div>
+              </div>
+
+              {/* ── BODY: scrollable — mode cards + step panel + loading ── */}
+              <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+                {/* Tarjetas de modo */}
+                <div className="px-3 pb-3 pt-3 flex flex-col gap-1.5">
+                  {MODES.map(m => (
+                    <ModeCard
+                      key={m.id}
+                      mode={{ ...m, isRecommended: iaPlanRecommended === m.id }}
+                      state={previews[m.id]}
+                      isActive={mode === m.id && route?.segments?.length > 0}
+                      onClick={() => handleActivateMode(m.id)}
+                      metroLines={metroLines}
+                    />
+                  ))}
+                  {/* Retry button when all modes fail */}
+                  {allFailed && originPoint && destPoint && (
+                    <button
+                      onClick={() => computePreviews(originPoint, destPoint)}
+                      className="w-full flex items-center justify-center gap-2 py-2 mt-1 font-mono text-[10px] uppercase tracking-[0.08em] transition-colors"
+                      style={{ borderRadius: 6, border: '1px solid #333', color: '#888', background: 'transparent' }}
+                      onMouseEnter={e => { e.currentTarget.style.color = '#EBEBEB'; e.currentTarget.style.borderColor = '#555' }}
+                      onMouseLeave={e => { e.currentTarget.style.color = '#888'; e.currentTarget.style.borderColor = '#333' }}
+                    >
+                      <svg width="11" height="11" viewBox="0 0 16 16" fill="none">
+                        <path d="M13.5 8A5.5 5.5 0 1 1 8 2.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                        <path d="M8 0.5L10.5 2.5L8 4.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      {t('search.retry') ?? 'Reintentar'}
+                    </button>
+                  )}
+                </div>
+
+                {/* Panel detallado paso a paso */}
+                {route?.segments?.length > 0 && (
+                  <RouteStepPanel
+                    segments={route.segments}
+                    origin={originPoint}
+                    destination={destPoint}
+                    mode={mode}
+                  />
+                )}
+
+                {/* Estado calculando */}
+                {isLoading && (
+                  <div className="px-3 pb-3">
+                    <div className="flex items-center gap-2 px-3 py-2" style={{ borderRadius: 6, background: '#1C1C1C' }}>
+                      {[0, 150, 300].map(d => (
+                        <span key={d} className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: '#E8622A', animationDelay: `${d}ms` }} />
+                      ))}
+                      <span className="font-mono text-[10px] uppercase tracking-[0.1em] ml-1" style={{ color: '#555' }}>{t('search.calculating')}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* ── FOOTER: CTA — always visible at bottom ── */}
               {route?.segments?.length > 0 && !isLoading && (
-                <div className="px-3 pb-3 flex gap-2">
+                <div className="px-3 py-2.5 flex gap-2"
+                  style={{ flexShrink: 0, borderTop: '1px solid #1A1A1A' }}
+                >
                   <button
                     onClick={() => { setPhase('pill') }}
                     className="flex-1 px-3 py-2.5 font-syne text-[12px] font-semibold transition-colors"

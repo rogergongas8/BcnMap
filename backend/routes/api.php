@@ -42,8 +42,8 @@ Route::prefix('v1')->group(function () {
     Route::get('/city-context',    [CityContextController::class, 'index']);
 
     Route::post('/chat',           [ChatController::class, 'send'])->middleware('throttle:20,1');
-    Route::get('/route',           [RouteController::class, 'calculate'])->middleware('throttle:30,1');
-    Route::get('/route/plan',      [RouteController::class, 'plan'])->middleware('throttle:20,1');
+    Route::get('/route',           [RouteController::class, 'calculate'])->middleware('throttle:200,1');
+    Route::get('/route/plan',      [RouteController::class, 'plan'])->middleware('throttle:40,1');
 
     Route::get('/pois/nearby',     [PoiController::class, 'nearby']);
     Route::get('/pois/search',     [PoiController::class, 'search']);
