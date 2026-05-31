@@ -13,34 +13,34 @@
     width: 100%;
     height: 100%;
     overflow: hidden;
-    background: #0e0e0e;
-    font-family: 'Syne', system-ui, sans-serif;
+    background: #0C0B09;
+    font-family: 'Bricolage Grotesque', system-ui, sans-serif;
   }
 }
 
 @layer utilities {
-  /* Solid panel — design system "Registre" */
+  /* Solid panel */
   .panel {
-    background: #141414;
-    border: 1px solid #262626;
+    background: #151210;
+    border: 1px solid #2C2926;
     border-radius: 8px;
   }
   .panel-inner {
-    background: #1C1C1C;
-    border: 1px solid #1C1C1C;
+    background: #211F1B;
+    border: 1px solid #2C2926;
     border-radius: 6px;
   }
 
   /* Legacy glass — mantenim per compatibilitat */
   .panel-glass {
-    background: #141414;
-    border: 1px solid #262626;
+    background: #151210;
+    border: 1px solid #2C2926;
     border-radius: 8px;
   }
 
   /* Typographic utilities */
-  .font-syne { font-family: 'Syne', sans-serif; }
-  .font-imono { font-family: 'Instrument Mono', monospace; }
+  .font-syne  { font-family: 'Bricolage Grotesque', sans-serif; }
+  .font-imono { font-family: 'IBM Plex Mono', monospace; }
 
   /* Accent bar (3px left edge on transport cards) */
   .accent-bar {
@@ -49,14 +49,14 @@
     border-radius: 1.5px 0 0 1.5px;
   }
 
-  /* Text scale */
-  .text-hi   { color: #EBEBEB; }
-  .text-mid  { color: #888888; }
-  .text-lo   { color: #555555; }
+  /* Text scale — warm grays with real contrast */
+  .text-hi   { color: #F7F6F4; }
+  .text-mid  { color: #B0ACA7; }
+  .text-lo   { color: #8C8884; }
 
   /* Status badge */
   .badge {
-    font-family: 'Instrument Mono', monospace;
+    font-family: 'IBM Plex Mono', monospace;
     font-size: 9px;
     font-weight: 500;
     letter-spacing: 0.08em;
@@ -65,12 +65,11 @@
     text-transform: uppercase;
   }
 
-  /* Legacy neon */
-  .text-neon-green  { color: #00ff88; }
-  .text-neon-blue   { color: #00aaff; }
-  .text-neon-yellow { color: #ffcc00; }
-  .text-neon-red    { color: #ff3333; }
-  .text-neon-cyan   { color: #22d3ee; }
+  /* Status colors — kept for data layers */
+  .text-accent  { color: #B8885A; }
+  .text-success { color: #3CB887; }
+  .text-warn    { color: #C98E2E; }
+  .text-danger  { color: #D45555; }
 }
 
 /* Ensure MapLibre controls are always clickable above React overlays */
@@ -101,17 +100,17 @@
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  background: rgba(34, 211, 238, 0.25);
+  background: rgba(184, 136, 90, 0.2);
   animation: bcn-pin-pulse 1.6s ease-out infinite;
 }
 .bcn-pin-dot {
   position: absolute;
   inset: 8px;
   border-radius: 50%;
-  background: #22d3ee;
+  background: #B8885A;
   box-shadow:
     0 0 0 2px rgba(0, 0, 0, 0.7),
-    0 0 12px rgba(34, 211, 238, 0.8);
+    0 0 10px rgba(184, 136, 90, 0.6);
 }
 @keyframes bcn-pin-pulse {
   0%   { transform: scale(0.6); opacity: 0.8; }

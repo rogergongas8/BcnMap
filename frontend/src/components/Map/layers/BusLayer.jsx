@@ -163,6 +163,13 @@ export default function BusLayer({ onHover }) {
     ;[LAYER_ID, LAYER_ID + '-glow', LAYER_ID + '-label'].forEach(id => {
       if (mapInstance.getLayer(id)) mapInstance.setLayoutProperty(id, 'visibility', vis)
     })
+    if (visible) {
+      setTimeout(() => {
+        const source = mapInstance.getSource(SOURCE_ID)
+        if (source) source.setData(buildGeojson(useDataStore.getState().bus))
+      }, 50)
+    }
+    mapInstance.triggerRepaint()
   }, [visible, mapInstance, isLoaded])
 
   return null

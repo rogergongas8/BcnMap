@@ -12,7 +12,7 @@ function SkylineDecor() {
       fill="currentColor"
       aria-hidden="true"
       className="absolute bottom-0 left-0 w-full"
-      style={{ color: '#E8622A', opacity: 0.09, height: 44 }}
+      style={{ color: '#B8885A', opacity: 0.09, height: 44 }}
     >
       {/* Edificis esquerra */}
       <rect x="0" y="34" width="12" height="10" />
@@ -67,11 +67,11 @@ function InputField({ id, label, type, value, onChange, required, minLength }) {
         className="w-full px-3.5 py-2.5 rounded-lg font-mono text-[13px] outline-none"
         style={{
           background: '#181410',
-          border: `1px solid ${focused ? '#E8622A66' : '#28221A'}`,
+          border: `1px solid ${focused ? '#B8885A66' : '#28221A'}`,
           color: '#EDE8DF',
-          caretColor: '#E8622A',
+          caretColor: '#B8885A',
           boxShadow: focused
-            ? 'inset 0 1px 3px rgba(0,0,0,0.4), 0 0 0 3px rgba(232,98,42,0.07)'
+            ? 'inset 0 1px 3px rgba(0,0,0,0.4), 0 0 0 3px rgba(184,136,90,0.07)'
             : 'inset 0 1px 3px rgba(0,0,0,0.3)',
           transition: 'border-color 0.16s, box-shadow 0.16s',
         }}
@@ -160,7 +160,7 @@ export default function LoginModal({ onClose }) {
                 </span>
                 <span
                   className="font-mono text-[10px] font-medium uppercase"
-                  style={{ color: '#E8622A', letterSpacing: '0.22em' }}
+                  style={{ color: '#B8885A', letterSpacing: '0.22em' }}
                 >
                   Live
                 </span>
@@ -191,7 +191,7 @@ export default function LoginModal({ onClose }) {
                     <motion.div
                       layoutId="tab-pill"
                       className="absolute inset-0 rounded-[6px]"
-                      style={{ background: '#E8622A' }}
+                      style={{ background: '#B8885A' }}
                       transition={{ duration: 0.2, ease: EASE }}
                     />
                   )}
@@ -263,14 +263,14 @@ export default function LoginModal({ onClose }) {
               disabled={loading}
               className="w-full py-2.5 rounded-lg font-syne font-semibold text-[13px] mt-1"
               style={{
-                background: loading ? '#7A3518' : '#E8622A',
+                background: loading ? '#7A3518' : '#B8885A',
                 color: '#1A0E06',
                 letterSpacing: '0.04em',
                 cursor: loading ? 'not-allowed' : 'pointer',
                 transition: 'background 0.16s, transform 0.1s',
               }}
               onMouseEnter={e => { if (!loading) e.currentTarget.style.background = '#F06D32' }}
-              onMouseLeave={e => { if (!loading) e.currentTarget.style.background = '#E8622A' }}
+              onMouseLeave={e => { if (!loading) e.currentTarget.style.background = '#B8885A' }}
               onMouseDown={e => { e.currentTarget.style.transform = 'translateY(1px)' }}
               onMouseUp={e => { e.currentTarget.style.transform = 'translateY(0)' }}
             >

@@ -69,18 +69,18 @@ export default function ChatInput({ onSend, isLoading }) {
   const canSubmit   = text.trim() && !isLoading
 
   return (
-    <div className="flex-shrink-0" style={{ borderTop: '1px solid #1a1a1a', background: '#111111' }}>
+    <div className="flex-shrink-0" style={{ borderTop: '1px solid #201E1B', background: '#121008' }}>
       {/* Voice indicator */}
       {listening && (
         <div className="flex items-center gap-2 px-4 pt-3">
           <div className="flex gap-0.5 items-end h-3">
             {[0, 100, 200, 100, 0].map((d, i) => (
               <span key={i} className="w-0.5 rounded-full animate-bounce"
-                style={{ background: '#E8622A', height: `${6 + i * 2}px`, animationDelay: `${d}ms`, animationDuration: '0.6s' }}
+                style={{ background: '#B8885A', height: `${6 + i * 2}px`, animationDelay: `${d}ms`, animationDuration: '0.6s' }}
               />
             ))}
           </div>
-          <span className="font-mono text-[9px] uppercase tracking-[0.12em]" style={{ color: '#E8622A' }}>
+          <span className="font-mono text-[9px] uppercase tracking-[0.12em]" style={{ color: '#B8885A' }}>
             {transcript || 'Escoltant…'}
           </span>
         </div>
@@ -95,12 +95,12 @@ export default function ChatInput({ onSend, isLoading }) {
             title={listening ? 'Aturar' : 'Parlar'}
             className="w-8 h-8 flex items-center justify-center rounded-lg transition-all flex-shrink-0 mb-0.5 disabled:opacity-30"
             style={{
-              background: listening ? 'rgba(232,98,42,0.12)' : '#1a1a1a',
-              border: `1px solid ${listening ? '#E8622A55' : '#222'}`,
-              color: listening ? '#E8622A' : '#444',
+              background: listening ? 'rgba(184,136,90,0.12)' : '#1E1C19',
+              border: `1px solid ${listening ? '#B8885A55' : '#2C2926'}`,
+              color: listening ? '#B8885A' : '#8C8884',
             }}
-            onMouseEnter={e => { if (!listening) { e.currentTarget.style.color = '#888'; e.currentTarget.style.borderColor = '#333' } }}
-            onMouseLeave={e => { if (!listening) { e.currentTarget.style.color = '#444'; e.currentTarget.style.borderColor = '#222' } }}
+            onMouseEnter={e => { if (!listening) { e.currentTarget.style.color = '#B0ACA7'; e.currentTarget.style.borderColor = '#3D3A36' } }}
+            onMouseLeave={e => { if (!listening) { e.currentTarget.style.color = '#8C8884'; e.currentTarget.style.borderColor = '#2C2926' } }}
           >
             {listening ? (
               <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
@@ -130,16 +130,16 @@ export default function ChatInput({ onSend, isLoading }) {
             readOnly={listening}
             className="w-full resize-none rounded-lg px-3 py-2 text-[12px] outline-none transition-all leading-relaxed disabled:opacity-40"
             style={{
-              background: '#161616',
-              border: '1px solid #222',
-              color: '#EBEBEB',
+              background: '#181512',
+              border: '1px solid #2C2926',
+              color: '#F7F6F4',
               maxHeight: 80,
-              caretColor: listening ? 'transparent' : '#E8622A',
+              caretColor: listening ? 'transparent' : '#B8885A',
             }}
-            onFocus={e => { e.target.style.borderColor = '#E8622A44' }}
+            onFocus={e => { e.target.style.borderColor = '#B8885A44' }}
             onBlur={e => { e.target.style.borderColor = '#222' }}
           />
-          <style>{`textarea::placeholder { color: #3a3a3a; }`}</style>
+          <style>{`textarea::placeholder { color: #7D7975; }`}</style>
         </div>
 
         {/* Send */}
@@ -148,9 +148,9 @@ export default function ChatInput({ onSend, isLoading }) {
           disabled={!canSubmit}
           className="w-8 h-8 flex items-center justify-center rounded-lg transition-all flex-shrink-0 mb-0.5 disabled:opacity-20 disabled:cursor-not-allowed"
           style={{
-            background: canSubmit ? '#E8622A' : '#1a1a1a',
-            border: `1px solid ${canSubmit ? '#E8622A' : '#222'}`,
-            color: canSubmit ? '#fff' : '#444',
+            background: canSubmit ? '#B8885A' : '#1E1C19',
+            border: `1px solid ${canSubmit ? '#B8885A' : '#2C2926'}`,
+            color: canSubmit ? '#fff' : '#8C8884',
           }}
         >
           {isLoading ? (

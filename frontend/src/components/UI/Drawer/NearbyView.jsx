@@ -16,7 +16,7 @@ function CategoryRail() {
   const { activeCategory, setCategory } = useNearbyStore()
 
   return (
-    <div className="px-3 py-2.5" style={{ borderBottom: '1px solid #262626' }}>
+    <div className="px-3 py-2.5" style={{ borderBottom: '1px solid #2C2926' }}>
       <div className="flex gap-1.5 overflow-x-auto scrollbar-hide pb-1 -mb-1">
         {NEARBY_CATEGORIES.map(cat => {
           const Icon   = cat.icon
@@ -31,12 +31,12 @@ function CategoryRail() {
                 fontSize: 11,
                 fontWeight: active ? 600 : 400,
                 borderRadius: 6,
-                border: `1px solid ${active ? '#E8622A' : '#262626'}`,
-                background: active ? '#E8622A' : '#1C1C1C',
-                color: active ? '#fff' : '#888',
+                border: `1px solid ${active ? '#B8885A' : '#2C2926'}`,
+                background: active ? '#B8885A' : '#211F1B',
+                color: active ? '#fff' : '#B0ACA7',
               }}
             >
-              <span style={{ color: active ? '#fff' : '#555' }}><Icon size={12} /></span>
+              <span style={{ color: active ? '#fff' : '#8C8884' }}><Icon size={12} /></span>
               <span>{cat.label}</span>
             </button>
           )
@@ -48,7 +48,7 @@ function CategoryRail() {
 
 const EVT_COLORS = {
   musica: '#C98E2E', esport: '#3CB887', cultura: '#8B6AD4',
-  gastronomia: '#E8622A', familia: '#4D84D4', altres: '#5A5248',
+  gastronomia: '#B8885A', familia: '#4D84D4', altres: '#5A5248',
 }
 
 function formatEvtDate(start) {
@@ -69,7 +69,7 @@ function EventRow({ evt, onSelect, isHovered, onHover }) {
       onMouseEnter={() => onHover(evt.id)}
       onMouseLeave={() => onHover(null)}
       className="flex cursor-pointer transition-colors"
-      style={{ borderBottom: '1px solid #1A1A1A', background: isHovered ? '#1C1C1C' : 'transparent' }}
+      style={{ borderBottom: '1px solid #201E1B', background: isHovered ? '#211F1B' : 'transparent' }}
     >
       <div className="w-[3px] flex-shrink-0 self-stretch transition-colors" style={{ background: isHovered ? color : 'transparent' }} />
       <div className="flex items-start gap-3 px-3.5 py-3 flex-1 min-w-0">
@@ -79,13 +79,13 @@ function EventRow({ evt, onSelect, isHovered, onHover }) {
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline justify-between gap-2">
-            <p className="font-syne text-[13px] font-medium leading-tight truncate" style={{ color: '#EBEBEB' }}>{evt.name}</p>
+            <p className="font-syne text-[13px] font-medium leading-tight truncate" style={{ color: '#F7F6F4' }}>{evt.name}</p>
             {evt.distance_m != null && (
-              <span className="font-mono text-[10px] flex-shrink-0" style={{ color: '#555' }}>{formatDistance(evt.distance_m)}</span>
+              <span className="font-mono text-[10px] flex-shrink-0" style={{ color: '#8C8884' }}>{formatDistance(evt.distance_m)}</span>
             )}
           </div>
           <div className="flex items-center gap-2 mt-0.5">
-            {evt.place && <p className="font-mono text-[10px] truncate" style={{ color: '#555' }}>{evt.place}</p>}
+            {evt.place && <p className="font-mono text-[10px] truncate" style={{ color: '#8C8884' }}>{evt.place}</p>}
             {evt.date_start && (
               <span className="font-mono text-[9px] px-1.5 py-0.5 rounded flex-shrink-0"
                 style={{ background: color + '18', color }}>
@@ -109,36 +109,36 @@ function PoiRow({ poi, categoryIcon, onSelect, onHover, isHovered }) {
       onMouseLeave={() => onHover(null)}
       className="flex cursor-pointer transition-colors"
       style={{
-        borderBottom: '1px solid #1A1A1A',
-        background: isHovered ? '#1C1C1C' : 'transparent',
+        borderBottom: '1px solid #201E1B',
+        background: isHovered ? '#211F1B' : 'transparent',
       }}
     >
       {/* Accent bar */}
-      <div className="w-[3px] flex-shrink-0 self-stretch" style={{ background: isHovered ? '#E8622A' : 'transparent', transition: 'background 0.15s' }} />
+      <div className="w-[3px] flex-shrink-0 self-stretch" style={{ background: isHovered ? '#B8885A' : 'transparent', transition: 'background 0.15s' }} />
 
       <div className="flex items-start gap-3 px-3.5 py-3 flex-1 min-w-0">
         <div
           className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0"
-          style={{ background: '#262626', color: '#888' }}
+          style={{ background: '#2C2926', color: '#B0ACA7' }}
         >
           <Icon size={13} />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline justify-between gap-2">
-            <p className="font-syne text-[13px] font-medium leading-tight truncate" style={{ color: '#EBEBEB' }}>
+            <p className="font-syne text-[13px] font-medium leading-tight truncate" style={{ color: '#F7F6F4' }}>
               {poi.name}
             </p>
             {poi.distance_m != null && (
-              <span className="font-mono text-[10px] flex-shrink-0 tabular-nums" style={{ color: '#555' }}>
+              <span className="font-mono text-[10px] flex-shrink-0 tabular-nums" style={{ color: '#8C8884' }}>
                 {formatDistance(poi.distance_m)}
               </span>
             )}
           </div>
           {poi.address && (
-            <p className="font-mono text-[10px] truncate mt-0.5" style={{ color: '#555' }}>{poi.address}</p>
+            <p className="font-mono text-[10px] truncate mt-0.5" style={{ color: '#8C8884' }}>{poi.address}</p>
           )}
           {poi.cuisine && (
-            <p className="font-mono text-[10px] mt-0.5 capitalize" style={{ color: '#555' }}>
+            <p className="font-mono text-[10px] mt-0.5 capitalize" style={{ color: '#8C8884' }}>
               {poi.cuisine.replace(/_/g, ' · ')}
             </p>
           )}
@@ -180,13 +180,13 @@ export default function NearbyView() {
       <div className="flex-1 overflow-y-auto min-h-0">
         {!activeCategory && (
           <div className="px-6 py-12 flex flex-col items-center text-center gap-2">
-            <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: '#1C1C1C', color: '#555' }}>
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: '#211F1B', color: '#8C8884' }}>
               <Icons.search size={15} />
             </div>
-            <p className="font-syne text-[13px] leading-snug max-w-[200px]" style={{ color: '#888' }}>
+            <p className="font-syne text-[13px] leading-snug max-w-[200px]" style={{ color: '#B0ACA7' }}>
               Selecciona una categoría per descobrir llocs a prop
             </p>
-            <p className="font-mono text-[10px]" style={{ color: '#555' }}>
+            <p className="font-mono text-[10px]" style={{ color: '#8C8884' }}>
               {NEARBY_CATEGORIES.length} categories disponibles
             </p>
           </div>
@@ -195,15 +195,15 @@ export default function NearbyView() {
         {activeCategory && isLoading && (
           <ul>
             {Array.from({ length: 6 }).map((_, i) => (
-              <li key={i} className="flex" style={{ borderBottom: '1px solid #1A1A1A' }}>
+              <li key={i} className="flex" style={{ borderBottom: '1px solid #201E1B' }}>
                 <div className="w-[3px] flex-shrink-0" />
                 <div className="flex items-center gap-3 px-3.5 py-3 flex-1">
-                  <div className="w-7 h-7 rounded-md flex-shrink-0 animate-pulse" style={{ background: '#262626' }} />
+                  <div className="w-7 h-7 rounded-md flex-shrink-0 animate-pulse" style={{ background: '#2C2926' }} />
                   <div className="flex-1 flex flex-col gap-2">
-                    <div className="h-3 rounded animate-pulse" style={{ background: '#262626', width: `${55 + (i % 3) * 15}%` }} />
-                    <div className="h-2.5 rounded animate-pulse" style={{ background: '#1C1C1C', width: `${35 + (i % 4) * 12}%` }} />
+                    <div className="h-3 rounded animate-pulse" style={{ background: '#2C2926', width: `${55 + (i % 3) * 15}%` }} />
+                    <div className="h-2.5 rounded animate-pulse" style={{ background: '#211F1B', width: `${35 + (i % 4) * 12}%` }} />
                   </div>
-                  <div className="w-8 h-2.5 rounded animate-pulse flex-shrink-0" style={{ background: '#1C1C1C' }} />
+                  <div className="w-8 h-2.5 rounded animate-pulse flex-shrink-0" style={{ background: '#211F1B' }} />
                 </div>
               </li>
             ))}
@@ -212,11 +212,11 @@ export default function NearbyView() {
 
         {activeCategory && !isLoading && pois.length === 0 && (
           <div className="px-6 py-12 flex flex-col items-center text-center gap-2">
-            <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: '#1C1C1C', color: '#555' }}>
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: '#211F1B', color: '#8C8884' }}>
               <Icons.info size={15} />
             </div>
-            <p className="font-syne text-[13px]" style={{ color: '#888' }}>Sense resultats a prop</p>
-            <p className="font-mono text-[10px]" style={{ color: '#555' }}>Prova amb una altra categoria</p>
+            <p className="font-syne text-[13px]" style={{ color: '#B0ACA7' }}>Sense resultats a prop</p>
+            <p className="font-mono text-[10px]" style={{ color: '#8C8884' }}>Prova amb una altra categoria</p>
           </div>
         )}
 
@@ -228,7 +228,7 @@ export default function NearbyView() {
                 : <PoiRow   key={item.id} poi={item} categoryIcon={activeMeta?.icon ?? Icons.pin} onSelect={handleSelect} onHover={setHovered} isHovered={hoveredId === item.id} />
               )}
             </ul>
-            <div className="px-4 py-3" style={{ borderTop: '1px solid #262626' }}>
+            <div className="px-4 py-3" style={{ borderTop: '1px solid #2C2926' }}>
               <button
                 onClick={() => openChatWithPrompt(
                   `¿Cuál de estas ${activeMeta?.label.toLowerCase() ?? 'lugares'} me recomiendas? Tengo ${pois.length} opciones cerca.`
@@ -239,12 +239,12 @@ export default function NearbyView() {
                   fontSize: 12,
                   fontWeight: 500,
                   borderRadius: 6,
-                  border: '1px solid #262626',
-                  background: '#1C1C1C',
-                  color: '#888',
+                  border: '1px solid #2C2926',
+                  background: '#211F1B',
+                  color: '#B0ACA7',
                 }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = '#E8622A'; e.currentTarget.style.color = '#E8622A' }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = '#262626'; e.currentTarget.style.color = '#888' }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = '#B8885A'; e.currentTarget.style.color = '#B8885A' }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = '#2C2926'; e.currentTarget.style.color = '#B0ACA7' }}
               >
                 <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
                   <path d="M8 1.5C4.41 1.5 1.5 4.02 1.5 7.12c0 1.64.73 3.11 1.9 4.14L3 14.5l3.88-1.94c.35.07.72.1 1.12.1 3.59 0 6.5-2.52 6.5-5.54S11.59 1.5 8 1.5Z"

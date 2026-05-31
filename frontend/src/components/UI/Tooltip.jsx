@@ -1,7 +1,7 @@
 import React from 'react'
 
 const C = {
-  orange: '#E8622A',
+  orange: '#B8885A',
   blue:   '#4D84D4',
   green:  '#3CB887',
   amber:  '#C98E2E',
@@ -66,7 +66,7 @@ function BusTooltip({ object }) {
               <div className="flex items-center gap-1.5 flex-shrink-0">
                 {(b.arrivals ?? []).slice(0, 2).map((mins, j) => (
                   <React.Fragment key={j}>
-                    {j > 0 && <span style={{ color: '#333' }}>·</span>}
+                    {j > 0 && <span style={{ color: '#6B6865' }}>·</span>}
                     <ArrivalPill mins={mins} />
                   </React.Fragment>
                 ))}
@@ -131,7 +131,7 @@ function MetroTooltip({ object }) {
                         <div className="flex items-center gap-1.5 flex-shrink-0">
                           {(t.arrivals ?? []).slice(0, 2).map((mins, j) => (
                             <React.Fragment key={j}>
-                              {j > 0 && <span style={{ color: '#333' }}>·</span>}
+                              {j > 0 && <span style={{ color: '#6B6865' }}>·</span>}
                               <ArrivalPill mins={mins} />
                             </React.Fragment>
                           ))}
@@ -162,7 +162,7 @@ function BicingTooltip({ object }) {
       <div className="flex items-center justify-between mb-1">
         <Label>Estació Bicing</Label>
         <span className="font-mono text-[8px] uppercase tracking-[0.1em] px-1.5 py-0.5 rounded"
-          style={{ background: isActive ? '#E8622A18' : '#1C1C1C', color: isActive ? C.orange : '#555', border: `1px solid ${isActive ? '#E8622A44' : '#262626'}` }}>
+          style={{ background: isActive ? '#B8885A18' : '#1C1C1C', color: isActive ? C.orange : '#555', border: `1px solid ${isActive ? '#B8885A44' : '#262626'}` }}>
           {isActive ? 'Activa' : 'Inactiva'}
         </span>
       </div>
@@ -193,7 +193,7 @@ const EVENT_COLORS = {
   musica:      '#C98E2E',
   esport:      '#3CB887',
   cultura:     '#8B6AD4',
-  gastronomia: '#E8622A',
+  gastronomia: '#B8885A',
   familia:     '#4D84D4',
   altres:      '#6B6055',
 }

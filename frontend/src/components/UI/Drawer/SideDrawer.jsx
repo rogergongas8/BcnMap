@@ -30,24 +30,24 @@ export default function SideDrawer() {
             shadow-[0_4px_32px_rgba(0,0,0,0.5)]"
           style={{
             maxHeight: (view === 'events' || view === 'disruptions') ? 'min(580px, calc(100dvh - 80px))' : 'calc(100dvh - 56px)',
-            background: '#141414', border: '1px solid #262626', borderRadius: 8,
+            background: '#151210', border: '1px solid #2C2926', borderRadius: 8,
           }}
         >
           {(view === 'nearby' || view === 'saved' || view === 'events' || view === 'disruptions') && (
-            <header className="flex items-center justify-between px-4 py-3 flex-shrink-0" style={{ borderBottom: '1px solid #262626' }}>
+            <header className="flex items-center justify-between px-4 py-3 flex-shrink-0" style={{ borderBottom: '1px solid #2C2926' }}>
               <div className="flex items-center gap-2.5">
-                <span style={{ color: view === 'disruptions' ? '#D45555' : '#555' }}>
+                <span style={{ color: view === 'disruptions' ? '#D45555' : '#8C8884' }}>
                   {view === 'nearby'       ? <Icons.search   size={13} />
                   : view === 'events'      ? <Icons.calendar size={13} />
                   : view === 'disruptions' ? <Icons.alert    size={13} />
                   :                          <Icons.pin      size={13} />}
                 </span>
-                <h2 className="font-syne text-[13px] font-medium" style={{ color: '#EBEBEB' }}>{title}</h2>
+                <h2 className="font-syne text-[13px] font-medium" style={{ color: '#F7F6F4' }}>{title}</h2>
               </div>
               <button
                 onClick={close}
                 className="w-7 h-7 flex items-center justify-center rounded-md transition-colors hover:bg-[#1C1C1C]"
-                style={{ color: '#555' }}
+                style={{ color: '#8C8884' }}
                 aria-label="Cerrar"
               >
                 <Icons.close size={13} />

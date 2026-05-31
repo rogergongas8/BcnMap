@@ -54,6 +54,39 @@ class EventsEnrichmentService
         return $result;
     }
 
+    public function search(string $query, int $limit = 5): array
+    {
+        $events = $this->current();
+        
+        // Normalize query: remove accents, lowercase
+        $query = strtolower(iconv('UTF-8', 'ASCII//TRANSLIT', $query));
+        
+        // Extract words with more than 3 characters
+        $terms = array_filter(str_word_count($query, 1), fn($t) => strlen($t) > 3);
+        if (empty($terms)) return [];
+
+        $matches = [];
+        foreach ($events as $e) {
+            $text = strtolower(iconv('UTF-8', 'ASCII//TRANSLIT', ($e['title'] ?? '') . ' ' . ($e['place'] ?? '') . ' ' . ($e['category'] ?? '')));
+            $score = 0;
+            foreach ($terms as $t) {
+                if (str_contains($text, $t)) $score++;
+            }
+            if ($score > 0) {
+                $e['_score'] = $score;
+                $matches[] = $e;
+            }
+        }
+        
+        // Sort by highest score, then by start date
+        usort($matches, function (array $a, array $b): int {
+            if ($a['_score'] !== $b['_score']) return $b['_score'] <=> $a['_score'];
+            return strcmp((string) ($a['start'] ?? '9999'), (string) ($b['start'] ?? '9999'));
+        });
+        
+        return array_slice($matches, 0, $limit);
+    }
+
     /**
      * Concise summary for the AI context — max ~15 events to keep prompt short.
      */
@@ -232,11 +265,21 @@ class EventsEnrichmentService
 
     private function deriveCategory(array $event): string
     {
-        $text = strtolower(implode(' ', [
+        $title = strtolower($event['title'] ?? '');
+        $text  = strtolower(implode(' ', [
             $event['title']    ?? '',
             $event['category'] ?? '',
             $event['place']    ?? '',
         ]));
+
+        // Workshop/course prefixes take priority — avoid misclassifying
+        // "Taller d'estimulació musical" as Música just because of the keyword
+        $workshopPrefixes = ['taller', 'curs ', 'cursos', 'classe ', 'classes', 'xerrada', 'conferència', 'conferencia', 'seminari'];
+        foreach ($workshopPrefixes as $prefix) {
+            if (str_starts_with($title, $prefix) || str_contains($text, 'curs i taller') || str_contains($text, 'cursos i tallers')) {
+                return 'cultura';
+            }
+        }
 
         $map = [
             'musica'      => ['música', 'musica', 'concert', 'concierto', 'jazz', 'rock', 'pop', 'opera', 'festival'],

@@ -4,7 +4,7 @@ import { useDataStore } from '../../store/dataStore'
 import { useTimeStore } from '../../store/timeStore'
 
 const C = {
-  orange: '#E8622A',
+  orange: '#B8885A',
   blue:   '#4D84D4',
   green:  '#3CB887',
   amber:  '#C98E2E',
@@ -23,7 +23,7 @@ function fmtDate(date) {
 
 function DataBar({ pct, color }) {
   return (
-    <div className="h-[2px] w-full rounded-full" style={{ background: '#262626' }}>
+    <div className="h-[2px] w-full rounded-full" style={{ background: '#2C2926' }}>
       <div
         className="h-full rounded-full transition-all duration-700"
         style={{ width: `${Math.min(100, Math.max(0, pct))}%`, background: color }}
@@ -36,7 +36,7 @@ function DataRow({ label, value, sub, pct, color }) {
   return (
     <div className="space-y-1">
       <div className="flex items-baseline justify-between">
-        <span className="text-[10px] font-mono uppercase tracking-[0.12em]" style={{ color: '#555' }}>
+        <span className="text-[10px] font-mono uppercase tracking-[0.12em]" style={{ color: '#8C8884' }}>
           {label}
         </span>
         <div className="flex items-baseline gap-1.5">
@@ -44,7 +44,7 @@ function DataRow({ label, value, sub, pct, color }) {
             {value}
           </span>
           {sub && (
-            <span className="text-[10px] font-mono" style={{ color: '#555' }}>
+            <span className="text-[10px] font-mono" style={{ color: '#8C8884' }}>
               {sub}
             </span>
           )}
@@ -75,33 +75,33 @@ function HudExpanded({ weather, airQuality, traffic, bicing, now }) {
   return (
     <div className="panel w-[260px] overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.6)]">
       {/* Header */}
-      <div className="w-full flex items-center justify-between px-3.5 py-2.5 border-b border-[#262626]">
+      <div className="w-full flex items-center justify-between px-3.5 py-2.5 border-b border-[#2C2926]">
         <div className="flex items-center gap-2">
           <span className="w-1.5 h-1.5 rounded-full bg-[#3CB887] animate-pulse" />
-          <span className="font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color: '#555' }}>
+          <span className="font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color: '#8C8884' }}>
             Barcelona · Temps real
           </span>
         </div>
-        <span className="font-mono text-[9px]" style={{ color: '#555' }}>
+        <span className="font-mono text-[9px]" style={{ color: '#8C8884' }}>
           {fmtDate(now)} · {fmtTime(now)}
         </span>
       </div>
 
       {/* Temperature */}
-      <div className="px-3.5 py-3 border-b border-[#1a1a1a]">
+      <div className="px-3.5 py-3 border-b border-[#201E1B]">
         <div className="flex items-end gap-3">
           <div className="flex items-baseline gap-0.5">
-            <span className="font-syne text-[34px] leading-none font-light" style={{ color: '#EBEBEB' }}>
+            <span className="font-syne text-[34px] leading-none font-light" style={{ color: '#F7F6F4' }}>
               {weather?.temp != null ? Math.round(weather.temp) : '—'}
             </span>
-            <span className="font-mono text-[14px] leading-none" style={{ color: '#555' }}>°C</span>
+            <span className="font-mono text-[14px] leading-none" style={{ color: '#8C8884' }}>°C</span>
           </div>
           <div className="flex-1 min-w-0 pb-0.5">
-            <p className="font-syne text-[11px] leading-snug capitalize truncate" style={{ color: '#888' }}>
+            <p className="font-syne text-[11px] leading-snug capitalize truncate" style={{ color: '#B0ACA7' }}>
               {weather?.description ?? '—'}
             </p>
             {(weather?.temp_min != null || weather?.wind_speed != null) && (
-              <p className="font-mono text-[9px] mt-0.5 tracking-wide" style={{ color: '#555' }}>
+              <p className="font-mono text-[9px] mt-0.5 tracking-wide" style={{ color: '#8C8884' }}>
                 {weather.temp_min != null && `+${Math.round(weather.temp_min)}° `}
                 {weather.temp_max != null && `+${Math.round(weather.temp_max)}° `}
                 {weather.wind_speed != null && `${Math.round(weather.wind_speed)} km/h`}
@@ -112,7 +112,7 @@ function HudExpanded({ weather, airQuality, traffic, bicing, now }) {
       </div>
 
       {/* Data rows */}
-      <div className="px-3.5 py-3 space-y-3" style={{ borderBottom: '1px solid #1A1A1A' }}>
+      <div className="px-3.5 py-3 space-y-3" style={{ borderBottom: '1px solid #201E1B' }}>
         <DataRow
           label="Qualitat de l'aire"
           value={aqiLabel}
@@ -139,7 +139,7 @@ function HudExpanded({ weather, airQuality, traffic, bicing, now }) {
       {/* AQI pollutant detail */}
       {airQuality && (airQuality.pm25 != null || airQuality.pm10 != null || airQuality.no2 != null || airQuality.o3 != null) && (
         <div className="px-3.5 py-3">
-          <p className="font-mono text-[9px] uppercase tracking-[0.14em] mb-2.5" style={{ color: '#555' }}>
+          <p className="font-mono text-[9px] uppercase tracking-[0.14em] mb-2.5" style={{ color: '#8C8884' }}>
             Contaminants
           </p>
           <div className="space-y-2">
@@ -154,10 +154,10 @@ function HudExpanded({ weather, airQuality, traffic, bicing, now }) {
               return (
                 <div key={row.label}>
                   <div className="flex justify-between mb-0.5">
-                    <span className="font-mono text-[9px] uppercase tracking-[0.1em]" style={{ color: '#555' }}>{row.label}</span>
+                    <span className="font-mono text-[9px] uppercase tracking-[0.1em]" style={{ color: '#8C8884' }}>{row.label}</span>
                     <span className="font-mono text-[10px] tabular-nums" style={{ color }}>{row.value.toFixed(1)}</span>
                   </div>
-                  <div className="h-[2px] w-full rounded-full" style={{ background: '#262626' }}>
+                  <div className="h-[2px] w-full rounded-full" style={{ background: '#2C2926' }}>
                     <div className="h-full rounded-full transition-all duration-700"
                       style={{ width: `${pct}%`, background: color }} />
                   </div>
@@ -194,7 +194,7 @@ export default function CityHud() {
       {/* Compact pill */}
       <div
         className="flex items-center gap-2 h-9 px-2.5 rounded-lg cursor-default select-none transition-colors"
-        style={{ background: open ? '#1a1a1a' : 'transparent' }}
+        style={{ background: open ? '#201E1B' : 'transparent' }}
       >
         <span
           className="w-1.5 h-1.5 rounded-full flex-shrink-0"
@@ -203,7 +203,7 @@ export default function CityHud() {
             boxShadow: `0 0 5px ${isHistorical ? C.amber : statusColor}`,
           }}
         />
-        <span className="font-syne text-[13px] font-medium" style={{ color: '#EBEBEB' }}>
+        <span className="font-syne text-[13px] font-medium" style={{ color: '#F7F6F4' }}>
           {weather?.temp != null ? `${Math.round(weather.temp)}°` : '—'}
         </span>
         {weather?.description && (

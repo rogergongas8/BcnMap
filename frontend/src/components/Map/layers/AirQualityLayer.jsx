@@ -75,6 +75,7 @@ export default function AirQualityLayer({ visible }) {
       }
 
       mapInstance.setLayoutProperty(LAYER_ID, 'visibility', visible ? 'visible' : 'none')
+      mapInstance.triggerRepaint()
     } catch (err) {
       console.error('[AirQualityLayer]', err)
     }

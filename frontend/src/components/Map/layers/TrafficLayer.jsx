@@ -144,6 +144,7 @@ function setVisibility(map, visible) {
   ;[LAYER_GLOW, LAYER_LINE, LAYER_HEATMAP].forEach(id => {
     if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', v)
   })
+  map.triggerRepaint()
 }
 
 function updateData(map, traffic, mode) {

@@ -148,21 +148,21 @@ export default function HistorySlider() {
               className="flex items-center gap-1.5 px-2.5 py-1.5 flex-shrink-0 transition-all"
               style={{
                 borderRadius: 6,
-                border: `1px solid ${!isHistorical ? '#3CB88744' : '#262626'}`,
-                background: !isHistorical ? '#3CB88718' : '#1C1C1C',
+                border: `1px solid ${!isHistorical ? '#3CB88744' : '#2C2926'}`,
+                background: !isHistorical ? '#3CB88718' : '#211F1B',
               }}
             >
               <span
                 className="w-1.5 h-1.5 rounded-full flex-shrink-0"
                 style={{
-                  background: !isHistorical ? '#3CB887' : '#555',
+                  background: !isHistorical ? '#3CB887' : '#8C8884',
                   boxShadow: !isHistorical ? '0 0 6px #3CB887' : 'none',
                   animation: !isHistorical ? 'hsPulse 1.8s ease-in-out infinite' : 'none',
                 }}
               />
               <span
                 className="font-mono text-[9px] uppercase tracking-[0.14em]"
-                style={{ color: !isHistorical ? '#3CB887' : '#555' }}
+                style={{ color: !isHistorical ? '#3CB887' : '#8C8884' }}
               >
                 Live
               </span>
@@ -190,16 +190,16 @@ export default function HistorySlider() {
                   onChange={handleSliderChange}
                   className="w-full h-[3px] appearance-none cursor-pointer rounded-full outline-none"
                   style={{
-                    background: `linear-gradient(to right, #E8622A ${value}%, #262626 ${value}%)`,
+                    background: `linear-gradient(to right, #B8885A ${value}%, #2C2926 ${value}%)`,
                   }}
                 />
               </div>
 
               <div className="flex justify-between">
-                <span className="font-mono text-[9px]" style={{ color: '#555' }}>
+                <span className="font-mono text-[9px]" style={{ color: '#8C8884' }}>
                   {range?.earliest ? formatAt(range.earliest) : '–24h'}
                 </span>
-                <span className="font-mono text-[9px]" style={{ color: '#555' }}>Ara</span>
+                <span className="font-mono text-[9px]" style={{ color: '#8C8884' }}>Ara</span>
               </div>
             </div>
 
@@ -207,9 +207,9 @@ export default function HistorySlider() {
             <button
               onClick={handleClose}
               className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded transition-colors"
-              style={{ color: '#555' }}
-              onMouseEnter={e => { e.currentTarget.style.color = '#888' }}
-              onMouseLeave={e => { e.currentTarget.style.color = '#555' }}
+              style={{ color: '#8C8884' }}
+              onMouseEnter={e => { e.currentTarget.style.color = '#B0ACA7' }}
+              onMouseLeave={e => { e.currentTarget.style.color = '#8C8884' }}
               title="Tancar"
             >
               <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
@@ -225,8 +225,8 @@ export default function HistorySlider() {
           -webkit-appearance: none;
           width: 13px; height: 13px;
           border-radius: 50%;
-          background: #E8622A;
-          box-shadow: 0 0 0 2px #141414, 0 0 8px #E8622A80;
+          background: #B8885A;
+          box-shadow: 0 0 0 2px #151210, 0 0 8px #B8885A80;
           cursor: pointer;
           transition: transform 0.15s;
         }
@@ -234,8 +234,8 @@ export default function HistorySlider() {
         input[type=range]::-moz-range-thumb {
           width: 13px; height: 13px;
           border-radius: 50%;
-          background: #E8622A;
-          box-shadow: 0 0 0 2px #141414, 0 0 8px #E8622A80;
+          background: #B8885A;
+          box-shadow: 0 0 0 2px #151210, 0 0 8px #B8885A80;
           border: none;
           cursor: pointer;
         }

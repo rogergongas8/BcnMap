@@ -70,6 +70,7 @@ export default function BicingLayer({ onHover }) {
       }
 
       mapInstance.setLayoutProperty(LAYER_ID, 'visibility', visible ? 'visible' : 'none')
+      mapInstance.triggerRepaint()
     } catch (err) {
       console.error('[BicingLayer]', err)
     }

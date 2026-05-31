@@ -13,7 +13,7 @@ const CATEGORY_COLOR = [
   'musica',      '#C98E2E',
   'esport',      '#3CB887',
   'cultura',     '#8B6AD4',
-  'gastronomia', '#E8622A',
+  'gastronomia', '#B8885A',
   'familia',     '#4D84D4',
   /* altres */   '#6B6055',
 ]
@@ -147,6 +147,7 @@ export default function EventsLayer({ onHover, onEventClick }) {
       mapInstance.setLayoutProperty(LAYER_HALO, 'visibility', v)
       mapInstance.setLayoutProperty(LAYER_DOT,  'visibility', v)
       mapInstance.setLayoutProperty(LAYER_TEXT, 'visibility', v)
+      mapInstance.triggerRepaint()
     } catch (err) {
       console.error('[EventsLayer]', err)
     }

@@ -43,7 +43,7 @@ export default function MapControls() {
   return (
     <motion.div
       initial={{ opacity: 0, x: 20 }}
-      animate={{ opacity: 1, x: chatOpen ? 356 : 0 }}
+      animate={{ opacity: 1, x: chatOpen ? -340 : 0 }}
       transition={{ delay: introDelay, duration: 0.28, ease: [0.25, 0.46, 0.45, 0.94] }}
       onAnimationComplete={() => { hasAnimatedIn.current = true }}
       className="absolute right-4 bottom-8 select-none"

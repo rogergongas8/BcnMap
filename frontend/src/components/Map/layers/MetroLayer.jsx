@@ -63,24 +63,30 @@ export default function MetroLayer({ onHover }) {
   useEffect(() => { onHoverRef.current = onHover }, [onHover])
   useEffect(() => { metroRef.current = metro }, [metro])
 
-  // Registrar fuentes, layers y listeners
   useEffect(() => {
-    if (!mapInstance || !isLoaded) return
+    if (!mapInstance || !isLoaded || !metro.length || !metroLines.length) return
 
     try {
-      // ── Estaciones (primero, para que LYR_STA_GLOW exista antes de insertar líneas) ──
-      if (!mapInstance.getSource(SRC_STATIONS)) {
-        mapInstance.addSource(SRC_STATIONS, {
-          type: 'geojson',
-          data: buildStationsGeojson(metro),
-        })
+      const stationsGeojson = buildStationsGeojson(metro)
+      const linesGeojson    = buildLinesGeojson(metroLines)
+
+      // ── ESTACIONES (CÍRCULOS) ──
+      if (mapInstance.getSource(SRC_STATIONS)) {
+        mapInstance.getSource(SRC_STATIONS).setData(stationsGeojson)
+        mapInstance.getSource(SRC_STATIONS + '-label').setData(stationsGeojson)
+      } else {
+        // Usamos dos fuentes separadas con los mismos datos.
+        // MapLibre bloquea el renderizado de los círculos si comparten la misma fuente con una capa de símbolos,
+        // porque espera a calcular todas las colisiones de texto. Al separarlos, los círculos cargan al instante.
+        mapInstance.addSource(SRC_STATIONS, { type: 'geojson', data: stationsGeojson })
+        mapInstance.addSource(SRC_STATIONS + '-label', { type: 'geojson', data: stationsGeojson })
 
         mapInstance.addLayer({
           id: LYR_STA_GLOW,
           type: 'circle',
           source: SRC_STATIONS,
           paint: {
-            'circle-radius':  ['interpolate', ['linear'], ['zoom'], 10, 8, 16, 18],
+            'circle-radius':  ['interpolate', ['linear'], ['zoom'], 8, 6, 12, 10, 16, 18],
             'circle-color':   ['get', 'color'],
             'circle-opacity': 0.2,
             'circle-blur':    1,
@@ -92,7 +98,7 @@ export default function MetroLayer({ onHover }) {
           type: 'circle',
           source: SRC_STATIONS,
           paint: {
-            'circle-radius':       ['interpolate', ['linear'], ['zoom'], 10, 3, 14, 6, 16, 9],
+            'circle-radius':       ['interpolate', ['linear'], ['zoom'], 8, 3, 12, 5, 14, 6, 16, 9],
             'circle-color':        ['get', 'color'],
             'circle-opacity':      1,
             'circle-stroke-width': 1.5,
@@ -103,7 +109,7 @@ export default function MetroLayer({ onHover }) {
         mapInstance.addLayer({
           id: LYR_STA_LABEL,
           type: 'symbol',
-          source: SRC_STATIONS,
+          source: SRC_STATIONS + '-label',
           minzoom: 14,
           layout: {
             'text-field':     ['get', 'station_name'],
@@ -120,9 +126,8 @@ export default function MetroLayer({ onHover }) {
           },
         })
 
-        // Listeners
+        // Listeners para estaciones (usando LYR_STA)
         const loadArrivals = async (props, point) => {
-          // Normalise to string — MapLibre coerces numeric-looking properties to numbers
           const stationId   = String(props.station_id)
           const stationType = props.type ?? 'metro'
           activeStation.current = stationId
@@ -133,15 +138,8 @@ export default function MetroLayer({ onHover }) {
             try { return JSON.parse(props.lines ?? '[]') } catch { return [] }
           })()
 
-          const baseObject = {
-            type:         stationType,
-            station_id:   stationId,
-            station_name: props.station_name,
-            lines,
-          }
+          const baseObject = { type: stationType, station_id: stationId, station_name: props.station_name, lines }
 
-          // Overpass-sourced FGC/Tram stations (station_id like 'fgc_...' / 'tram_...')
-          // have no numeric TMB estacioId — backend returns [] immediately, no need to show loading
           const hasNumericId = /^\d+$/.test(stationId)
           if (!hasNumericId) {
             onHoverRef.current?.({ x: point.x, y: point.y, object: { ...baseObject, trains: [], loading: false } })
@@ -153,51 +151,36 @@ export default function MetroLayer({ onHover }) {
           try {
             const data = await fetchMetroArrivals(stationId)
             if (activeStation.current === stationId) {
-              onHoverRef.current?.({
-                x: lastPoint.current.x, y: lastPoint.current.y,
-                object: { ...baseObject, trains: data.trains ?? [], loading: false },
-              })
+              onHoverRef.current?.({ x: lastPoint.current.x, y: lastPoint.current.y, object: { ...baseObject, trains: data.trains ?? [], loading: false } })
             }
           } catch {
             if (activeStation.current === stationId) {
-              onHoverRef.current?.({
-                x: lastPoint.current.x, y: lastPoint.current.y,
-                object: { ...baseObject, trains: [], loading: false },
-              })
+              onHoverRef.current?.({ x: lastPoint.current.x, y: lastPoint.current.y, object: { ...baseObject, trains: [], loading: false } })
             }
           }
         }
 
         mapInstance.on('mouseenter', LYR_STA, (e) => {
           mapInstance.getCanvas().style.cursor = 'pointer'
-          const props = e.features[0]?.properties ?? {}
-          loadArrivals(props, e.point)
+          loadArrivals(e.features[0]?.properties ?? {}, e.point)
         })
-
         mapInstance.on('mousemove', LYR_STA, (e) => {
           const props = e.features[0]?.properties ?? {}
           lastPoint.current = e.point
-          // Compare as strings — MapLibre may coerce numeric properties
-          if (activeStation.current !== String(props.station_id)) {
-            loadArrivals(props, e.point)
-          }
+          if (activeStation.current !== String(props.station_id)) loadArrivals(props, e.point)
         })
-
         mapInstance.on('mouseleave', LYR_STA, () => {
           mapInstance.getCanvas().style.cursor = ''
           activeStation.current = null
           onHoverRef.current?.(null)
         })
-      } else {
-        mapInstance.getSource(SRC_STATIONS).setData(buildStationsGeojson(metro))
       }
 
-      // ── Líneas (después de estaciones, LYR_STA_GLOW ya existe) ──
-      if (!mapInstance.getSource(SRC_LINES)) {
-        mapInstance.addSource(SRC_LINES, {
-          type: 'geojson',
-          data: buildLinesGeojson(metroLines),
-        })
+      // ── LÍNEAS ──
+      if (mapInstance.getSource(SRC_LINES)) {
+        mapInstance.getSource(SRC_LINES).setData(linesGeojson)
+      } else {
+        mapInstance.addSource(SRC_LINES, { type: 'geojson', data: linesGeojson })
 
         mapInstance.addLayer({
           id: LYR_LINES_GLOW,
@@ -223,39 +206,20 @@ export default function MetroLayer({ onHover }) {
             'line-opacity': 1,
           },
         }, LYR_STA_GLOW)
-      } else {
-        mapInstance.getSource(SRC_LINES).setData(buildLinesGeojson(metroLines))
       }
+
+      // ── VISIBILIDAD ──
+      const vis = visible ? 'visible' : 'none'
+      ALL_LAYERS.forEach(id => {
+        if (mapInstance.getLayer(id)) mapInstance.setLayoutProperty(id, 'visibility', vis)
+      })
+
+      mapInstance.triggerRepaint()
 
     } catch (err) {
       console.error('[MetroLayer]', err)
     }
-  }, [mapInstance, isLoaded, styleKey])
-
-  // Actualizar datos de líneas cuando cambian
-  useEffect(() => {
-    if (!mapInstance || !isLoaded) return
-    if (mapInstance.getSource(SRC_LINES)) {
-      mapInstance.getSource(SRC_LINES).setData(buildLinesGeojson(metroLines))
-    }
-  }, [metroLines])
-
-  // Actualizar datos de estaciones cuando cambian
-  useEffect(() => {
-    if (!mapInstance || !isLoaded) return
-    if (mapInstance.getSource(SRC_STATIONS)) {
-      mapInstance.getSource(SRC_STATIONS).setData(buildStationsGeojson(metro))
-    }
-  }, [metro])
-
-  // Visibilidad
-  useEffect(() => {
-    if (!mapInstance || !isLoaded) return
-    const vis = visible ? 'visible' : 'none'
-    ALL_LAYERS.forEach(id => {
-      if (mapInstance.getLayer(id)) mapInstance.setLayoutProperty(id, 'visibility', vis)
-    })
-  }, [visible, mapInstance, isLoaded])
+  }, [mapInstance, isLoaded, styleKey, metro, metroLines, visible])
 
   return null
 }

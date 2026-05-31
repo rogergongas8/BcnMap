@@ -78,6 +78,7 @@ export default function LandmarksLayer({ visible }) {
     const v = visible ? 'visible' : 'none'
     mapInstance.setLayoutProperty(LAYER_CIRCLES, 'visibility', v)
     mapInstance.setLayoutProperty(LAYER_LABELS,  'visibility', v)
+    mapInstance.triggerRepaint()
   }, [mapInstance, styleKey, visible])
 
   return null

@@ -32,13 +32,13 @@ function ToolButton({ active, onClick, icon: Icon, label, badge, badgeColor = 's
       className={`relative w-11 h-11 flex items-center justify-center rounded-xl border transition-all
         ${active
           ? 'bg-white text-black border-white shadow-[0_4px_14px_rgba(0,0,0,0.3)]'
-          : 'bg-[#0a0c10]/85 backdrop-blur-xl text-white/70 border-white/[0.08] hover:text-white hover:border-white/[0.18]'
+          : 'bg-[#0C0B09]/85 backdrop-blur-xl text-white/70 border-white/[0.08] hover:text-white hover:border-white/[0.18]'
         }`}
     >
       <Icon size={16} />
       {badge && (
         <span
-          className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full ring-2 ring-[#0a0c10]"
+          className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full ring-2 ring-[#0C0B09]"
           style={{ background: badgeBg }}
         />
       )}
@@ -58,7 +58,7 @@ function LayersPopover({ onClose }) {
       exit={{ opacity: 0, x: -8, scale: 0.96 }}
       transition={{ duration: 0.16, ease: [0.2, 0.7, 0.2, 1] }}
       className="absolute left-[60px] top-0 w-[230px] rounded-xl
-        bg-[#0a0c10]/95 backdrop-blur-2xl border border-white/[0.08]
+        bg-[#0C0B09]/95 backdrop-blur-2xl border border-white/[0.08]
         shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden"
     >
       <header className="px-4 py-3 flex items-center justify-between border-b border-white/[0.05]">
@@ -168,7 +168,7 @@ function ProfileButton() {
           onClick={() => setShowLogin(true)}
           title="Iniciar sesión"
           className="w-11 h-11 flex items-center justify-center rounded-xl border
-            bg-[#0a0c10]/85 backdrop-blur-xl text-white/50 border-white/[0.08]
+            bg-[#0C0B09]/85 backdrop-blur-xl text-white/50 border-white/[0.08]
             hover:text-white hover:border-white/[0.18] transition-all"
         >
           <Icons.user size={16} />
@@ -185,8 +185,8 @@ function ProfileButton() {
       <button
         onClick={() => setOpen(v => !v)}
         className="w-11 h-11 flex items-center justify-center rounded-xl border
-          bg-cyan-500/10 border-cyan-500/30 text-cyan-300
-          hover:bg-cyan-500/20 transition-all text-[11px] font-mono font-bold"
+          transition-all text-[11px] font-mono font-bold"
+          style={{ background: 'rgba(184,136,90,0.12)', border: '1px solid rgba(184,136,90,0.3)', color: '#C9A882' }}
       >
         {initials}
       </button>
@@ -198,7 +198,7 @@ function ProfileButton() {
             exit={{ opacity: 0, x: -8, scale: 0.96 }}
             transition={{ duration: 0.15 }}
             className="absolute left-[60px] top-0 w-[180px] rounded-xl
-              bg-[#0a0c10]/95 backdrop-blur-2xl border border-white/[0.08]
+              bg-[#0C0B09]/95 backdrop-blur-2xl border border-white/[0.08]
               shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden z-50"
           >
             <div className="px-3 py-2.5 border-b border-white/[0.06]">

@@ -10,7 +10,7 @@ import { sharePlaceUrl } from '../../../hooks/useDeepLink'
 /* ── Skeleton ───────────────────────────────────────────────────────────── */
 
 function Sk({ w = 'w-full', h = 'h-3', rounded = 'rounded' }) {
-  return <div className={`${w} ${h} ${rounded} animate-pulse`} style={{ background: '#262626' }} />
+  return <div className={`${w} ${h} ${rounded} animate-pulse`} style={{ background: '#2C2926' }} />
 }
 
 function PlaceSkeleton() {
@@ -30,7 +30,7 @@ function PlaceSkeleton() {
 /* ── Constants ─────────────────────────────────────────────────────────── */
 
 const C = {
-  orange: '#E8622A',
+  orange: '#B8885A',
   blue:   '#4D84D4',
   green:  '#3CB887',
   amber:  '#C98E2E',
@@ -55,13 +55,13 @@ function DataRow({ label, value, color, pct }) {
   return (
     <div>
       <div className="flex items-baseline justify-between mb-1">
-        <span className="font-mono text-[9px] uppercase tracking-[0.12em]" style={{ color: '#555' }}>{label}</span>
-        <span className="font-mono text-[11px] font-medium" style={{ color: color ?? '#EBEBEB' }}>{value}</span>
+        <span className="font-mono text-[9px] uppercase tracking-[0.12em]" style={{ color: '#8C8884' }}>{label}</span>
+        <span className="font-mono text-[11px] font-medium" style={{ color: color ?? '#F7F6F4' }}>{value}</span>
       </div>
       {pct != null && (
-        <div className="h-[2px] w-full rounded-full" style={{ background: '#262626' }}>
+        <div className="h-[2px] w-full rounded-full" style={{ background: '#2C2926' }}>
           <div className="h-full rounded-full transition-all duration-700"
-            style={{ width: `${Math.min(100, Math.max(0, pct))}%`, background: color ?? '#888' }} />
+            style={{ width: `${Math.min(100, Math.max(0, pct))}%`, background: color ?? '#B0ACA7' }} />
         </div>
       )}
     </div>
@@ -72,8 +72,8 @@ function MetaRow({ icon: Icon, children, href }) {
   if (!children) return null
   const content = (
     <div className="flex items-start gap-2.5 py-1.5">
-      <span className="flex-shrink-0 mt-0.5" style={{ color: '#555' }}><Icon size={13} /></span>
-      <span className="font-mono text-[11px] leading-snug min-w-0 break-words" style={{ color: '#888' }}>{children}</span>
+      <span className="flex-shrink-0 mt-0.5" style={{ color: '#8C8884' }}><Icon size={13} /></span>
+      <span className="font-mono text-[11px] leading-snug min-w-0 break-words" style={{ color: '#B0ACA7' }}>{children}</span>
     </div>
   )
   if (href) return <a href={href} target="_blank" rel="noreferrer" className="block hover:opacity-80 transition-opacity">{content}</a>
@@ -92,14 +92,14 @@ function StarRating({ rating }) {
         {half && <StarHalf />}
         {Array.from({ length: empty }).map((_, i) => <StarEmpty key={`e${i}`} />)}
       </div>
-      <span className="font-mono text-[12px] font-semibold tabular-nums" style={{ color: '#EBEBEB' }}>{rating.toFixed(1)}</span>
+      <span className="font-mono text-[12px] font-semibold tabular-nums" style={{ color: '#F7F6F4' }}>{rating.toFixed(1)}</span>
     </div>
   )
 }
 
 const StarFull  = () => <svg width="11" height="11" viewBox="0 0 12 12" fill="#C98E2E"><path d="M6 1l1.4 2.8 3.1.45-2.25 2.2.53 3.1L6 8.1 3.22 9.55l.53-3.1L1.5 4.25l3.1-.45z"/></svg>
-const StarHalf  = () => <svg width="11" height="11" viewBox="0 0 12 12"><path d="M6 1l1.4 2.8 3.1.45-2.25 2.2.53 3.1L6 8.1V1z" fill="#C98E2E"/><path d="M6 1L4.6 3.8l-3.1.45 2.25 2.2-.53 3.1L6 8.1V1z" fill="#1C1C1C"/></svg>
-const StarEmpty = () => <svg width="11" height="11" viewBox="0 0 12 12" fill="#262626"><path d="M6 1l1.4 2.8 3.1.45-2.25 2.2.53 3.1L6 8.1 3.22 9.55l.53-3.1L1.5 4.25l3.1-.45z"/></svg>
+const StarHalf  = () => <svg width="11" height="11" viewBox="0 0 12 12"><path d="M6 1l1.4 2.8 3.1.45-2.25 2.2.53 3.1L6 8.1V1z" fill="#C98E2E"/><path d="M6 1L4.6 3.8l-3.1.45 2.25 2.2-.53 3.1L6 8.1V1z" fill="#211F1B"/></svg>
+const StarEmpty = () => <svg width="11" height="11" viewBox="0 0 12 12" fill="#2C2926"><path d="M6 1l1.4 2.8 3.1.45-2.25 2.2.53 3.1L6 8.1 3.22 9.55l.53-3.1L1.5 4.25l3.1-.45z"/></svg>
 
 /* ── Photo / Hero ───────────────────────────────────────────────────────── */
 
@@ -116,7 +116,7 @@ function PlaceHero({ photos, category }) {
   if (!showPhoto) {
     return (
       <div className="relative w-full h-[120px] flex-shrink-0 flex items-center justify-center overflow-hidden"
-        style={{ background: `linear-gradient(135deg, ${accent}18 0%, ${accent}06 100%)`, borderBottom: '1px solid #262626' }}>
+        style={{ background: `linear-gradient(135deg, ${accent}18 0%, ${accent}06 100%)`, borderBottom: '1px solid #2C2926' }}>
         <div className="w-14 h-14 rounded-xl flex items-center justify-center"
           style={{ background: `${accent}14`, boxShadow: `0 0 32px ${accent}28` }}>
           <span style={{ color: accent, opacity: 0.85 }}><CatIcon size={28} /></span>
@@ -126,7 +126,7 @@ function PlaceHero({ photos, category }) {
   }
 
   return (
-    <div className="relative w-full h-[150px] overflow-hidden flex-shrink-0" style={{ borderBottom: '1px solid #262626' }}>
+    <div className="relative w-full h-[150px] overflow-hidden flex-shrink-0" style={{ borderBottom: '1px solid #2C2926' }}>
       <AnimatePresence mode="wait">
         <motion.img
           key={photos[idx]}
@@ -141,7 +141,7 @@ function PlaceHero({ photos, category }) {
           className="w-full h-full object-cover"
         />
       </AnimatePresence>
-      <div className="absolute inset-0 bg-gradient-to-t from-[#141414]/80 via-transparent to-transparent pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-t from-[#151210]/80 via-transparent to-transparent pointer-events-none" />
       {photos.length > 1 && (
         <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1.5">
           {photos.map((_, i) => (
@@ -185,20 +185,20 @@ const TABS = [
 
 function TabBar({ active, onChange }) {
   return (
-    <div className="flex flex-shrink-0" style={{ borderBottom: '1px solid #262626' }}>
+    <div className="flex flex-shrink-0" style={{ borderBottom: '1px solid #2C2926' }}>
       {TABS.map(tab => (
         <button
           key={tab.id}
           onClick={() => onChange(tab.id)}
           className="flex-1 py-2.5 font-mono text-[10px] uppercase tracking-[0.1em] transition-colors relative"
-          style={{ color: active === tab.id ? '#EBEBEB' : '#555' }}
+          style={{ color: active === tab.id ? '#F7F6F4' : '#8C8884' }}
         >
           {tab.label}
           {active === tab.id && (
             <motion.div
               layoutId="tab-underline"
               className="absolute bottom-0 left-3 right-3 h-[2px] rounded-full"
-              style={{ background: '#E8622A' }}
+              style={{ background: '#B8885A' }}
               transition={{ type: 'spring', stiffness: 400, damping: 38 }}
             />
           )}
@@ -228,11 +228,11 @@ function InfoTab({ place, enrich, enrichLoading }) {
           initial={{ opacity: 0, y: 4 }}
           animate={{ opacity: 1, y: 0 }}
           className="px-4 pt-3 pb-2 flex items-center gap-3 flex-wrap"
-          style={{ borderBottom: '1px solid #1A1A1A' }}
+          style={{ borderBottom: '1px solid #201E1B' }}
         >
           {enrich.rating != null && <StarRating rating={enrich.rating} />}
           {enrich.price && (
-            <span className="font-mono text-[11px]" style={{ color: '#555' }}>{enrich.price}</span>
+            <span className="font-mono text-[11px]" style={{ color: '#8C8884' }}>{enrich.price}</span>
           )}
           {enrich.is_open_now != null && (
             <span className="font-mono text-[9px] uppercase tracking-[0.08em] px-2 py-0.5 rounded"
@@ -253,7 +253,7 @@ function InfoTab({ place, enrich, enrichLoading }) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           className="px-4 py-3 font-mono text-[11px] leading-relaxed"
-          style={{ color: '#888', borderBottom: '1px solid #1A1A1A' }}
+          style={{ color: '#B0ACA7', borderBottom: '1px solid #201E1B' }}
         >
           {enrich.description}
         </motion.p>
@@ -286,12 +286,12 @@ function InfoTab({ place, enrich, enrichLoading }) {
       </div>
 
       {enrich?.wiki_url && (
-        <div className="px-4 pb-3" style={{ borderTop: '1px solid #1A1A1A' }}>
+        <div className="px-4 pb-3" style={{ borderTop: '1px solid #201E1B' }}>
           <a href={enrich.wiki_url} target="_blank" rel="noreferrer"
             className="inline-flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.1em] transition-colors"
-            style={{ color: '#555' }}
-            onMouseEnter={e => { e.currentTarget.style.color = '#888' }}
-            onMouseLeave={e => { e.currentTarget.style.color = '#555' }}>
+            style={{ color: '#8C8884' }}
+            onMouseEnter={e => { e.currentTarget.style.color = '#B0ACA7' }}
+            onMouseLeave={e => { e.currentTarget.style.color = '#8C8884' }}>
             <Icons.external size={9} />
             Veure a Wikipedia
           </a>
@@ -317,11 +317,11 @@ function HorarisTab({ place, enrich, enrichLoading }) {
   if (!hours) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-2 px-6 text-center">
-        <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: '#1C1C1C', color: '#555' }}>
+        <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: '#211F1B', color: '#8C8884' }}>
           <Icons.clock size={16} />
         </div>
-        <p className="font-syne text-[13px]" style={{ color: '#888' }}>Horari no disponible</p>
-        <p className="font-mono text-[10px]" style={{ color: '#555' }}>No tenim dades d'horari per a aquest lloc</p>
+        <p className="font-syne text-[13px]" style={{ color: '#B0ACA7' }}>Horari no disponible</p>
+        <p className="font-mono text-[10px]" style={{ color: '#8C8884' }}>No tenim dades d'horari per a aquest lloc</p>
       </div>
     )
   }
@@ -334,7 +334,7 @@ function HorarisTab({ place, enrich, enrichLoading }) {
   return (
     <div className="flex-1 overflow-y-auto min-h-0">
       <div className="px-4 pt-3 pb-4">
-        <p className="font-mono text-[9px] uppercase tracking-[0.14em] mb-3" style={{ color: '#555' }}>Horari d'obertura</p>
+        <p className="font-mono text-[9px] uppercase tracking-[0.14em] mb-3" style={{ color: '#8C8884' }}>Horari d'obertura</p>
 
         {enrich?.is_open_now != null && (
           <div className="mb-3 flex items-center gap-2">
@@ -349,16 +349,16 @@ function HorarisTab({ place, enrich, enrichLoading }) {
         )}
 
         {lines.length > 0 ? (
-          <div className="flex flex-col" style={{ borderRadius: 6, border: '1px solid #262626', overflow: 'hidden' }}>
+          <div className="flex flex-col" style={{ borderRadius: 6, border: '1px solid #2C2926', overflow: 'hidden' }}>
             {lines.map((line, i) => (
               <div key={i} className="px-3 py-2 font-mono text-[11px]"
-                style={{ color: '#888', borderBottom: i < lines.length - 1 ? '1px solid #1A1A1A' : 'none' }}>
+                style={{ color: '#B0ACA7', borderBottom: i < lines.length - 1 ? '1px solid #201E1B' : 'none' }}>
                 {line}
               </div>
             ))}
           </div>
         ) : (
-          <p className="font-mono text-[11px] leading-relaxed" style={{ color: '#888' }}>{hours}</p>
+          <p className="font-mono text-[11px] leading-relaxed" style={{ color: '#B0ACA7' }}>{hours}</p>
         )}
       </div>
     </div>
@@ -369,7 +369,7 @@ function HorarisTab({ place, enrich, enrichLoading }) {
 
 const ROUTE_MODES = [
   { id: 'foot',   label: 'A peu',  color: '#ffffff' },
-  { id: 'bicing', label: 'Bicing', color: '#E8622A' },
+  { id: 'bicing', label: 'Bicing', color: '#B8885A' },
   { id: 'metro',  label: 'Metro',  color: '#ff6b35' },
   { id: 'bus',    label: 'Bus',    color: '#00b4ff' },
   { id: 'car',    label: 'Cotxe',  color: '#C98E2E' },
@@ -381,7 +381,7 @@ function RutaTab({ place, onRoute }) {
   return (
     <div className="flex-1 flex flex-col min-h-0">
       <div className="px-4 pt-3 pb-2 flex-shrink-0">
-        <p className="font-mono text-[9px] uppercase tracking-[0.14em] mb-2.5" style={{ color: '#555' }}>Mode de transport</p>
+        <p className="font-mono text-[9px] uppercase tracking-[0.14em] mb-2.5" style={{ color: '#8C8884' }}>Mode de transport</p>
         <div className="grid grid-cols-5 gap-1">
           {ROUTE_MODES.map(m => (
             <button
@@ -390,12 +390,12 @@ function RutaTab({ place, onRoute }) {
               className="py-2 flex flex-col items-center gap-1 transition-all"
               style={{
                 borderRadius: 6,
-                border: `1px solid ${selectedMode === m.id ? m.color + '55' : '#262626'}`,
-                background: selectedMode === m.id ? '#1C1C1C' : 'transparent',
+                border: `1px solid ${selectedMode === m.id ? m.color + '55' : '#2C2926'}`,
+                background: selectedMode === m.id ? '#211F1B' : 'transparent',
               }}
             >
               <span className="font-mono text-[9px] uppercase tracking-[0.08em]"
-                style={{ color: selectedMode === m.id ? m.color : '#555' }}>
+                style={{ color: selectedMode === m.id ? m.color : '#8C8884' }}>
                 {m.label}
               </span>
             </button>
@@ -403,12 +403,12 @@ function RutaTab({ place, onRoute }) {
         </div>
       </div>
 
-      <div className="px-4 py-3 flex-shrink-0" style={{ borderTop: '1px solid #1A1A1A' }}>
-        <div className="p-3 rounded-lg" style={{ background: '#1C1C1C', border: '1px solid #262626' }}>
-          <p className="font-mono text-[10px]" style={{ color: '#555' }}>Destí</p>
-          <p className="font-syne text-[13px] font-medium mt-0.5 truncate" style={{ color: '#EBEBEB' }}>{place.name}</p>
+      <div className="px-4 py-3 flex-shrink-0" style={{ borderTop: '1px solid #201E1B' }}>
+        <div className="p-3 rounded-lg" style={{ background: '#211F1B', border: '1px solid #2C2926' }}>
+          <p className="font-mono text-[10px]" style={{ color: '#8C8884' }}>Destí</p>
+          <p className="font-syne text-[13px] font-medium mt-0.5 truncate" style={{ color: '#F7F6F4' }}>{place.name}</p>
           {place.address && (
-            <p className="font-mono text-[10px] mt-0.5 truncate" style={{ color: '#555' }}>{place.address}</p>
+            <p className="font-mono text-[10px] mt-0.5 truncate" style={{ color: '#8C8884' }}>{place.address}</p>
           )}
         </div>
       </div>
@@ -419,7 +419,7 @@ function RutaTab({ place, onRoute }) {
         <button
           onClick={() => onRoute(selectedMode)}
           className="w-full h-11 flex items-center justify-center gap-2 font-syne text-[13px] font-semibold transition-all active:scale-[0.98]"
-          style={{ borderRadius: 6, background: '#E8622A', border: '1px solid #E8622A', color: '#fff' }}
+          style={{ borderRadius: 6, background: '#B8885A', border: '1px solid #B8885A', color: '#fff' }}
         >
           <Icons.route size={14} style={{ color: '#fff' }} />
           Calcular ruta
@@ -433,30 +433,30 @@ function RutaTab({ place, onRoute }) {
 
 function BeachBody({ place }) {
   const b = place.meta ?? {}
-  const flagColor = FLAG_COLOR[b.flag] ?? '#888'
-  const occColor  = OCC_COLOR[b.occupancy_level] ?? '#888'
+  const flagColor = FLAG_COLOR[b.flag] ?? '#B0ACA7'
+  const occColor  = OCC_COLOR[b.occupancy_level] ?? '#B0ACA7'
 
   return (
     <div className="flex-1 overflow-y-auto min-h-0">
       {/* Stats grid */}
-      <div className="px-4 pt-3 pb-3 grid grid-cols-3 gap-2" style={{ borderBottom: '1px solid #1A1A1A' }}>
-        <DataRow label="Aire"  value={`${b.weather?.temp ?? '—'}°`} color="#EBEBEB" />
+      <div className="px-4 pt-3 pb-3 grid grid-cols-3 gap-2" style={{ borderBottom: '1px solid #201E1B' }}>
+        <DataRow label="Aire"  value={`${b.weather?.temp ?? '—'}°`} color="#F7F6F4" />
         <DataRow label="Aigua" value={`${b.water_temp ?? '—'}°`}    color={C.blue} />
         <DataRow label="Afluència" value={`${b.occupancy_pct ?? '—'}%`} color={occColor} />
       </div>
 
       {/* Flag + occupancy */}
-      <div className="px-4 py-3" style={{ borderBottom: '1px solid #1A1A1A' }}>
+      <div className="px-4 py-3" style={{ borderBottom: '1px solid #201E1B' }}>
         <div className="flex items-center gap-2 mb-2">
           <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: flagColor }} />
-          <span className="font-syne text-[12px] font-medium" style={{ color: '#EBEBEB' }}>
+          <span className="font-syne text-[12px] font-medium" style={{ color: '#F7F6F4' }}>
             {FLAG_LABEL[b.flag] ?? b.flag}
           </span>
-          {b.flag_reason && <span className="font-mono text-[10px]" style={{ color: '#555' }}>· {b.flag_reason}</span>}
+          {b.flag_reason && <span className="font-mono text-[10px]" style={{ color: '#8C8884' }}>· {b.flag_reason}</span>}
         </div>
         <div className="flex items-center gap-2">
-          <span className="font-mono text-[10px] w-24" style={{ color: '#888' }}>{OCC_LABEL[b.occupancy_level]}</span>
-          <div className="flex-1 h-[2px] rounded-full" style={{ background: '#262626' }}>
+          <span className="font-mono text-[10px] w-24" style={{ color: '#B0ACA7' }}>{OCC_LABEL[b.occupancy_level]}</span>
+          <div className="flex-1 h-[2px] rounded-full" style={{ background: '#2C2926' }}>
             <div className="h-full rounded-full" style={{ width: `${b.occupancy_pct}%`, background: occColor }} />
           </div>
         </div>
@@ -465,11 +465,11 @@ function BeachBody({ place }) {
       {/* Amenities */}
       {b.amenities?.length > 0 && (
         <div className="px-4 py-3">
-          <p className="font-mono text-[9px] uppercase tracking-[0.14em] mb-2" style={{ color: '#555' }}>Serveis</p>
+          <p className="font-mono text-[9px] uppercase tracking-[0.14em] mb-2" style={{ color: '#8C8884' }}>Serveis</p>
           <div className="flex flex-wrap gap-1.5">
             {b.amenities.map(a => (
               <span key={a} className="font-mono text-[9px] px-2 py-1 uppercase tracking-[0.08em]"
-                style={{ borderRadius: 4, background: '#1C1C1C', border: '1px solid #262626', color: '#888' }}>
+                style={{ borderRadius: 4, background: '#211F1B', border: '1px solid #2C2926', color: '#B0ACA7' }}>
                 {a === 'lifeguard' ? 'socorrista' : a === 'showers' ? 'dutxes' : a === 'accessible' ? 'accessible' : a}
               </span>
             ))}
@@ -485,8 +485,8 @@ function BeachBody({ place }) {
 function PinBody({ place }) {
   return (
     <div className="flex-1 px-4 py-4">
-      <p className="font-mono text-[9px] uppercase tracking-[0.14em] mb-2" style={{ color: '#555' }}>Coordenades</p>
-      <p className="font-mono text-[12px] tabular-nums" style={{ color: '#888' }}>
+      <p className="font-mono text-[9px] uppercase tracking-[0.14em] mb-2" style={{ color: '#8C8884' }}>Coordenades</p>
+      <p className="font-mono text-[12px] tabular-nums" style={{ color: '#B0ACA7' }}>
         {place.lat.toFixed(5)}, {place.lng.toFixed(5)}
       </p>
     </div>
@@ -559,18 +559,18 @@ export default function PlaceView() {
 
       {/* Title block */}
       <div className="flex items-start justify-between gap-3 px-4 pt-3 pb-2.5 flex-shrink-0"
-        style={{ borderBottom: showTabs ? 'none' : '1px solid #262626' }}>
+        style={{ borderBottom: showTabs ? 'none' : '1px solid #2C2926' }}>
         <div className="min-w-0 flex-1">
           {place.kind === 'poi' && (
             <button onClick={back}
               className="flex items-center gap-1 mb-1.5 font-mono text-[9px] uppercase tracking-[0.1em] transition-colors"
-              style={{ color: '#555' }}
-              onMouseEnter={e => { e.currentTarget.style.color = '#888' }}
-              onMouseLeave={e => { e.currentTarget.style.color = '#555' }}>
+              style={{ color: '#8C8884' }}
+              onMouseEnter={e => { e.currentTarget.style.color = '#B0ACA7' }}
+              onMouseLeave={e => { e.currentTarget.style.color = '#8C8884' }}>
               ← Tornar
             </button>
           )}
-          <h2 className="font-syne text-[15px] font-semibold leading-tight" style={{ color: '#EBEBEB' }}>
+          <h2 className="font-syne text-[15px] font-semibold leading-tight" style={{ color: '#F7F6F4' }}>
             {place.name}
           </h2>
           {place.kind === 'poi' && place.category?.label && (
@@ -580,14 +580,14 @@ export default function PlaceView() {
             </span>
           )}
           {subtitle && (
-            <p className="font-mono text-[10px] mt-1.5 truncate" style={{ color: '#555' }}>{subtitle}</p>
+            <p className="font-mono text-[10px] mt-1.5 truncate" style={{ color: '#8C8884' }}>{subtitle}</p>
           )}
         </div>
         <button onClick={close}
           className="w-7 h-7 flex items-center justify-center rounded-md transition-colors flex-shrink-0"
-          style={{ color: '#555' }}
-          onMouseEnter={e => { e.currentTarget.style.color = '#EBEBEB' }}
-          onMouseLeave={e => { e.currentTarget.style.color = '#555' }}>
+          style={{ color: '#8C8884' }}
+          onMouseEnter={e => { e.currentTarget.style.color = '#F7F6F4' }}
+          onMouseLeave={e => { e.currentTarget.style.color = '#8C8884' }}>
           <Icons.close size={12} />
         </button>
       </div>
@@ -626,10 +626,10 @@ export default function PlaceView() {
 
       {/* Action bar — hide when ruta tab active (it has its own CTA) */}
       {!(showTabs && tab === 'ruta') && (
-        <div className="px-4 pt-2 pb-3.5 flex gap-2 flex-shrink-0" style={{ borderTop: '1px solid #1A1A1A' }}>
+        <div className="px-4 pt-2 pb-3.5 flex gap-2 flex-shrink-0" style={{ borderTop: '1px solid #201E1B' }}>
           <button onClick={() => showTabs ? setTab('ruta') : handleRoute()}
             className="flex-1 h-10 flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
-            style={{ borderRadius: 6, background: '#E8622A', border: '1px solid #E8622A' }}>
+            style={{ borderRadius: 6, background: '#B8885A', border: '1px solid #B8885A' }}>
             <Icons.navigation size={13} style={{ color: '#fff' }} />
             <span className="font-syne text-[12px] font-semibold" style={{ color: '#fff' }}>Porta'm aquí</span>
           </button>
@@ -637,7 +637,7 @@ export default function PlaceView() {
           {(enrich?.website || place.meta?.website) && (
             <a href={enrich?.website || place.meta?.website} target="_blank" rel="noopener noreferrer"
               className="flex-1 h-10 flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]"
-              style={{ borderRadius: 6, background: '#1C1C1C', border: '1px solid #262626', color: '#EBEBEB' }}>
+              style={{ borderRadius: 6, background: '#211F1B', border: '1px solid #2C2926', color: '#F7F6F4' }}>
               <Icons.external size={12} />
               <span className="font-syne text-[12px] font-medium">Entrades / Web</span>
             </a>
@@ -646,7 +646,7 @@ export default function PlaceView() {
           {!(enrich?.website || place.meta?.website) && (
             <button onClick={handleCopy}
               className="h-10 px-3 flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]"
-              style={{ borderRadius: 6, background: '#1C1C1C', border: `1px solid ${copied ? '#E8622A' : '#262626'}`, color: copied ? '#E8622A' : '#555' }}>
+              style={{ borderRadius: 6, background: '#211F1B', border: `1px solid ${copied ? '#B8885A' : '#2C2926'}`, color: copied ? '#B8885A' : '#8C8884' }}>
               <Icons.copy size={12} />
               <span className="font-mono text-[9px] uppercase tracking-[0.08em]">{copied ? 'Copiat' : 'Coords'}</span>
             </button>
@@ -655,7 +655,7 @@ export default function PlaceView() {
           {place.kind === 'poi' && (
             <button onClick={handleShare}
               className="h-10 px-3 flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]"
-              style={{ borderRadius: 6, background: '#1C1C1C', border: `1px solid ${shared ? '#4D84D4' : '#262626'}`, color: shared ? '#4D84D4' : '#555' }}>
+              style={{ borderRadius: 6, background: '#211F1B', border: `1px solid ${shared ? '#4D84D4' : '#2C2926'}`, color: shared ? '#4D84D4' : '#8C8884' }}>
               <Icons.external size={12} />
               <span className="font-mono text-[9px] uppercase tracking-[0.08em]">{shared ? 'Copiat!' : 'Compartir'}</span>
             </button>

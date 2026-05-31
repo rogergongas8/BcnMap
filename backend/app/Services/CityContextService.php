@@ -100,7 +100,7 @@ class CityContextService
     /**
      * Appends user-specific data (position + nearby POIs) to a pre-built base context.
      */
-    public function appendUserData(string $base, ?float $userLat, ?float $userLng, array $nearbyPois): string
+    public function appendUserData(string $base, ?float $userLat, ?float $userLng, array $nearbyPois, array $relevantEvents = []): string
     {
         $userBlock = '';
         if ($userLat !== null && $userLng !== null) {
@@ -121,7 +121,30 @@ class CityContextService
                 . "\nUsa lat/lng exactos en calculate_route para rutas a estos lugares.";
         }
 
-        return $base . $userBlock . $poisBlock;
+        $relevantEventsBlock = '';
+        if (!empty($relevantEvents)) {
+            $lines = [];
+            foreach ($relevantEvents as $e) {
+                $label = $e['title'];
+                if ($e['start'] ?? null) {
+                    $label .= ' (' . $e['start'] . ')';
+                }
+                $meta = array_filter([$e['place'] ?? null, $e['time'] ?? null]);
+                if ($meta) $label .= ' — ' . implode(', ', $meta);
+                
+                $coords = '';
+                if (isset($e['lat']) && isset($e['lng'])) {
+                    $lat = number_format((float)$e['lat'], 6, '.', '');
+                    $lng = number_format((float)$e['lng'], 6, '.', '');
+                    $coords = " [lat={$lat},lng={$lng}]";
+                }
+                $lines[] = "  - {$label}{$coords}";
+            }
+            $relevantEventsBlock = "\n\nPOSIBLES EVENTOS MENCIONADOS POR EL USUARIO:\n" . implode("\n", $lines)
+                . "\nSi el usuario pregunta por alguno de estos, ya tienes los datos.";
+        }
+
+        return $base . $userBlock . $poisBlock . $relevantEventsBlock;
     }
 
     // Kept for backwards compatibility with any other callers (e.g. city-context endpoint).

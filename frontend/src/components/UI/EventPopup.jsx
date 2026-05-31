@@ -8,7 +8,7 @@ const CAT_COLOR = {
   musica:      '#C98E2E',
   esport:      '#3CB887',
   cultura:     '#8B6AD4',
-  gastronomia: '#E8622A',
+  gastronomia: '#B8885A',
   familia:     '#4D84D4',
   altres:      '#5A5248',
 }
@@ -83,7 +83,7 @@ export default function EventPopup({ popup, onClose }) {
               left,
               top,
               width: popupW,
-              background: '#141414',
+              background: '#151210',
               border: '1px solid #2A2A2A',
               borderRadius: 10,
               boxShadow: '0 8px 32px rgba(0,0,0,0.7)',
@@ -95,15 +95,15 @@ export default function EventPopup({ popup, onClose }) {
             <div className="px-3.5 pt-3 pb-3.5 flex flex-col gap-2">
               {/* Header */}
               <div className="flex items-start justify-between gap-2">
-                <p className="font-syne text-[13px] font-semibold leading-snug flex-1" style={{ color: '#EBEBEB' }}>
+                <p className="font-syne text-[13px] font-semibold leading-snug flex-1" style={{ color: '#F7F6F4' }}>
                   {event.title}
                 </p>
                 <button
                   onClick={onClose}
                   className="flex-shrink-0 w-5 h-5 flex items-center justify-center rounded"
-                  style={{ color: '#555', background: 'transparent' }}
-                  onMouseEnter={e => e.currentTarget.style.color = '#888'}
-                  onMouseLeave={e => e.currentTarget.style.color = '#555'}
+                  style={{ color: '#8C8884', background: 'transparent' }}
+                  onMouseEnter={e => e.currentTarget.style.color = '#B0ACA7'}
+                  onMouseLeave={e => e.currentTarget.style.color = '#8C8884'}
                 >
                   <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
                     <line x1="1.5" y1="1.5" x2="8.5" y2="8.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
@@ -115,7 +115,7 @@ export default function EventPopup({ popup, onClose }) {
               {/* Meta */}
               <div className="flex flex-col gap-1">
                 {event.place && (
-                  <p className="font-mono text-[10px] truncate" style={{ color: '#666' }}>
+                  <p className="font-mono text-[10px] truncate" style={{ color: '#9A9692' }}>
                     {event.place}{event.district ? ` · ${event.district}` : ''}
                   </p>
                 )}
@@ -127,14 +127,14 @@ export default function EventPopup({ popup, onClose }) {
                     {CAT_LABELS[event.category] ?? event.category}
                   </span>
                   {event.start && (
-                    <span className="font-mono text-[9px]" style={{ color: '#555' }}>
+                    <span className="font-mono text-[9px]" style={{ color: '#8C8884' }}>
                       {formatDate(event.start, event.end)}
                       {event.time && ` · ${event.time}h`}
                     </span>
                   )}
                 </div>
                 {event.timetable && (
-                  <p className="font-mono text-[9px] leading-relaxed" style={{ color: '#555' }}>
+                  <p className="font-mono text-[9px] leading-relaxed" style={{ color: '#8C8884' }}>
                     {event.timetable}
                   </p>
                 )}
@@ -148,7 +148,7 @@ export default function EventPopup({ popup, onClose }) {
                     return dt.toLocaleDateString('ca', { day: 'numeric', month: 'short' })
                   })
                   return (
-                    <p className="font-mono text-[9px]" style={{ color: '#555' }}>
+                    <p className="font-mono text-[9px]" style={{ color: '#8C8884' }}>
                       Tb: {labels.join(', ')}{extras.length > 3 ? '…' : ''}
                     </p>
                   )
@@ -161,9 +161,9 @@ export default function EventPopup({ popup, onClose }) {
                   <button
                     onClick={handleNavigate}
                     className="w-full py-2 font-syne text-[12px] font-semibold transition-colors"
-                    style={{ borderRadius: 6, background: '#E8622A', color: '#fff' }}
+                    style={{ borderRadius: 6, background: '#B8885A', color: '#fff' }}
                     onMouseEnter={e => e.currentTarget.style.background = '#d4541f'}
-                    onMouseLeave={e => e.currentTarget.style.background = '#E8622A'}
+                    onMouseLeave={e => e.currentTarget.style.background = '#B8885A'}
                   >
                     Porta'm aquí
                   </button>
@@ -186,9 +186,9 @@ export default function EventPopup({ popup, onClose }) {
                       onClose()
                     }}
                     className="flex-1 flex items-center justify-center py-1.5 font-syne text-[10px] font-medium transition-colors"
-                    style={{ borderRadius: 6, background: '#1C1C1C', border: '1px solid #2A2A2A', color: '#888' }}
-                    onMouseEnter={e => { e.currentTarget.style.borderColor = '#E8622A'; e.currentTarget.style.color = '#E8622A' }}
-                    onMouseLeave={e => { e.currentTarget.style.borderColor = '#2A2A2A'; e.currentTarget.style.color = '#888' }}
+                    style={{ borderRadius: 6, background: '#211F1B', border: '1px solid #2A2A2A', color: '#B0ACA7' }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = '#B8885A'; e.currentTarget.style.color = '#B8885A' }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = '#2A2A2A'; e.currentTarget.style.color = '#B0ACA7' }}
                   >
                     Preguntar
                   </button>

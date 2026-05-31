@@ -17,8 +17,9 @@ class ChatController extends Controller
     private const CONTEXT_TTL = 120;
 
     public function __construct(
-        private GroqService        $groq,
-        private CityContextService $context,
+        private GroqService             $groq,
+        private CityContextService      $context,
+        private \App\Services\EventsEnrichmentService $events,
     ) {}
 
     public function send(Request $request): JsonResponse
@@ -32,19 +33,23 @@ class ChatController extends Controller
             'nearby_pois'          => 'nullable|array|max:12',
         ]);
 
+        $userMessage = $request->input('message');
         $userLat    = $request->input('user_lat') !== null ? (float) $request->input('user_lat') : null;
         $userLng    = $request->input('user_lng') !== null ? (float) $request->input('user_lng') : null;
         $nearbyPois = $request->input('nearby_pois', []);
         $lang       = $request->input('lang', 'ca');
 
+        // Extract possible events mentioned in the message (Poor Man's RAG)
+        $relevantEvents = $this->events->search($userMessage, limit: 5);
+
         $baseContext = Cache::remember('chat:city_base_context', self::CONTEXT_TTL, fn () =>
             $this->context->buildBaseContext()
         );
 
-        $cityContext = $this->context->appendUserData($baseContext, $userLat, $userLng, $nearbyPois);
+        $cityContext = $this->context->appendUserData($baseContext, $userLat, $userLng, $nearbyPois, $relevantEvents);
 
         $result = $this->groq->chat(
-            userMessage: $request->input('message'),
+            userMessage: $userMessage,
             cityContext:  $cityContext,
             history:      $request->input('conversation_history', []),
             lang:         $lang,

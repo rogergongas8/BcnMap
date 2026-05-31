@@ -14,9 +14,9 @@ const LINE_COLORS = {
 }
 
 function lineColor(line) {
-  if (!line) return '#888'
+  if (!line) return '#B0ACA7'
   const key = line.toUpperCase().replace(/\s+/g, '')
-  return LINE_COLORS[key] ?? '#888'
+  return LINE_COLORS[key] ?? '#B0ACA7'
 }
 
 function LineTag({ line }) {
@@ -44,14 +44,14 @@ export default function DisruptionsView() {
       <div className="flex-1 flex flex-col items-center justify-center gap-3 px-6 text-center py-12">
         <div
           className="w-10 h-10 rounded-xl flex items-center justify-center"
-          style={{ background: '#1C1C1C', color: '#3CB34A' }}
+          style={{ background: '#211F1B', color: '#3CB34A' }}
         >
           <Icons.check size={18} />
         </div>
-        <p className="font-syne text-[14px] font-medium" style={{ color: '#EBEBEB' }}>
+        <p className="font-syne text-[14px] font-medium" style={{ color: '#F7F6F4' }}>
           Servei normal
         </p>
-        <p className="font-mono text-[11px] leading-snug max-w-[220px]" style={{ color: '#555' }}>
+        <p className="font-mono text-[11px] leading-snug max-w-[220px]" style={{ color: '#8C8884' }}>
           Cap incidencia activa a la xarxa de metro de Barcelona
         </p>
       </div>
@@ -60,7 +60,7 @@ export default function DisruptionsView() {
 
   return (
     <div className="flex-1 overflow-y-auto min-h-0">
-      <div className="px-4 py-2.5 flex items-center gap-2" style={{ borderBottom: '1px solid #1A1A1A' }}>
+      <div className="px-4 py-2.5 flex items-center gap-2" style={{ borderBottom: '1px solid #201E1B' }}>
         <span style={{ color: '#D45555' }}><Icons.alert size={11} /></span>
         <span className="font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color: '#D45555' }}>
           {disruptions.length} {disruptions.length === 1 ? 'incidencia activa' : 'incidencies actives'}
@@ -74,7 +74,7 @@ export default function DisruptionsView() {
             <li
               key={i}
               className="flex"
-              style={{ borderBottom: '1px solid #1A1A1A' }}
+              style={{ borderBottom: '1px solid #201E1B' }}
             >
               <div
                 className="w-[3px] flex-shrink-0 self-stretch"
@@ -85,13 +85,13 @@ export default function DisruptionsView() {
                 <div className="min-w-0 flex-1">
                   <p
                     className="font-mono text-[11px] leading-snug"
-                    style={{ color: '#EBEBEB' }}
+                    style={{ color: '#F7F6F4' }}
                   >
                     {d.description}
                   </p>
                   <p
                     className="font-mono text-[9px] mt-1 uppercase tracking-[0.08em]"
-                    style={{ color: '#555' }}
+                    style={{ color: '#8C8884' }}
                   >
                     Metro Barcelona
                   </p>
@@ -102,8 +102,8 @@ export default function DisruptionsView() {
         })}
       </ul>
 
-      <div className="px-4 py-3" style={{ borderTop: '1px solid #262626' }}>
-        <p className="font-mono text-[9px] leading-relaxed" style={{ color: '#444' }}>
+      <div className="px-4 py-3" style={{ borderTop: '1px solid #2C2926' }}>
+        <p className="font-mono text-[9px] leading-relaxed" style={{ color: '#7D7975' }}>
           Dades TMB · S'actualitzen cada 2 min
         </p>
       </div>

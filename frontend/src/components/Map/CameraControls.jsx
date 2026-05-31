@@ -44,8 +44,8 @@ export default function CameraControls() {
           className="w-9 h-9 flex items-center justify-center rounded-full transition-all"
           style={{
             background: '#141414',
-            border: `1px solid ${bearingDeg !== 0 ? '#E8622A55' : '#262626'}`,
-            boxShadow: bearingDeg !== 0 ? '0 0 8px rgba(232,98,42,0.2)' : 'none',
+            border: `1px solid ${bearingDeg !== 0 ? '#B8885A55' : '#262626'}`,
+            boxShadow: bearingDeg !== 0 ? '0 0 8px rgba(184,136,90,0.2)' : 'none',
           }}
         >
           <svg

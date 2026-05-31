@@ -60,7 +60,7 @@ export default function NavigationHUD() {
         className="absolute bottom-6 left-1/2 -translate-x-1/2 z-50 w-[340px] max-w-[calc(100vw-32px)]"
       >
         <div className="overflow-hidden shadow-[0_4px_32px_rgba(0,0,0,0.6)]"
-          style={{ background: '#141414', border: '1px solid #262626', borderRadius: 8 }}
+          style={{ background: '#151210', border: '1px solid #2C2926', borderRadius: 8 }}
         >
           {/* Off-route warning */}
           <AnimatePresence>
@@ -84,7 +84,7 @@ export default function NavigationHUD() {
           <div className="px-4 py-3.5 flex items-center gap-3.5">
             <div
               className="w-12 h-12 rounded-lg flex items-center justify-center text-2xl flex-shrink-0"
-              style={{ background: '#1C1C1C', border: '1px solid #262626', color: '#E8622A' }}
+              style={{ background: '#211F1B', border: '1px solid #2C2926', color: '#B8885A' }}
             >
               {arrow}
             </div>
@@ -92,22 +92,22 @@ export default function NavigationHUD() {
             <div className="flex-1 min-w-0">
               {isLast ? (
                 <>
-                  <p className="font-syne text-[14px] font-semibold leading-snug" style={{ color: '#EBEBEB' }}>
+                  <p className="font-syne text-[14px] font-semibold leading-snug" style={{ color: '#F7F6F4' }}>
                     Has arribat al destí
                   </p>
                   {destination?.label && (
-                    <p className="font-mono text-[10px] mt-0.5 truncate" style={{ color: '#555' }}>
+                    <p className="font-mono text-[10px] mt-0.5 truncate" style={{ color: '#8C8884' }}>
                       {destination.label}
                     </p>
                   )}
                 </>
               ) : (
                 <>
-                  <p className="font-syne text-[14px] font-semibold leading-snug line-clamp-2" style={{ color: '#EBEBEB' }}>
+                  <p className="font-syne text-[14px] font-semibold leading-snug line-clamp-2" style={{ color: '#F7F6F4' }}>
                     {step?.instruction ?? 'Continua recte'}
                   </p>
                   {step?.distance > 0 && (
-                    <p className="font-mono text-[11px] mt-0.5" style={{ color: '#E8622A' }}>
+                    <p className="font-mono text-[11px] mt-0.5" style={{ color: '#B8885A' }}>
                       en {fmtDist(step.distance)}
                     </p>
                   )}
@@ -118,9 +118,9 @@ export default function NavigationHUD() {
             <button
               onClick={stopNavigation}
               className="w-8 h-8 rounded-md flex items-center justify-center transition-colors flex-shrink-0 text-lg"
-              style={{ background: '#1C1C1C', border: '1px solid #262626', color: '#555' }}
+              style={{ background: '#211F1B', border: '1px solid #2C2926', color: '#8C8884' }}
               onMouseEnter={e => { e.currentTarget.style.color = '#D45555' }}
-              onMouseLeave={e => { e.currentTarget.style.color = '#555' }}
+              onMouseLeave={e => { e.currentTarget.style.color = '#8C8884' }}
             >
               ×
             </button>
@@ -129,24 +129,24 @@ export default function NavigationHUD() {
           {/* Next step + total remaining */}
           {!isLast && (
             <div className="px-4 py-2.5 flex items-center justify-between gap-4"
-              style={{ borderTop: '1px solid #1A1A1A' }}
+              style={{ borderTop: '1px solid #201E1B' }}
             >
               <div className="flex items-center gap-2 min-w-0">
                 {next && (
                   <>
-                    <span className="font-mono text-[9px] uppercase tracking-[0.1em] flex-shrink-0" style={{ color: '#555' }}>
+                    <span className="font-mono text-[9px] uppercase tracking-[0.1em] flex-shrink-0" style={{ color: '#8C8884' }}>
                       després
                     </span>
-                    <span className="font-mono text-[10px] truncate" style={{ color: '#888' }}>
+                    <span className="font-mono text-[10px] truncate" style={{ color: '#B0ACA7' }}>
                       {next.instruction}
                     </span>
                   </>
                 )}
               </div>
               <div className="flex items-center gap-1.5 flex-shrink-0">
-                <span className="font-mono text-[10px]" style={{ color: '#555' }}>{fmtDist(totalLeft)}</span>
-                <span style={{ color: '#333' }}>·</span>
-                <span className="font-mono text-[10px]" style={{ color: '#555' }}>
+                <span className="font-mono text-[10px]" style={{ color: '#8C8884' }}>{fmtDist(totalLeft)}</span>
+                <span style={{ color: '#6B6865' }}>·</span>
+                <span className="font-mono text-[10px]" style={{ color: '#8C8884' }}>
                   {fmtTime(steps.slice(currentStepIndex).reduce((a, s) => a + (s.duration ?? 0), 0))}
                 </span>
               </div>

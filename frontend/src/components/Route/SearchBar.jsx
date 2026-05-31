@@ -348,7 +348,7 @@ function ModeCard({ mode, state, isActive, onClick, metroLines }) {
   const inefficient  = data?.inefficient === true
   const inefficientReason = data?.inefficient_reason
 
-  const accentColor = isActive && !inefficient ? color : inefficient ? '#333' : '#262626'
+  const accentColor = isActive && !inefficient ? color : inefficient ? '#6B6865' : '#2C2926'
 
   return (
     <motion.button
@@ -358,8 +358,8 @@ function ModeCard({ mode, state, isActive, onClick, metroLines }) {
       className="w-full text-left overflow-hidden flex transition-all"
       style={{
         borderRadius: 6,
-        border: `1px solid ${isActive && !inefficient ? color + '55' : '#262626'}`,
-        background: isActive && !inefficient ? '#1C1C1C' : inefficient ? '#111' : '#1A1A1A',
+        border: `1px solid ${isActive && !inefficient ? color + '55' : '#2C2926'}`,
+        background: isActive && !inefficient ? '#211F1B' : inefficient ? '#111' : '#201E1B',
         opacity: inefficient ? 0.55 : 1,
       }}
     >
@@ -370,8 +370,8 @@ function ModeCard({ mode, state, isActive, onClick, metroLines }) {
         <span
           className="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0"
           style={{
-            color:      inefficient ? '#444' : color,
-            background: '#262626',
+            color:      inefficient ? '#7D7975' : color,
+            background: '#2C2926',
           }}
         >
           <ModeIcon size={18} />
@@ -380,19 +380,19 @@ function ModeCard({ mode, state, isActive, onClick, metroLines }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
             <span className="font-mono text-[10px] uppercase tracking-[0.1em]"
-                  style={{ color: inefficient ? '#444' : isActive ? color : '#888' }}>
+                  style={{ color: inefficient ? '#7D7975' : isActive ? color : '#B0ACA7' }}>
               {t(`modes.${mode.id}`)}
             </span>
 
             <div className="flex items-center gap-2">
               {mode.isRecommended && (
                 <span className="font-mono text-[8px] uppercase tracking-[0.08em] px-1.5 py-0.5"
-                  style={{ background: '#E8622A', color: '#fff', borderRadius: 3 }}>
+                  style={{ background: '#B8885A', color: '#fff', borderRadius: 3 }}>
                   IA
                 </span>
               )}
               {data && !inefficient && (
-                <span className="font-syne text-[13px] font-semibold" style={{ color: isActive ? color : '#EBEBEB' }}>
+                <span className="font-syne text-[13px] font-semibold" style={{ color: isActive ? color : '#F7F6F4' }}>
                   {fmtTime(data.duration)}
                 </span>
               )}
@@ -409,7 +409,7 @@ function ModeCard({ mode, state, isActive, onClick, metroLines }) {
                   ))}
                 </span>
               )}
-              {failed && <span className="font-mono text-[9px]" style={{ color: '#555' }}>No disponible</span>}
+              {failed && <span className="font-mono text-[9px]" style={{ color: '#8C8884' }}>No disponible</span>}
             </div>
           </div>
 
@@ -419,10 +419,10 @@ function ModeCard({ mode, state, isActive, onClick, metroLines }) {
             </div>
           )}
           {data && inefficient && inefficientReason && (
-            <p className="mt-0.5 font-mono text-[10px]" style={{ color: '#555' }}>{inefficientReason}</p>
+            <p className="mt-0.5 font-mono text-[10px]" style={{ color: '#8C8884' }}>{inefficientReason}</p>
           )}
           {data && !inefficient && (
-            <div className="mt-1 flex items-center gap-2 font-mono text-[10px]" style={{ color: '#555' }}>
+            <div className="mt-1 flex items-center gap-2 font-mono text-[10px]" style={{ color: '#8C8884' }}>
               {data.distance != null && <span>{fmtDist(data.distance)}</span>}
               {trafficNote && (
                 <span className="font-mono text-[9px] px-1.5 py-0.5" style={{ color: trafficColor, background: trafficColor + '18', borderRadius: 3 }}>
@@ -615,14 +615,14 @@ function StepNodeMetro({ name, lineNames, lineColors, stationId, direction }) {
 
 function StepNodeTransfer({ name, fromLine, fromColor, toLine, toColor, toDirection, stationId }) {
   const { t } = useTranslation()
-  const toClr = toColor ?? '#888'
+  const toClr = toColor ?? '#B0ACA7'
   return (
     <div className="flex items-start gap-2.5">
       <span className="w-[22px] flex justify-center flex-shrink-0 mt-0.5">
         <span className="flex items-center gap-0.5">
           <span
             className="inline-flex items-center justify-center min-w-[18px] h-[15px] px-1 rounded text-[8px] font-mono font-bold text-white"
-            style={{ background: fromColor ?? '#888', boxShadow: `0 0 4px ${fromColor ?? '#888'}88` }}
+            style={{ background: fromColor ?? '#B0ACA7', boxShadow: `0 0 4px ${fromColor ?? '#B0ACA7'}88` }}
           >
             {fromLine ?? 'M'}
           </span>
@@ -706,25 +706,25 @@ function NumberedSteps({ steps, currentStep }) {
         const isCurrent = i === currentStep
         return (
           <div key={i} className="flex items-start gap-2.5 py-1.5"
-            style={{ borderBottom: i < steps.length - 1 ? '1px solid #1A1A1A' : 'none' }}>
+            style={{ borderBottom: i < steps.length - 1 ? '1px solid #201E1B' : 'none' }}>
             {/* Step number badge */}
             <span
               className="w-5 h-5 rounded flex items-center justify-center font-mono text-[9px] font-semibold flex-shrink-0 mt-0.5"
               style={{
-                background: isCurrent ? '#E8622A' : '#1C1C1C',
-                border: `1px solid ${isCurrent ? '#E8622A' : '#262626'}`,
-                color: isCurrent ? '#fff' : '#555',
+                background: isCurrent ? '#B8885A' : '#211F1B',
+                border: `1px solid ${isCurrent ? '#B8885A' : '#2C2926'}`,
+                color: isCurrent ? '#fff' : '#8C8884',
               }}
             >
               {i + 1}
             </span>
             <div className="flex-1 min-w-0">
               <p className="font-mono text-[11px] leading-snug"
-                style={{ color: isCurrent ? '#EBEBEB' : '#888' }}>
+                style={{ color: isCurrent ? '#F7F6F4' : '#B0ACA7' }}>
                 {step.instruction}
               </p>
               {step.distance > 0 && (
-                <p className="font-mono text-[9px] mt-0.5" style={{ color: '#555' }}>
+                <p className="font-mono text-[9px] mt-0.5" style={{ color: '#8C8884' }}>
                   {fmtDist(step.distance)}
                 </p>
               )}
@@ -792,17 +792,17 @@ function RouteStepPanel({ segments, origin, destination, mode }) {
 
   return (
     <div className="mx-3 mb-3 mt-1 overflow-hidden"
-      style={{ borderRadius: 6, border: '1px solid #262626', background: '#1A1A1A' }}>
+      style={{ borderRadius: 6, border: '1px solid #2C2926', background: '#201E1B' }}>
 
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2"
-        style={{ borderBottom: '1px solid #262626' }}>
+        style={{ borderBottom: '1px solid #2C2926' }}>
         <div className="flex items-center gap-2">
-          <p className="font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color: '#555' }}>
+          <p className="font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color: '#8C8884' }}>
             {isSimpleRoute && allSteps.length > 0 ? t('search.steps') : t('search.stepByStep')}
           </p>
           {isSimpleRoute && totalSteps > 0 && (
-            <span className="font-mono text-[9px]" style={{ color: '#555' }}>
+            <span className="font-mono text-[9px]" style={{ color: '#8C8884' }}>
               {isNavigating
                 ? t('search.stepOf', { current: currentStepIndex + 1, total: totalSteps })
                 : t('search.steps_count', { count: totalSteps })}
@@ -815,8 +815,8 @@ function RouteStepPanel({ segments, origin, destination, mode }) {
             className="flex items-center gap-1.5 px-2.5 py-1 font-syne text-[10px] font-semibold transition-all"
             style={{
               borderRadius: 5,
-              background: isNavigating ? '#D4555518' : '#E8622A',
-              border: `1px solid ${isNavigating ? '#D4555544' : '#E8622A'}`,
+              background: isNavigating ? '#D4555518' : '#B8885A',
+              border: `1px solid ${isNavigating ? '#D4555544' : '#B8885A'}`,
               color: isNavigating ? '#D45555' : '#fff',
             }}
           >
@@ -932,9 +932,9 @@ function SaveRouteButton({ originPoint, destPoint, mode }) {
       className="w-10 flex items-center justify-center transition-all flex-shrink-0"
       style={{
         borderRadius: 6,
-        background: saved ? '#E8622A1A' : '#1C1C1C',
-        border: `1px solid ${saved ? '#E8622A' : '#262626'}`,
-        color: saved ? '#E8622A' : '#555',
+        background: saved ? '#B8885A1A' : '#211F1B',
+        border: `1px solid ${saved ? '#B8885A' : '#2C2926'}`,
+        color: saved ? '#B8885A' : '#8C8884',
       }}
     >
       {saved ? (
@@ -1248,25 +1248,25 @@ export default function SearchBar({ embedded = false }) {
     // Uses flex-column layout: fixed PointFields header + scrollable body + sticky CTA footer.
     const optionsDropdownJSX = (
       <div className="shadow-[0_8px_40px_rgba(0,0,0,0.7)]"
-        style={{ background: '#141414', border: '1px solid #262626', borderRadius: 8,
+        style={{ background: '#151210', border: '1px solid #2C2926', borderRadius: 8,
                  maxHeight: 'calc(100dvh - 80px)', display: 'flex', flexDirection: 'column' }}
       >
         {/* ── HEADER: PointFields — always visible, suggestions can overflow below ── */}
         <div className="px-3 pt-3 pb-2 flex flex-col gap-2"
-          style={{ borderBottom: '1px solid #1A1A1A', flexShrink: 0,
-                   position: 'relative', zIndex: 5, background: '#141414' }}
+          style={{ borderBottom: '1px solid #201E1B', flexShrink: 0,
+                   position: 'relative', zIndex: 5, background: '#151210' }}
         >
           <PointField value={originQuery} onChange={v => { setOriginQuery(v); if (!v) setOriginPoint(null) }}
             onPickSuggestion={handlePickOriginSuggestion} onMyLocation={handleMyLocationOrigin}
             placeholder={t('search.origin')} dot="#00b4ff"
           />
           <div className="flex items-center gap-2 px-1">
-            <div className="flex-1 h-px" style={{ background: '#262626' }} />
-            <button onClick={handleSwap} title={t('search.swap')} className="transition-colors" style={{ color: '#555' }}
-              onMouseEnter={e => { e.currentTarget.style.color = '#EBEBEB' }}
-              onMouseLeave={e => { e.currentTarget.style.color = '#555' }}
+            <div className="flex-1 h-px" style={{ background: '#2C2926' }} />
+            <button onClick={handleSwap} title={t('search.swap')} className="transition-colors" style={{ color: '#8C8884' }}
+              onMouseEnter={e => { e.currentTarget.style.color = '#F7F6F4' }}
+              onMouseLeave={e => { e.currentTarget.style.color = '#8C8884' }}
             ><Icon.swap size={14} /></button>
-            <div className="flex-1 h-px" style={{ background: '#262626' }} />
+            <div className="flex-1 h-px" style={{ background: '#2C2926' }} />
           </div>
           <PointField value={destQuery} onChange={v => { setDestQuery(v); if (!v) setDestPoint(null) }}
             onPickSuggestion={handlePickDestSuggestionInOptions}
@@ -1292,9 +1292,9 @@ export default function SearchBar({ embedded = false }) {
               <button
                 onClick={() => computePreviews(originPoint, destPoint)}
                 className="w-full flex items-center justify-center gap-2 py-2 mt-1 font-mono text-[10px] uppercase tracking-[0.08em] transition-colors"
-                style={{ borderRadius: 6, border: '1px solid #333', color: '#888', background: 'transparent' }}
-                onMouseEnter={e => { e.currentTarget.style.color = '#EBEBEB'; e.currentTarget.style.borderColor = '#555' }}
-                onMouseLeave={e => { e.currentTarget.style.color = '#888'; e.currentTarget.style.borderColor = '#333' }}
+                style={{ borderRadius: 6, border: '1px solid #2C2926', color: '#B0ACA7', background: 'transparent' }}
+                onMouseEnter={e => { e.currentTarget.style.color = '#F7F6F4'; e.currentTarget.style.borderColor = '#8C8884' }}
+                onMouseLeave={e => { e.currentTarget.style.color = '#B0ACA7'; e.currentTarget.style.borderColor = '#6B6865' }}
               >
                 <svg width="11" height="11" viewBox="0 0 16 16" fill="none">
                   <path d="M13.5 8A5.5 5.5 0 1 1 8 2.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
@@ -1311,9 +1311,9 @@ export default function SearchBar({ embedded = false }) {
           {/* Loading */}
           {isLoading && (
             <div className="px-3 pb-3">
-              <div className="flex items-center gap-2 px-3 py-2" style={{ borderRadius: 6, background: '#1C1C1C' }}>
-                {[0, 150, 300].map(d => <span key={d} className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: '#E8622A', animationDelay: `${d}ms` }} />)}
-                <span className="font-mono text-[10px] uppercase tracking-[0.1em] ml-1" style={{ color: '#555' }}>{t('search.calculating')}</span>
+              <div className="flex items-center gap-2 px-3 py-2" style={{ borderRadius: 6, background: '#211F1B' }}>
+                {[0, 150, 300].map(d => <span key={d} className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: '#B8885A', animationDelay: `${d}ms` }} />)}
+                <span className="font-mono text-[10px] uppercase tracking-[0.1em] ml-1" style={{ color: '#8C8884' }}>{t('search.calculating')}</span>
               </div>
             </div>
           )}
@@ -1322,11 +1322,11 @@ export default function SearchBar({ embedded = false }) {
         {/* ── FOOTER: CTA — always visible at bottom ── */}
         {route?.segments?.length > 0 && !isLoading && (
           <div className="px-3 py-2.5 flex gap-2"
-            style={{ flexShrink: 0, borderTop: '1px solid #1A1A1A' }}
+            style={{ flexShrink: 0, borderTop: '1px solid #201E1B' }}
           >
             <button onClick={() => setPhase('pill')}
               className="flex-1 px-3 py-2.5 font-syne text-[12px] font-semibold"
-              style={{ borderRadius: 6, color: '#fff', background: '#E8622A', border: '1px solid #E8622A' }}
+              style={{ borderRadius: 6, color: '#fff', background: '#B8885A', border: '1px solid #B8885A' }}
             >Veure al mapa →</button>
             <SaveRouteButton originPoint={originPoint} destPoint={destPoint} mode={mode} />
           </div>
@@ -1335,8 +1335,8 @@ export default function SearchBar({ embedded = false }) {
     )
 
     const pillCard = {
-      background:   '#141414',
-      border:       '1px solid #262626',
+      background:   '#151210',
+      border:       '1px solid #2C2926',
       borderRadius: 8,
       boxShadow:    '0 2px 16px rgba(0,0,0,0.55)',
     }
@@ -1353,7 +1353,7 @@ export default function SearchBar({ embedded = false }) {
               {showActiveInPill ? (
                 <>
                   <span className="w-2 h-2 rounded-full animate-pulse flex-shrink-0" style={{ background: activeModeMeta.color }} />
-                  <span className="font-syne text-[13px] font-medium truncate flex-1 text-left" style={{ color: '#EBEBEB' }}>
+                  <span className="font-syne text-[13px] font-medium truncate flex-1 text-left" style={{ color: '#F7F6F4' }}>
                     {destPoint?.label ?? destination?.label ?? 'Destí'}
                   </span>
                   <span className="font-syne text-[13px] font-semibold flex-shrink-0" style={{ color: activeModeMeta.color }}>
@@ -1362,17 +1362,17 @@ export default function SearchBar({ embedded = false }) {
                 </>
               ) : (
                 <>
-                  <Icon.search size={14} style={{ color: '#444', flexShrink: 0 }} />
-                  <span className="font-syne text-[13px]" style={{ color: '#555' }}>{t('search.placeholder')}</span>
+                  <Icon.search size={14} style={{ color: '#7D7975', flexShrink: 0 }} />
+                  <span className="font-syne text-[13px]" style={{ color: '#8C8884' }}>{t('search.placeholder')}</span>
                 </>
               )}
             </button>
             {showActiveInPill && (
               <>
-                <div className="w-px h-5 flex-shrink-0" style={{ background: '#262626' }} />
+                <div className="w-px h-5 flex-shrink-0" style={{ background: '#2C2926' }} />
                 <button onClick={shareRoute} title="Copiar enllaç"
                   className="w-8 h-8 flex items-center justify-center rounded-md transition-all flex-shrink-0"
-                  style={{ color: shareToast ? '#E8622A' : '#555', background: shareToast ? '#E8622A1A' : 'transparent' }}
+                  style={{ color: shareToast ? '#B8885A' : '#8C8884', background: shareToast ? '#B8885A1A' : 'transparent' }}
                 >
                   <svg width="12" height="12" viewBox="0 0 16 16" fill="none">{shareIconContent}</svg>
                 </button>
@@ -1385,15 +1385,15 @@ export default function SearchBar({ embedded = false }) {
         {phase === 'search' && (
           <>
             <div className="flex items-center gap-2.5 px-3 h-11" style={{ ...pillCard, width: 440 }}>
-              <button onClick={exitToPill} className="flex items-center justify-center flex-shrink-0 transition-colors" style={{ color: '#555' }}
-                onMouseEnter={e => { e.currentTarget.style.color = '#EBEBEB' }} onMouseLeave={e => { e.currentTarget.style.color = '#555' }}
+              <button onClick={exitToPill} className="flex items-center justify-center flex-shrink-0 transition-colors" style={{ color: '#8C8884' }}
+                onMouseEnter={e => { e.currentTarget.style.color = '#F7F6F4' }} onMouseLeave={e => { e.currentTarget.style.color = '#8C8884' }}
               ><Icon.back size={14} /></button>
-              <div className="w-px h-5 flex-shrink-0" style={{ background: '#262626' }} />
-              <Icon.search size={13} style={{ color: '#444', flexShrink: 0 }} />
+              <div className="w-px h-5 flex-shrink-0" style={{ background: '#2C2926' }} />
+              <Icon.search size={13} style={{ color: '#7D7975', flexShrink: 0 }} />
               <input
                 ref={destInputRef}
                 className="flex-1 bg-transparent outline-none font-syne text-[13px] min-w-0"
-                style={{ color: '#EBEBEB' }}
+                style={{ color: '#F7F6F4' }}
                 placeholder={t('search.placeholder')}
                 value={destQuery}
                 onChange={e => setDestQuery(e.target.value)}
@@ -1403,7 +1403,7 @@ export default function SearchBar({ embedded = false }) {
                 }}
               />
               {destQuery && (
-                <button onMouseDown={e => { e.preventDefault(); setDestQuery('') }} style={{ color: '#555', flexShrink: 0 }}>
+                <button onMouseDown={e => { e.preventDefault(); setDestQuery('') }} style={{ color: '#8C8884', flexShrink: 0 }}>
                   <Icon.close size={11} />
                 </button>
               )}
@@ -1411,7 +1411,7 @@ export default function SearchBar({ embedded = false }) {
             {/* Suggestions dropdown */}
             {(destLoading || destSugg.length > 0) && (
               <div style={{ ...dropdownStyle, width: 440, maxWidth: '92vw' }}>
-                <div style={{ background: '#141414', border: '1px solid #262626', borderRadius: 8, overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,0.7)' }}>
+                <div style={{ background: '#151210', border: '1px solid #2C2926', borderRadius: 8, overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,0.7)' }}>
                   <SuggestionList items={destSugg} loading={destLoading} query={destQuery} onPick={handlePickDestination} />
                 </div>
               </div>
@@ -1423,14 +1423,14 @@ export default function SearchBar({ embedded = false }) {
         {phase === 'options' && (
           <>
             <div className="flex items-center gap-2.5 px-3 h-11"
-              style={{ ...pillCard, width: 440, borderColor: showActiveInPill ? activeModeMeta.color + '55' : '#262626' }}
+              style={{ ...pillCard, width: 440, borderColor: showActiveInPill ? activeModeMeta.color + '55' : '#2C2926' }}
             >
-              <button onClick={() => setPhase('search')} className="flex items-center justify-center flex-shrink-0 transition-colors" style={{ color: '#555' }}
-                onMouseEnter={e => { e.currentTarget.style.color = '#EBEBEB' }} onMouseLeave={e => { e.currentTarget.style.color = '#555' }}
+              <button onClick={() => setPhase('search')} className="flex items-center justify-center flex-shrink-0 transition-colors" style={{ color: '#8C8884' }}
+                onMouseEnter={e => { e.currentTarget.style.color = '#F7F6F4' }} onMouseLeave={e => { e.currentTarget.style.color = '#8C8884' }}
               ><Icon.back size={14} /></button>
-              <div className="w-px h-5 flex-shrink-0" style={{ background: '#262626' }} />
+              <div className="w-px h-5 flex-shrink-0" style={{ background: '#2C2926' }} />
               <div className="flex-1 min-w-0">
-                <p className="font-syne text-[13px] font-medium truncate" style={{ color: '#EBEBEB' }}>{destPoint?.label ?? '—'}</p>
+                <p className="font-syne text-[13px] font-medium truncate" style={{ color: '#F7F6F4' }}>{destPoint?.label ?? '—'}</p>
                 {showActiveInPill && (
                   <p className="font-mono text-[9px] leading-none mt-0.5" style={{ color: activeModeMeta.color }}>
                     {activeModeMeta.label} · {fmtTime(route.duration)}
@@ -1439,12 +1439,12 @@ export default function SearchBar({ embedded = false }) {
               </div>
               <button onClick={shareRoute} title="Copiar enllaç"
                 className="w-8 h-8 flex items-center justify-center flex-shrink-0 rounded-md transition-colors"
-                style={{ color: shareToast ? '#E8622A' : '#555', background: shareToast ? '#E8622A1A' : 'transparent' }}
+                style={{ color: shareToast ? '#B8885A' : '#8C8884', background: shareToast ? '#B8885A1A' : 'transparent' }}
               >
                 <svg width="11" height="11" viewBox="0 0 16 16" fill="none">{shareIconContent}</svg>
               </button>
-              <button onClick={exitToPill} className="w-8 h-8 flex items-center justify-center flex-shrink-0 transition-colors rounded-md" style={{ color: '#555' }}
-                onMouseEnter={e => { e.currentTarget.style.color = '#EBEBEB' }} onMouseLeave={e => { e.currentTarget.style.color = '#555' }}
+              <button onClick={exitToPill} className="w-8 h-8 flex items-center justify-center flex-shrink-0 transition-colors rounded-md" style={{ color: '#8C8884' }}
+                onMouseEnter={e => { e.currentTarget.style.color = '#F7F6F4' }} onMouseLeave={e => { e.currentTarget.style.color = '#8C8884' }}
               ><Icon.close size={11} /></button>
             </div>
             {/* Options dropdown */}
@@ -1477,8 +1477,8 @@ export default function SearchBar({ embedded = false }) {
               onClick={showActiveInPill ? () => setPhase('options') : enterSearch}
               className="flex items-center gap-2.5 px-4 py-2.5 transition-all"
               style={{
-                background: '#141414',
-                border: `1px solid ${showActiveInPill ? activeModeMeta.color + '66' : '#262626'}`,
+                background: '#151210',
+                border: `1px solid ${showActiveInPill ? activeModeMeta.color + '66' : '#2C2926'}`,
                 borderRadius: 8,
                 boxShadow: '0 2px 16px rgba(0,0,0,0.4)',
               }}
@@ -1486,18 +1486,18 @@ export default function SearchBar({ embedded = false }) {
               {showActiveInPill ? (
                 <>
                   <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: activeModeMeta.color }} />
-                  <span className="font-syne text-[12px] font-medium truncate max-w-[180px]" style={{ color: '#EBEBEB' }}>
+                  <span className="font-syne text-[12px] font-medium truncate max-w-[180px]" style={{ color: '#F7F6F4' }}>
                     {destPoint?.label ?? destination?.label ?? 'Destí'}
                   </span>
-                  <span className="font-mono text-[10px]" style={{ color: '#333' }}>·</span>
+                  <span className="font-mono text-[10px]" style={{ color: '#6B6865' }}>·</span>
                   <span className="font-syne text-[13px] font-semibold" style={{ color: activeModeMeta.color }}>
                     {fmtTime(route.duration)}
                   </span>
                 </>
               ) : (
                 <>
-                  <span style={{ color: '#555' }}><Icon.search /></span>
-                  <span className="font-syne text-[12px]" style={{ color: '#888' }}>{t('search.placeholder')}</span>
+                  <span style={{ color: '#8C8884' }}><Icon.search /></span>
+                  <span className="font-syne text-[12px]" style={{ color: '#B0ACA7' }}>{t('search.placeholder')}</span>
                 </>
               )}
             </button>
@@ -1509,10 +1509,10 @@ export default function SearchBar({ embedded = false }) {
                 title="Copiar enlace"
                 className="w-9 h-9 flex items-center justify-center transition-all"
                 style={{
-                  background: shareToast ? '#E8622A1A' : '#141414',
-                  border: `1px solid ${shareToast ? '#E8622A' : '#262626'}`,
+                  background: shareToast ? '#B8885A1A' : '#151210',
+                  border: `1px solid ${shareToast ? '#B8885A' : '#2C2926'}`,
                   borderRadius: 8,
-                  color: shareToast ? '#E8622A' : '#555',
+                  color: shareToast ? '#B8885A' : '#8C8884',
                 }}
               >
                 {shareToast ? (
@@ -1546,24 +1546,24 @@ export default function SearchBar({ embedded = false }) {
             className="absolute top-4 -translate-x-1/2 z-40 w-[420px] max-w-[92vw]"
             style={{ left: centeredLeft }}
           >
-            <div className="p-3" style={{ background: '#141414', border: '1px solid #262626', borderRadius: 8, boxShadow: '0 4px 24px rgba(0,0,0,0.5)' }}>
+            <div className="p-3" style={{ background: '#151210', border: '1px solid #2C2926', borderRadius: 8, boxShadow: '0 4px 24px rgba(0,0,0,0.5)' }}>
               <div className="flex items-center gap-2">
                 <button
                   onClick={exitToPill}
                   title="Cerrar"
                   className="w-8 h-8 flex items-center justify-center transition-colors flex-shrink-0"
-                  style={{ borderRadius: 6, background: '#1C1C1C', border: '1px solid #262626', color: '#555' }}
+                  style={{ borderRadius: 6, background: '#211F1B', border: '1px solid #2C2926', color: '#8C8884' }}
                 >
                   <Icon.close />
                 </button>
                 <div className="flex items-center gap-2 flex-1 px-3 py-2 transition-colors"
-                  style={{ borderRadius: 6, background: '#1C1C1C', border: '1px solid #262626' }}
+                  style={{ borderRadius: 6, background: '#211F1B', border: '1px solid #2C2926' }}
                 >
-                  <span style={{ color: '#555' }}><Icon.search /></span>
+                  <span style={{ color: '#8C8884' }}><Icon.search /></span>
                   <input
                     ref={destInputRef}
                     className="flex-1 bg-transparent outline-none min-w-0 font-mono text-[13px]"
-                    style={{ color: '#EBEBEB' }}
+                    style={{ color: '#F7F6F4' }}
                     placeholder={t('search.placeholder')}
                     value={destQuery}
                     onChange={e => setDestQuery(e.target.value)}
@@ -1592,7 +1592,7 @@ export default function SearchBar({ embedded = false }) {
               />
 
               {!destQuery && (
-                <div className="mt-3 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.1em]" style={{ color: '#555' }}>
+                <div className="mt-3 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.1em]" style={{ color: '#8C8884' }}>
                   Escriu una adreça, restaurant o lloc de Barcelona
                 </div>
               )}
@@ -1614,37 +1614,37 @@ export default function SearchBar({ embedded = false }) {
             style={{ left: centeredLeft }}
           >
             <div className="shadow-[0_4px_24px_rgba(0,0,0,0.5)]"
-              style={{ background: '#141414', border: '1px solid #262626', borderRadius: 8,
+              style={{ background: '#151210', border: '1px solid #2C2926', borderRadius: 8,
                        maxHeight: 'calc(100dvh - 80px)', display: 'flex', flexDirection: 'column' }}
             >
               {/* ── HEADER: fixed — back/close + PointFields, suggestions overflow below ── */}
-              <div style={{ flexShrink: 0, position: 'relative', zIndex: 5, background: '#141414' }}>
+              <div style={{ flexShrink: 0, position: 'relative', zIndex: 5, background: '#151210' }}>
                 {/* Destination label row */}
-                <div className="flex items-center gap-2 px-3 py-2.5" style={{ borderBottom: '1px solid #262626' }}>
+                <div className="flex items-center gap-2 px-3 py-2.5" style={{ borderBottom: '1px solid #2C2926' }}>
                   <button
                     onClick={() => setPhase('search')}
                     title="Volver a la búsqueda"
                     className="w-7 h-7 flex items-center justify-center transition-colors flex-shrink-0"
-                    style={{ borderRadius: 6, color: '#555' }}
+                    style={{ borderRadius: 6, color: '#8C8884' }}
                   >
                     <Icon.back />
                   </button>
                   <div className="flex-1 min-w-0">
-                    <p className="font-mono text-[8px] uppercase tracking-[0.14em]" style={{ color: '#555' }}>Destí</p>
-                    <p className="font-syne text-[13px] font-medium truncate" style={{ color: '#EBEBEB' }}>{destPoint?.label ?? '—'}</p>
+                    <p className="font-mono text-[8px] uppercase tracking-[0.14em]" style={{ color: '#8C8884' }}>Destí</p>
+                    <p className="font-syne text-[13px] font-medium truncate" style={{ color: '#F7F6F4' }}>{destPoint?.label ?? '—'}</p>
                   </div>
                   <button
                     onClick={exitToPill}
                     title="Cerrar"
                     className="w-7 h-7 flex items-center justify-center transition-colors flex-shrink-0"
-                    style={{ borderRadius: 6, color: '#555' }}
+                    style={{ borderRadius: 6, color: '#8C8884' }}
                   >
                     <Icon.close />
                   </button>
                 </div>
 
                 {/* Inputs origen / destino editables + swap */}
-                <div className="px-3 pt-3 pb-2 flex flex-col gap-2" style={{ borderBottom: '1px solid #1A1A1A' }}>
+                <div className="px-3 pt-3 pb-2 flex flex-col gap-2" style={{ borderBottom: '1px solid #201E1B' }}>
                   <PointField
                     value={originQuery}
                     onChange={(v) => {
@@ -1701,9 +1701,9 @@ export default function SearchBar({ embedded = false }) {
                     <button
                       onClick={() => computePreviews(originPoint, destPoint)}
                       className="w-full flex items-center justify-center gap-2 py-2 mt-1 font-mono text-[10px] uppercase tracking-[0.08em] transition-colors"
-                      style={{ borderRadius: 6, border: '1px solid #333', color: '#888', background: 'transparent' }}
-                      onMouseEnter={e => { e.currentTarget.style.color = '#EBEBEB'; e.currentTarget.style.borderColor = '#555' }}
-                      onMouseLeave={e => { e.currentTarget.style.color = '#888'; e.currentTarget.style.borderColor = '#333' }}
+                      style={{ borderRadius: 6, border: '1px solid #2C2926', color: '#B0ACA7', background: 'transparent' }}
+                      onMouseEnter={e => { e.currentTarget.style.color = '#F7F6F4'; e.currentTarget.style.borderColor = '#8C8884' }}
+                      onMouseLeave={e => { e.currentTarget.style.color = '#B0ACA7'; e.currentTarget.style.borderColor = '#6B6865' }}
                     >
                       <svg width="11" height="11" viewBox="0 0 16 16" fill="none">
                         <path d="M13.5 8A5.5 5.5 0 1 1 8 2.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
@@ -1727,11 +1727,11 @@ export default function SearchBar({ embedded = false }) {
                 {/* Estado calculando */}
                 {isLoading && (
                   <div className="px-3 pb-3">
-                    <div className="flex items-center gap-2 px-3 py-2" style={{ borderRadius: 6, background: '#1C1C1C' }}>
+                    <div className="flex items-center gap-2 px-3 py-2" style={{ borderRadius: 6, background: '#211F1B' }}>
                       {[0, 150, 300].map(d => (
-                        <span key={d} className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: '#E8622A', animationDelay: `${d}ms` }} />
+                        <span key={d} className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: '#B8885A', animationDelay: `${d}ms` }} />
                       ))}
-                      <span className="font-mono text-[10px] uppercase tracking-[0.1em] ml-1" style={{ color: '#555' }}>{t('search.calculating')}</span>
+                      <span className="font-mono text-[10px] uppercase tracking-[0.1em] ml-1" style={{ color: '#8C8884' }}>{t('search.calculating')}</span>
                     </div>
                   </div>
                 )}
@@ -1740,7 +1740,7 @@ export default function SearchBar({ embedded = false }) {
               {/* ── FOOTER: CTA — always visible at bottom ── */}
               {route?.segments?.length > 0 && !isLoading && (
                 <div className="px-3 py-2.5 flex gap-2"
-                  style={{ flexShrink: 0, borderTop: '1px solid #1A1A1A' }}
+                  style={{ flexShrink: 0, borderTop: '1px solid #201E1B' }}
                 >
                   <button
                     onClick={() => { setPhase('pill') }}
@@ -1748,8 +1748,8 @@ export default function SearchBar({ embedded = false }) {
                     style={{
                       borderRadius: 6,
                       color: '#fff',
-                      background: '#E8622A',
-                      border: '1px solid #E8622A',
+                      background: '#B8885A',
+                      border: '1px solid #B8885A',
                     }}
                   >
                     Veure al mapa →
