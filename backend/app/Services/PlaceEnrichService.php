@@ -36,6 +36,12 @@ class PlaceEnrichService
     // Categorías que se benefician de Wikimedia Commons
     private const VISUAL_CATEGORIES = ['museum', 'monument', 'attraction', 'hotel', 'hospital'];
 
+    // POIs comerciales: Wikipedia casi nunca tiene artículo → omitir búsqueda
+    private const SKIP_WIKI_CATEGORIES = [
+        'restaurant', 'cafe', 'bar', 'bakery', 'supermarket',
+        'pharmacy', 'bank', 'butcher', 'hairdresser', 'shop',
+    ];
+
     public function enrich(string $name, float $lat, float $lng, string $category = ''): ?array
     {
         $cacheKey = 'enrich:v3:' . md5($name . round($lat, 4) . round($lng, 4));
@@ -61,7 +67,11 @@ class PlaceEnrichService
         $useOtm     = $otmKey && $otmKey !== 'opentripmap';
 
         // ── 1. Buscar título Wikipedia ───────────────────────────────────────
-        $wikiTitle = $this->searchWikiTitle($name, $lat, $lng);
+        // Skip Wikipedia for commercial POIs — almost never have articles,
+        // and search often returns unrelated nearby landmarks.
+        $wikiTitle = in_array($category, self::SKIP_WIKI_CATEGORIES, true)
+            ? null
+            : $this->searchWikiTitle($name, $lat, $lng);
 
         // ── 2. Lanzar llamadas en paralelo ───────────────────────────────────
         $poolRequests = [];
@@ -267,7 +277,7 @@ class PlaceEnrichService
     private function runWikiSearch(string $query, string $originalName): ?string
     {
         try {
-            $response = Http::timeout(6)
+            $response = Http::timeout(4)
                 ->withHeaders(['User-Agent' => 'BcnMap/1.0 (personal project)'])
                 ->get(sprintf(self::WIKI_SEARCH_URL, 'es'), [
                     'action'   => 'query',
@@ -307,15 +317,22 @@ class PlaceEnrichService
 
                 // El título normalizado contiene el nombre buscado (o viceversa)
                 if (str_contains($titleNorm, $nameNormLower) || str_contains($nameNormLower, $titleNorm)) {
-                    $score += 4;
+                    $score += 5;
                 }
 
-                // Coincidencia parcial: alguna palabra del nombre aparece en el título
-                foreach (explode(' ', $nameNormLower) as $word) {
-                    if (mb_strlen($word) > 3 && str_contains($titleNorm, $word)) {
-                        $score += 1;
+                // Coincidencia parcial: alguna palabra significativa del nombre aparece en el título
+                $nameWords = array_filter(explode(' ', $nameNormLower), fn($w) => mb_strlen($w) > 3);
+                $sharedWords = 0;
+                foreach ($nameWords as $word) {
+                    if (str_contains($titleNorm, $word)) {
+                        $score += 2;
+                        $sharedWords++;
                     }
                 }
+
+                // FILTRO ESTRICTO: si el nombre tiene palabras significativas, el título
+                // debe compartir al menos una para ser candidato (evita artículos no relacionados)
+                if (!empty($nameWords) && $sharedWords === 0 && $score < 5) continue;
 
                 // El snippet menciona Barcelona
                 if (str_contains($snippet, 'barcelona')) $score += 2;
@@ -330,7 +347,7 @@ class PlaceEnrichService
                     }
                 }
 
-                if ($score > 0) {
+                if ($score >= 4) {
                     $candidates[] = ['title' => $title, 'score' => $score];
                 }
             }
@@ -338,6 +355,10 @@ class PlaceEnrichService
             if (empty($candidates)) return null;
 
             usort($candidates, fn ($a, $b) => $b['score'] <=> $a['score']);
+
+            // Umbral mínimo: score insuficiente → no hay artículo fiable
+            if ($candidates[0]['score'] < 6) return null;
+
             return $candidates[0]['title'];
 
         } catch (\Throwable $e) {

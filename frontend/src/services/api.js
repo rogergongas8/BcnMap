@@ -21,7 +21,8 @@ export const fetchMetro             = () => api.get('/metro').then(r => r.data)
 export const fetchMetroLines        = () => api.get('/metro/lines').then(r => r.data)
 export const fetchMetroArrivals     = (stationId) => api.get(`/metro/${stationId}/arrivals`).then(r => r.data)
 export const fetchMetroDisruptions  = () => api.get('/metro/disruptions').then(r => r.data)
-export const fetchWeather    = () => api.get('/weather').then(r => r.data)
+export const fetchWeather         = (lang = 'es') => api.get('/weather', { params: { lang } }).then(r => r.data)
+export const fetchWeatherForecast = (lang = 'es') => api.get('/weather/forecast', { params: { lang } }).then(r => r.data)
 export const fetchAirQuality = () => api.get('/air-quality').then(r => r.data)
 export const sendChat = (message, history, userLocation = null, nearbyPois = []) =>
   api.post('/chat', {
@@ -58,7 +59,7 @@ export const fetchPoisNearby = (lat, lng, radius = 800, categories = []) =>
   }).then(r => r.data)
 
 export const fetchPlaceEnrich = (name, lat, lng, category = '') =>
-  api.get('/pois/enrich', { params: { name, lat, lng, category } }).then(r => r.data)
+  api.get('/pois/enrich', { params: { name, lat, lng, category, lang: useLangStore.getState().lang } }).then(r => r.data)
 
 export const fetchEventsToday  = () => api.get('/events/today').then(r => r.data)
 export const fetchEventsNearby = (lat, lng, radius = 2) =>

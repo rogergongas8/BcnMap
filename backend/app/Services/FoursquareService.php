@@ -24,30 +24,43 @@ class FoursquareService
         ];
     }
 
-    public function findPlace(string $name, float $lat, float $lng): ?array
+    private const DAY_NAMES = [
+        'ca' => ['Dl', 'Dt', 'Dc', 'Dj', 'Dv', 'Ds', 'Dg'],
+        'es' => ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa', 'Do'],
+        'en' => ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'],
+    ];
+
+    public function findPlace(string $name, float $lat, float $lng, string $lang = 'ca'): ?array
     {
-        $cacheKey = 'fsq:place:' . md5($name . $lat . $lng);
+        $cacheKey = 'fsq:place:v2:' . md5($name . $lat . $lng . $lang);
 
         $cached = Cache::get($cacheKey);
         if ($cached !== null) return $cached;
 
-        $result = $this->fetchPlace($name, $lat, $lng);
+        $result = $this->fetchPlace($name, $lat, $lng, $lang);
         if ($result !== null) {
             Cache::put($cacheKey, $result, self::CACHE_TTL);
         }
         return $result;
     }
 
-    private function fetchPlace(string $name, float $lat, float $lng): ?array
+    private function fetchPlace(string $name, float $lat, float $lng, string $lang = 'ca'): ?array
     {
+        // Map app lang codes to locale codes Foursquare understands
+        $locale = match($lang) {
+            'ca' => 'ca',
+            'es' => 'es',
+            default => 'en',
+        };
+
         try {
-            $response = Http::withHeaders($this->headers())
-                ->timeout(8)
+            $response = Http::withHeaders(array_merge($this->headers(), ['Accept-Language' => $locale]))
+                ->timeout(5)
                 ->get(self::SEARCH_URL, [
-                    'll'    => "{$lat},{$lng}",
-                    'query' => $name,
-                    'limit' => 1,
-                    // New API: no 'radius' param, no 'fields' filter on free tier
+                    'll'     => "{$lat},{$lng}",
+                    'query'  => $name,
+                    'limit'  => 1,
+                    'fields' => 'fsq_place_id,name,rating,price,hours,photos,website,tel,description,categories,stats,link',
                 ]);
 
             if (!$response->successful()) {
@@ -59,11 +72,12 @@ class FoursquareService
             if (empty($results)) return null;
 
             $place = $results[0];
-            $fsqId = $place['fsq_place_id'] ?? null; // new field name
+            $fsqId = $place['fsq_place_id'] ?? null;
 
-            $photos = $fsqId ? $this->fetchPhotos($fsqId) : [];
+            // Skip separate photos request if search already returned photos
+            $photos = (!empty($place['photos']) || !$fsqId) ? [] : $this->fetchPhotos($fsqId);
 
-            return $this->normalise($place, $photos);
+            return $this->normalise($place, $photos, $lang);
 
         } catch (\Throwable $e) {
             Log::warning('FoursquareService exception: ' . $e->getMessage());
@@ -75,7 +89,7 @@ class FoursquareService
     {
         try {
             $response = Http::withHeaders($this->headers())
-                ->timeout(6)
+                ->timeout(4)
                 ->get(sprintf(self::PHOTOS_URL, $fsqId), [
                     'limit' => 5,
                     'sort'  => 'POPULAR',
@@ -89,7 +103,7 @@ class FoursquareService
         }
     }
 
-    private function normalise(array $place, array $photos): array
+    private function normalise(array $place, array $photos, string $lang = 'ca'): array
     {
         $photoUrls = [];
         foreach ($photos as $p) {
@@ -124,7 +138,11 @@ class FoursquareService
         $hours        = $place['hours'] ?? [];
         if (!empty($hours)) {
             $isOpenNow    = $hours['open_now'] ?? null;
-            $hoursDisplay = $hours['display'] ?? null;
+            // Prefer our own formatted hours over Foursquare's English display string
+            $regular      = $hours['regular'] ?? [];
+            $hoursDisplay = !empty($regular)
+                ? $this->formatHours($regular, $lang)
+                : ($hours['display'] ?? null);
         }
 
         $categories   = $place['categories'] ?? [];
@@ -153,5 +171,58 @@ class FoursquareService
             'foursquare_url'=> $link,
             'photos'        => array_values(array_slice($photoUrls, 0, 3)),
         ];
+    }
+
+    /**
+     * Format Foursquare hours.regular array into a locale-aware string.
+     * regular: [{ day: 1, open: "0900", close: "2200" }, ...] (1=Monday..7=Sunday)
+     */
+    private function formatHours(array $regular, string $lang): string
+    {
+        $dayNames = self::DAY_NAMES[$lang] ?? self::DAY_NAMES['en'];
+
+        // Group consecutive days with same hours
+        $byHours = [];
+        foreach ($regular as $slot) {
+            $dayIdx = (int)($slot['day'] ?? 0) - 1; // 0=Monday..6=Sunday
+            if ($dayIdx < 0 || $dayIdx > 6) continue;
+            $open  = $this->fmtTime($slot['open']  ?? '0000');
+            $close = $this->fmtTime($slot['close'] ?? '2359');
+            $key   = "{$open}–{$close}";
+            $byHours[$key][] = $dayIdx;
+        }
+
+        $lines = [];
+        foreach ($byHours as $timeRange => $dayIdxs) {
+            sort($dayIdxs);
+            $dayStr  = $this->consecutiveRanges($dayIdxs, $dayNames);
+            $lines[] = $dayStr . ' ' . $timeRange;
+        }
+
+        return implode('; ', $lines);
+    }
+
+    private function fmtTime(string $t): string
+    {
+        $t = str_pad(preg_replace('/[^0-9]/', '', $t), 4, '0', STR_PAD_LEFT);
+        return substr($t, 0, 2) . ':' . substr($t, 2, 2);
+    }
+
+    private function consecutiveRanges(array $dayIdxs, array $dayNames): string
+    {
+        if (empty($dayIdxs)) return '';
+        $ranges = [];
+        $start  = $dayIdxs[0];
+        $prev   = $dayIdxs[0];
+        for ($i = 1; $i < count($dayIdxs); $i++) {
+            if ($dayIdxs[$i] === $prev + 1) {
+                $prev = $dayIdxs[$i];
+            } else {
+                $ranges[] = $start === $prev ? $dayNames[$start] : $dayNames[$start] . '–' . $dayNames[$prev];
+                $start = $prev = $dayIdxs[$i];
+            }
+        }
+        $ranges[] = $start === $prev ? $dayNames[$start] : $dayNames[$start] . '–' . $dayNames[$prev];
+        return implode(', ', $ranges);
     }
 }

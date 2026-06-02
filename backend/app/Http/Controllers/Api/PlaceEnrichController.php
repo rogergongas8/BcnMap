@@ -9,6 +9,7 @@ use App\Services\FoursquareService;
 use App\Services\PlaceEnrichService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class PlaceEnrichController extends Controller
 {
@@ -24,22 +25,32 @@ class PlaceEnrichController extends Controller
             'lat'      => 'required|numeric|between:-90,90',
             'lng'      => 'required|numeric|between:-180,180',
             'category' => 'nullable|string|max:50',
+            'lang'     => 'nullable|string|in:ca,es,en',
         ]);
 
         $name     = (string) $request->query('name');
         $lat      = (float)  $request->query('lat');
         $lng      = (float)  $request->query('lng');
         $category = (string) ($request->query('category') ?? '');
+        $lang     = (string) ($request->query('lang') ?? 'ca');
 
-        // Foursquare: fotos + rating + horarios para cualquier tipo de lugar
-        $fsq = config('services.foursquare.key')
-            ? $this->foursquareService->findPlace($name, $lat, $lng)
+        $cacheKey = 'enrich:ctrl:v1:' . md5($name . round($lat, 4) . round($lng, 4) . $category . $lang);
+        $cached = Cache::get($cacheKey);
+        if ($cached !== null) {
+            return response()->json(['data' => $cached]);
+        }
+
+        // Foursquare: fotos + rating + horarios localizados
+        $fsq  = config('services.foursquare.key')
+            ? $this->foursquareService->findPlace($name, $lat, $lng, $lang)
             : null;
 
-        // Wikipedia/Wikimedia: descripción + fotos para landmarks históricos
+        // Wikipedia/Wikimedia: descripción + fotos para landmarks (skipped for commercial POIs)
         $wiki = $this->enrichService->enrich($name, $lat, $lng, $category);
 
         $data = $this->merge($fsq, $wiki);
+
+        Cache::put($cacheKey, $data, 86400); // 24h — same as individual service caches
 
         return response()->json(['data' => $data]);
     }

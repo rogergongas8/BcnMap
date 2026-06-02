@@ -38,7 +38,8 @@ Route::prefix('v1')->group(function () {
     Route::get('/metro/{stationId}/arrivals',   [MetroController::class, 'arrivals']);
     Route::post('/metro/refresh',               [MetroController::class, 'fetch']);
 
-    Route::get('/weather',         [WeatherController::class, 'current']);
+    Route::get('/weather/forecast', [WeatherController::class, 'forecast']);
+    Route::get('/weather',          [WeatherController::class, 'current']);
     Route::get('/air-quality',     [AirQualityController::class, 'current']);
     Route::get('/city-context',    [CityContextController::class, 'index']);
 

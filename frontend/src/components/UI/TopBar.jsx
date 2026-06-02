@@ -233,27 +233,15 @@ export default function TopBar({ children }) {
   const { showBeaches }  = useLeisureStore()
   const { isOpen: chatOpen, toggleChat, hasUnread } = useChatStore()
 
-  const [layersOpen, setLayersOpen] = useState(false)
-  const layersRef = useRef(null)
-
   useEffect(() => {
-    if (view) setLayersOpen(false)
     if (view === 'events' && !activeLayers.includes('events')) toggleLayer('events')
     if (view !== 'events' &&  activeLayers.includes('events')) toggleLayer('events')
   }, [view])
-
-  useEffect(() => {
-    if (!layersOpen) return
-    const handler = e => { if (layersRef.current && !layersRef.current.contains(e.target)) setLayersOpen(false) }
-    window.addEventListener('mousedown', handler)
-    return () => window.removeEventListener('mousedown', handler)
-  }, [layersOpen])
 
   const nearbyActive       = view === 'nearby'
   const savedActive        = view === 'saved'
   const eventsActive       = view === 'events'
   const disruptionsActive  = view === 'disruptions'
-  const hasLayersOn        = showBeaches || activeLayers.filter(l => l !== 'events').length > 0
   const hasDisruptions     = disruptions.length > 0
 
   return (
@@ -271,21 +259,18 @@ export default function TopBar({ children }) {
         <IconBtn active={savedActive}       onClick={() => savedActive       ? close() : openSaved()}       icon={Icons.bookmark} label={t('topbar.saved')} />
         <IconBtn active={eventsActive}      onClick={() => eventsActive      ? close() : openEvents()}      icon={Icons.calendar} label={t('topbar.events')} />
         <IconBtn active={disruptionsActive} onClick={() => disruptionsActive ? close() : openDisruptions()} icon={Icons.alert}    label={t('topbar.disruptions')} badge={hasDisruptions} badgeColor="#D45555" />
-        <div ref={layersRef} className="relative">
-          <IconBtn active={layersOpen} onClick={() => { const next = !layersOpen; if (next && view) close(); setLayersOpen(next) }} icon={Icons.layers} label={t('topbar.layers')} badge={hasLayersOn} />
-          <AnimatePresence>
-            {layersOpen && <LayersDropdown onClose={() => setLayersOpen(false)} />}
-          </AnimatePresence>
-        </div>
+      </div>
+
+      {/* ── Weather HUD pill ── */}
+      <div className="flex items-center flex-shrink-0 pointer-events-auto" style={{ ...CARD_STYLE, height: 44 }}>
+        <CityHud />
       </div>
 
       {/* ── Center: truly centered in viewport ── */}
       <div className="flex-1 pointer-events-none" />
 
-      {/* ── Right: HUD + Lang + Profile + Chat ── */}
+      {/* ── Right: Lang + Profile + Chat ── */}
       <div className="flex items-center gap-1 px-1.5 flex-shrink-0 pointer-events-auto" style={{ ...CARD_STYLE, height: 44 }}>
-        <CityHud />
-        <div style={{ width: 1, height: 16, background: '#2C2926', flexShrink: 0, margin: '0 2px' }} />
         <LangToggle />
         <div style={{ width: 1, height: 16, background: '#2C2926', flexShrink: 0, margin: '0 2px' }} />
         <ProfileBtn />

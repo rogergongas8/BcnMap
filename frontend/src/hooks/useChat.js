@@ -85,6 +85,9 @@ async function executeMapActions(actions) {
         setChatRequest({ origin, destination: dest, mode: 'foot', route: null })
       }
 
+    } else if (action.type === 'show_events') {
+      useDrawerStore.getState().openEvents({ category: action.category ?? null })
+
     } else if (action.type === 'calculate_route') {
       const userLoc = useMapStore.getState().userLocation
 
@@ -152,7 +155,10 @@ export function useChat() {
       const userLocation = useMapStore.getState().userLocation
       const nearbyPois   = useNearbyStore.getState().pois
       const data = await sendChat(text.trim(), history, userLocation, nearbyPois)
-      addMessage('assistant', data.reply ?? 'Sin respuesta')
+      const suggestions = Array.isArray(data.suggestions) && data.suggestions.length > 0
+        ? data.suggestions
+        : undefined
+      addMessage('assistant', data.reply ?? 'Sin respuesta', suggestions ? { suggestions } : {})
       await executeMapActions(data.map_actions)
     } catch {
       addMessage('assistant', 'Error conectando con el servidor. Comprueba que el backend está activo.')
@@ -161,5 +167,18 @@ export function useChat() {
     }
   }
 
-  return { messages, isLoading, sendMessage }
+  async function executeSuggestionAction(suggestion) {
+    if (suggestion.action === 'open_place') {
+      await executeMapActions([
+        { type: 'fly_to', lat: suggestion.lat, lng: suggestion.lng, zoom: 16 },
+        { type: 'open_place', name: suggestion.name, lat: suggestion.lat, lng: suggestion.lng, category: suggestion.category ?? null },
+      ])
+    } else if (suggestion.action === 'route') {
+      await executeMapActions([
+        { type: 'plan_trip', origin_lat: null, origin_lng: null, origin_label: null, dest_lat: suggestion.lat, dest_lng: suggestion.lng, dest_label: suggestion.name, constraint: null },
+      ])
+    }
+  }
+
+  return { messages, isLoading, sendMessage, executeSuggestionAction }
 }

@@ -175,16 +175,23 @@ class EventsService
 
         $lines = [];
         foreach ($selected as $e) {
-            $line = $e['title'];
+            $cat  = $e['category'] ?? '';
+            $line = $e['title'] . ($cat ? " ({$cat})" : '');
 
             if ($e['start'] && $e['start'] > $today) {
-                $line .= ' (a partir del ' . $e['start'] . ')';
-            } elseif ($e['end']) {
-                $line .= ' (hasta el ' . $e['end'] . ')';
+                $line .= ' — a partir del ' . $e['start'];
+            } elseif ($e['end'] && $e['end'] >= $today) {
+                $line .= ' — hasta el ' . $e['end'];
+            } else {
+                $line .= ' — hoy';
             }
 
             $loc = array_filter([$e['place'], $e['district']]);
-            if ($loc) $line .= ' — ' . implode(', ', $loc);
+            if ($loc) $line .= ', ' . implode(', ', $loc);
+
+            if (!empty($e['timetable'])) {
+                $line .= '. Horario: ' . $e['timetable'];
+            }
 
             $lines[] = $line;
         }

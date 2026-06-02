@@ -20,10 +20,10 @@ export const useChatStore = create((set) => ({
   openChatWithPromptNoFly: (msg) => set({ isOpen: true, hasUnread: false, pendingPrompt: msg, suppressMapMove: true }),
   clearSuppressMapMove: () => set({ suppressMapMove: false }),
 
-  addMessage: (role, text) => set((s) => ({
+  addMessage: (role, text, extras = {}) => set((s) => ({
     messages: [
       ...s.messages,
-      { id: Date.now(), role, text, timestamp: new Date() },
+      { id: Date.now(), role, text, timestamp: new Date(), ...extras },
     ],
     hasUnread: role === 'assistant' && !s.isOpen,
   })),

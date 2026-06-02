@@ -196,18 +196,29 @@ class MetroRouter
         $i    = 0;
         $n    = count($path);
         while ($i < $n) {
-            $line    = $path[$i][2];
-            $legFrom = $path[$i][0];
-            $legTo   = $path[$i][1];
-            $j       = $i + 1;
+            $line       = $path[$i][2];
+            $legFrom    = $path[$i][0];
+            $legTo      = $path[$i][1];
+            $legTimeS   = 0.0;
+            $hops       = 0;
+            $j          = $i;
             while ($j < $n && $path[$j][2] === $line) {
-                $legTo = $path[$j][1];
+                $fromS     = $this->stationMap[$path[$j][0]];
+                $toS       = $this->stationMap[$path[$j][1]];
+                $legTimeS += $this->haversine(
+                    (float)$fromS['lat'], (float)$fromS['lng'],
+                    (float)$toS['lat'],   (float)$toS['lng']
+                ) / self::METRO_SPEED_MS;
+                $legTo     = $path[$j][1];
+                $hops++;
                 $j++;
             }
             $legs[] = [
                 'line'         => $line,
                 'from_station' => $this->stationMap[$legFrom],
                 'to_station'   => $this->stationMap[$legTo],
+                'route_time_s' => $legTimeS,
+                'stops_count'  => $hops,
             ];
             $i = $j;
         }

@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Icons } from '../icons'
 import { useAuthStore } from '../../../store/authStore'
 import { useRouteStore } from '../../../store/routeStore'
@@ -91,6 +92,7 @@ function RouteRow({ route, onDelete, onLoad }) {
 }
 
 export default function SavedView() {
+  const { t } = useTranslation()
   const isLogged = useAuthStore(s => s.isLogged)
   const [tab,      setTab]      = useState(TAB.favs)
   const [favs,     setFavs]     = useState([])
@@ -139,7 +141,7 @@ export default function SavedView() {
   }
 
   if (!isLogged) {
-    return <EmptyState icon={Icons.user} text="Inicia sessió per veure els teus llocs i rutes guardades" />
+    return <EmptyState icon={Icons.user} text={t('drawer.savedView.loginHint')} />
   }
 
   return (
@@ -147,18 +149,18 @@ export default function SavedView() {
       {/* Tabs */}
       <div className="flex px-3 pt-2.5 pb-0 gap-1" style={{ borderBottom: '1px solid #2C2926' }}>
         {[
-          { id: TAB.favs,     label: 'Favorits' },
-          { id: TAB.routes,   label: 'Rutes' },
-          { id: TAB.commutes, label: 'Trajectes' },
-        ].map(t => (
+          { id: TAB.favs,     label: t('drawer.savedView.favs') },
+          { id: TAB.routes,   label: t('drawer.savedView.routes') },
+          { id: TAB.commutes, label: t('drawer.savedView.commutes') },
+        ].map(tabItem => (
           <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
+            key={tabItem.id}
+            onClick={() => setTab(tabItem.id)}
             className="px-3 pb-2.5 font-syne text-[12px] font-medium transition-colors relative"
-            style={{ color: tab === t.id ? '#F7F6F4' : '#8C8884' }}
+            style={{ color: tab === tabItem.id ? '#F7F6F4' : '#8C8884' }}
           >
-            {t.label}
-            {tab === t.id && (
+            {tabItem.label}
+            {tab === tabItem.id && (
               <span className="absolute bottom-0 left-0 right-0 h-[2px] rounded-full" style={{ background: '#B8885A' }} />
             )}
           </button>
@@ -176,13 +178,13 @@ export default function SavedView() {
 
         {!loading && tab === TAB.favs && (
           favs.length === 0
-            ? <EmptyState icon={Icons.pin} text="Encara no tens cap lloc guardat" />
+            ? <EmptyState icon={Icons.pin} text={t('drawer.savedView.empty')} />
             : <ul>{favs.map(f => <FavRow key={f.id} fav={f} onDelete={handleDeleteFav} onSelect={handleSelectFav} />)}</ul>
         )}
 
         {!loading && tab === TAB.routes && (
           routes.length === 0
-            ? <EmptyState icon={Icons.search} text="Encara no tens cap ruta guardada" />
+            ? <EmptyState icon={Icons.search} text={t('drawer.savedView.emptyRoutes')} />
             : <ul>{routes.map(r => <RouteRow key={r.id} route={r} onDelete={handleDeleteRoute} onLoad={handleLoadRoute} />)}</ul>
         )}
 

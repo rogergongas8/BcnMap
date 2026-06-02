@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Icons } from '../icons'
 import { useCommutes } from '../../../hooks/useCommutes'
 import { useAuthStore } from '../../../store/authStore'
@@ -12,10 +13,6 @@ const MODE_COLORS = {
   car:    '#ffaa00',
 }
 
-const MODE_LABEL = {
-  foot: 'A peu', bicing: 'Bicing', bus: 'Bus', metro: 'Metro', car: 'Cotxe',
-}
-
 const MODE_ICON = {
   foot:   Icons.walking,
   bicing: Icons.bike,
@@ -24,9 +21,8 @@ const MODE_ICON = {
   car:    Icons.car,
 }
 
-const DAY_NAMES = ['Dl', 'Dt', 'Dc', 'Dj', 'Dv', 'Ds', 'Dg']
-
-function CommuteRow({ commute, status, onToggle, onDelete, onEdit }) {
+function CommuteRow({ commute, status, onToggle, onDelete, onEdit, dayNames, modeLabel }) {
+  const { t } = useTranslation()
   const color = MODE_COLORS[commute.mode] ?? '#B0ACA7'
   const ModeIcon = MODE_ICON[commute.mode] ?? Icons.route
   const isToday = status?.is_today ?? false
@@ -78,7 +74,7 @@ function CommuteRow({ commute, status, onToggle, onDelete, onEdit }) {
             onClick={() => onToggle(commute.id)}
             className="w-8 h-4 rounded-full flex-shrink-0 relative transition-colors"
             style={{ background: commute.is_active ? color + '55' : '#2C2926', border: `1px solid ${commute.is_active ? color : '#3C3A36'}` }}
-            title={commute.is_active ? 'Desactivar' : 'Activar'}
+            title={commute.is_active ? t('drawer.commuteView.deactivate') : t('drawer.commuteView.activate')}
           >
             <span
               className="absolute top-0.5 w-3 h-3 rounded-full transition-all"
@@ -95,7 +91,7 @@ function CommuteRow({ commute, status, onToggle, onDelete, onEdit }) {
         {/* Days + arrival time */}
         <div className="flex items-center gap-1.5" style={{ paddingLeft: '2rem' }}>
           <div className="flex gap-0.5">
-            {DAY_NAMES.map((d, i) => {
+            {dayNames.map((d, i) => {
               const dayNum = i + 1
               const active = commute.days_of_week.includes(dayNum)
               return (
@@ -133,17 +129,17 @@ function CommuteRow({ commute, status, onToggle, onDelete, onEdit }) {
             <div className="flex flex-col gap-0.5 min-w-0">
               {status.leave_by && (
                 <p className="font-mono text-[11px] font-bold" style={{ color }}>
-                  Sortir a les {status.leave_by}
+                  {t('drawer.commuteView.leaveBy', { time: status.leave_by })}
                 </p>
               )}
               {status.next_departure && (
                 <p className="font-mono text-[10px]" style={{ color: '#B0ACA7' }}>
-                  {MODE_LABEL[commute.mode]} {status.next_departure} · {status.travel_minutes} min
+                  {modeLabel} {status.next_departure} · {status.travel_minutes} min
                 </p>
               )}
               {!status.next_departure && status.travel_minutes && (
                 <p className="font-mono text-[10px]" style={{ color: '#B0ACA7' }}>
-                  ~{status.travel_minutes} min de trajecte
+                  {t('drawer.commuteView.journeyMins', { n: status.travel_minutes })}
                 </p>
               )}
               {status.warning && (
@@ -158,10 +154,13 @@ function CommuteRow({ commute, status, onToggle, onDelete, onEdit }) {
 }
 
 export default function CommuteView() {
+  const { t } = useTranslation()
   const isLogged = useAuthStore(s => s.isLogged)
   const { commutes, statuses, loading, add, toggle, remove, save } = useCommutes()
   const [showForm, setShowForm] = useState(false)
   const [editTarget, setEditTarget] = useState(null)
+
+  const dayNames = t('drawer.commuteForm.daysShort', { returnObjects: true })
 
   if (!isLogged) {
     return (
@@ -170,7 +169,7 @@ export default function CommuteView() {
           <Icons.route size={15} />
         </div>
         <p className="font-syne text-[13px] leading-snug max-w-[200px]" style={{ color: '#B0ACA7' }}>
-          Inicia sessió per gestionar els teus trajectes recurrents
+          {t('drawer.commuteView.loginHint')}
         </p>
       </div>
     )
@@ -222,7 +221,7 @@ export default function CommuteView() {
             <Icons.route size={15} />
           </div>
           <p className="font-syne text-[13px] leading-snug max-w-[220px]" style={{ color: '#B0ACA7' }}>
-            Guarda un trajecte recurrent i et diem quan has de sortir de casa
+            {t('drawer.commuteView.empty')}
           </p>
         </div>
       )}
@@ -237,6 +236,8 @@ export default function CommuteView() {
               onToggle={toggle}
               onDelete={remove}
               onEdit={handleEdit}
+              dayNames={dayNames}
+              modeLabel={t(`modes.${c.mode}`)}
             />
           ))}
         </ul>
@@ -250,7 +251,7 @@ export default function CommuteView() {
           onMouseEnter={e => { e.currentTarget.style.background = '#B8885A33' }}
           onMouseLeave={e => { e.currentTarget.style.background = '#B8885A22' }}
         >
-          + Nou trajecte recurrent
+          {t('drawer.commuteView.add')}
         </button>
       </div>
     </div>

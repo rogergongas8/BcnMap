@@ -241,7 +241,7 @@ export default function FloatingToolbar() {
   useEffect(() => {
     if (!layersOpen) return
     const handler = (e) => {
-      if (containerRef.current && !containerRef.current.contains(e.target)) {
+      if (containerRef.current && !containerRef.current.contains(e.target) && e.target.tagName === 'CANVAS') {
         setLayersOpen(false)
       }
     }

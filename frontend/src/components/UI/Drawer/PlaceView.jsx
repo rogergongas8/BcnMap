@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Icons, POI_CATEGORY_COLORS } from '../icons'
 import { useDrawerStore } from '../../../store/drawerStore'
 import { useMapStore } from '../../../store/mapStore'
 import { useRouteStore } from '../../../store/routeStore'
-import { fetchPlaceEnrich } from '../../../services/api'
+import { fetchPlaceEnrich, fetchRoutePlan } from '../../../services/api'
 import { sharePlaceUrl } from '../../../hooks/useDeepLink'
 
 /* ── Skeleton ───────────────────────────────────────────────────────────── */
@@ -47,6 +47,20 @@ const CATEGORY_ICONS = {
   bakery: Icons.bakery, supermarket: Icons.supermarket, pharmacy: Icons.pharmacy,
   hospital: Icons.hospital, bank: Icons.bank, museum: Icons.museum,
   attraction: Icons.attraction, monument: Icons.monument, hotel: Icons.hotel,
+}
+
+/* ── Format helpers ─────────────────────────────────────────────────────── */
+
+function fmtDur(s) {
+  if (s == null || s <= 0) return '—'
+  const m = Math.round(s / 60)
+  if (m < 60) return `${m} min`
+  return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}min`
+}
+
+function fmtKm(m) {
+  if (m == null || m <= 0) return null
+  return m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(1)} km`
 }
 
 /* ── Small helpers ──────────────────────────────────────────────────────── */
@@ -173,6 +187,31 @@ function usePlaceEnrich(place) {
     return () => { cancelled = true }
   }, [place?.id])
   return { data, loading }
+}
+
+/* ── Route plan hook (pre-fetched eagerly so "Com arribar-hi" is instant) ── */
+
+function useRoutePlan(place, userLocation) {
+  const [plan,    setPlan]    = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error,   setError]   = useState(false)
+
+  const doFetch = useCallback(() => {
+    if (place?.kind !== 'poi' || !userLocation) return
+    let cancelled = false
+    setLoading(true)
+    setError(false)
+    setPlan(null)
+    fetchRoutePlan(userLocation.lat, userLocation.lng, place.lat, place.lng)
+      .then(r  => { if (!cancelled) setPlan(r) })
+      .catch(() => { if (!cancelled) setError(true) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [place?.id, userLocation?.lat, userLocation?.lng])
+
+  useEffect(() => doFetch(), [doFetch])
+
+  return { plan, loading, error, refetch: doFetch }
 }
 
 /* ── Tabs ───────────────────────────────────────────────────────────────── */
@@ -368,61 +407,271 @@ function HorarisTab({ place, enrich, enrichLoading }) {
 /* ── Tab: Com arribar-hi ────────────────────────────────────────────────── */
 
 const ROUTE_MODES = [
-  { id: 'foot',   label: 'A peu',  color: '#ffffff' },
-  { id: 'bicing', label: 'Bicing', color: '#B8885A' },
-  { id: 'metro',  label: 'Metro',  color: '#ff6b35' },
-  { id: 'bus',    label: 'Bus',    color: '#00b4ff' },
-  { id: 'car',    label: 'Cotxe',  color: '#C98E2E' },
+  { id: 'foot',   label: 'A peu',  color: '#a78bfa', icon: Icons.walking },
+  { id: 'bicing', label: 'Bicing', color: '#00ff88', icon: Icons.bike },
+  { id: 'metro',  label: 'Metro',  color: '#ff6b35', icon: Icons.metro },
+  { id: 'bus',    label: 'Bus',    color: '#00b4ff', icon: Icons.bus },
+  { id: 'car',    label: 'Cotxe',  color: '#ffaa00', icon: Icons.car },
 ]
 
-function RutaTab({ place, onRoute }) {
+function modeSubtitle(modeId, route) {
+  if (!route) return null
+  if (modeId === 'metro' || modeId === 'bus') return route.lines_label ?? null
+  return null
+}
+
+function modeAlternatives(modeId, route) {
+  if (modeId !== 'metro' && modeId !== 'bus') return []
+  return route?.alternatives ?? []
+}
+
+function RutaTab({ place, onRoute, plan, planLoading, planError, onRefetch }) {
+  const userLocation = useMapStore(s => s.userLocation)
+  const setRoute     = useRouteStore(s => s.setRoute)
+  const flyTo        = useMapStore(s => s.flyTo)
+
   const [selectedMode, setSelectedMode] = useState('foot')
+  const [selectedAlt,  setSelectedAlt]  = useState(0)
+  const prevPlanRef = useRef(null)
+
+  // When plan freshly arrives: set recommended mode, preview on map, fly to midpoint
+  useEffect(() => {
+    if (!plan || plan === prevPlanRef.current) return
+    prevPlanRef.current = plan
+    const recommended = plan.recommended ?? 'foot'
+    setSelectedMode(recommended)
+    setSelectedAlt(0)
+    const recommendedRoute = plan.options?.[recommended]
+    if (recommendedRoute?.segments) setRoute(recommendedRoute)
+    if (userLocation) {
+      flyTo({ lat: (userLocation.lat + place.lat) / 2, lng: (userLocation.lng + place.lng) / 2, zoom: 14 })
+    }
+  }, [plan])
+
+  // Preview route on map whenever selected mode/alt changes
+  useEffect(() => {
+    if (!plan?.options) return
+    const route = plan.options[selectedMode]
+    if (!route?.segments) return
+    const alts = route.alternatives ?? []
+    const preview = alts.length > 1 && selectedAlt > 0 && alts[selectedAlt]
+      ? { ...route, ...alts[selectedAlt] }
+      : route
+    setRoute(preview)
+  }, [selectedMode, selectedAlt, plan])
+
+  // Cleanup route preview when tab unmounts
+  useEffect(() => () => setRoute(null), [])
+
+  // No location
+  if (!userLocation) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center gap-3 px-6 text-center">
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: '#211F1B', color: '#5C5A56' }}>
+          <Icons.myLocation size={18} />
+        </div>
+        <p className="font-syne text-[13px]" style={{ color: '#B0ACA7' }}>Activa la ubicació</p>
+        <p className="font-mono text-[10px]" style={{ color: '#5C5A56' }}>Necessitem la teva posició per calcular rutes</p>
+      </div>
+    )
+  }
+
+  // Loading
+  if (planLoading) {
+    return (
+      <div className="flex-1 flex flex-col gap-2.5 px-4 pt-4">
+        {ROUTE_MODES.map((_, i) => (
+          <div key={i} className="h-14 rounded-lg animate-pulse" style={{ background: '#1C1A17' }} />
+        ))}
+      </div>
+    )
+  }
+
+  // Error
+  if (planError || (!planLoading && !plan)) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center gap-3 px-6 text-center">
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: '#211F1B', color: '#5C5A56' }}>
+          <Icons.alert size={18} />
+        </div>
+        <p className="font-syne text-[13px]" style={{ color: '#B0ACA7' }}>No s'ha pogut calcular</p>
+        <button onClick={onRefetch} className="font-mono text-[10px] uppercase tracking-wide px-3 py-1.5 rounded"
+          style={{ background: '#211F1B', border: '1px solid #2C2926', color: '#8C8884' }}>
+          Reintentar
+        </button>
+      </div>
+    )
+  }
+
+  const activeMode  = ROUTE_MODES.find(m => m.id === selectedMode)
+  const activeRoute = plan?.options?.[selectedMode]
+  const transitAlts = modeAlternatives(selectedMode, activeRoute)
+
+  // Foot distance from plan — determines if transit/car makes sense
+  const footDist = plan?.options?.foot?.distance ?? 0
+  const isVeryClose = footDist > 0 && footDist <= 600   // <600m: transit/car absurd
+  const isClose     = footDist > 0 && footDist <= 1500  // <1.5km: transit rarely worth it
+
+  const isModeRecommended = (modeId, route) => {
+    if (!route || route.error || route.inefficient) return false
+    if (isVeryClose && (modeId === 'metro' || modeId === 'bus' || modeId === 'car')) return false
+    if (isClose && (modeId === 'metro' || modeId === 'bus')) return false
+    return true
+  }
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
-      <div className="px-4 pt-3 pb-2 flex-shrink-0">
-        <p className="font-mono text-[9px] uppercase tracking-[0.14em] mb-2.5" style={{ color: '#8C8884' }}>Mode de transport</p>
-        <div className="grid grid-cols-5 gap-1">
-          {ROUTE_MODES.map(m => (
+      {/* Mode list */}
+      <div className="flex-1 overflow-y-auto min-h-0 px-3 pt-3 pb-2 flex flex-col gap-1.5">
+        {ROUTE_MODES.map(m => {
+          const route     = plan?.options?.[m.id]
+          const isActive  = selectedMode === m.id
+          const isRecom   = plan?.recommended === m.id
+          const ModeIcon  = m.icon
+          const subtitle  = modeSubtitle(m.id, route)
+          const hasRoute  = !!route && !route.error
+
+          const isEfficient = isModeRecommended(m.id, route)
+          const isDisabled  = !hasRoute || (!isEfficient && !isActive)
+          const labelColor  = isActive ? '#F7F6F4' : isEfficient ? '#8C8884' : '#3C3A36'
+
+          return (
             <button
               key={m.id}
-              onClick={() => setSelectedMode(m.id)}
-              className="py-2 flex flex-col items-center gap-1 transition-all"
+              onClick={() => { setSelectedMode(m.id); setSelectedAlt(0) }}
+              disabled={!hasRoute}
+              className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-all active:scale-[0.99]"
               style={{
-                borderRadius: 6,
-                border: `1px solid ${selectedMode === m.id ? m.color + '55' : '#2C2926'}`,
-                background: selectedMode === m.id ? '#211F1B' : 'transparent',
+                borderRadius: 8,
+                border: `1px solid ${isActive ? m.color + '55' : '#252320'}`,
+                background: isActive ? m.color + '0d' : '#171512',
+                opacity: isDisabled ? 0.4 : 1,
               }}
             >
-              <span className="font-mono text-[9px] uppercase tracking-[0.08em]"
-                style={{ color: selectedMode === m.id ? m.color : '#8C8884' }}>
-                {m.label}
+              {/* Icon badge */}
+              <span className="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0"
+                style={{ background: isActive ? m.color + '20' : '#1C1A17' }}>
+                <ModeIcon size={14} style={{ color: isActive ? m.color : isEfficient ? '#5C5A56' : '#3C3A36' }} />
               </span>
+
+              {/* Label + subtitle */}
+              <div className="flex-1 min-w-0">
+                <p className="font-syne text-[12px] font-semibold leading-tight" style={{ color: labelColor }}>
+                  {m.label}
+                </p>
+                {subtitle && isEfficient && (
+                  <p className="font-mono text-[9px] truncate mt-0.5" style={{ color: isActive ? m.color + 'cc' : '#5C5A56' }}>
+                    {subtitle}
+                  </p>
+                )}
+                {!isEfficient && hasRoute && (
+                  <p className="font-mono text-[8px] mt-0.5" style={{ color: '#4C4A46' }}>
+                    No recomanat
+                  </p>
+                )}
+              </div>
+
+              {/* Time + recommended badge */}
+              <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
+                {hasRoute ? (
+                  <span className="font-syne text-[14px] font-bold tabular-nums"
+                    style={{ color: isActive ? m.color : isEfficient ? '#B0ACA7' : '#4C4A46' }}>
+                    {fmtDur(route.duration)}
+                  </span>
+                ) : (
+                  <span className="font-mono text-[9px]" style={{ color: '#3C3A36' }}>—</span>
+                )}
+                {isRecom && isEfficient && (
+                  <span className="font-mono text-[7px] uppercase tracking-wide px-1.5 py-0.5 rounded-full"
+                    style={{ background: m.color + '22', color: m.color, border: `1px solid ${m.color}44` }}>
+                    Recomanat
+                  </span>
+                )}
+                {hasRoute && fmtKm(route.distance) && isEfficient && (
+                  <span className="font-mono text-[9px]" style={{ color: '#4C4A46' }}>
+                    {fmtKm(route.distance)}
+                  </span>
+                )}
+              </div>
             </button>
-          ))}
-        </div>
+          )
+        })}
+
+        {/* Transit alternatives — metro and bus */}
+        {transitAlts.length > 1 && (
+          <div className="mt-0.5 px-1">
+            <p className="font-mono text-[8px] uppercase tracking-[0.14em] mb-1.5 px-1" style={{ color: '#5C5A56' }}>
+              {transitAlts.length} alternatives disponibles
+            </p>
+            <div className="flex flex-col gap-1">
+              {transitAlts.slice(0, 3).map((alt, i) => {
+                const mColor = activeMode?.color ?? '#B0ACA7'
+                const isAlt  = selectedAlt === i
+                return (
+                  <button
+                    key={i}
+                    onClick={() => setSelectedAlt(i)}
+                    className="flex items-center gap-2.5 px-3 py-2.5 text-left transition-all active:scale-[0.99]"
+                    style={{
+                      borderRadius: 8,
+                      border: `1px solid ${isAlt ? mColor + '55' : '#252320'}`,
+                      background: isAlt ? mColor + '0d' : '#171512',
+                    }}
+                  >
+                    {/* Line badge(s) */}
+                    <span className="flex items-center gap-0.5 flex-shrink-0">
+                      {(alt.lines_label ?? '').split(' → ').slice(0, 3).map((line, li) => (
+                        <span key={li} className="inline-flex items-center">
+                          {li > 0 && <span className="text-[8px] mx-0.5" style={{ color: '#5C5A56' }}>→</span>}
+                          <span className="font-mono text-[9px] font-bold px-1.5 py-0.5 rounded"
+                            style={{ background: isAlt ? mColor + '25' : '#2C2926', color: isAlt ? mColor : '#8C8884' }}>
+                            {line}
+                          </span>
+                        </span>
+                      ))}
+                    </span>
+
+                    <span className="flex-1 min-w-0" />
+
+                    {/* Time */}
+                    <span className="font-syne text-[13px] font-bold tabular-nums flex-shrink-0"
+                      style={{ color: isAlt ? mColor : '#B0ACA7' }}>
+                      {fmtDur(alt.duration)}
+                    </span>
+
+                    {/* Transfers badge */}
+                    {alt.transfers != null && alt.transfers > 0 && (
+                      <span className="font-mono text-[8px] px-1.5 py-0.5 rounded-full flex-shrink-0"
+                        style={{ background: '#211F1B', border: '1px solid #2C2926', color: '#5C5A56' }}>
+                        {alt.transfers}t
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
-      <div className="px-4 py-3 flex-shrink-0" style={{ borderTop: '1px solid #201E1B' }}>
-        <div className="p-3 rounded-lg" style={{ background: '#211F1B', border: '1px solid #2C2926' }}>
-          <p className="font-mono text-[10px]" style={{ color: '#8C8884' }}>Destí</p>
-          <p className="font-syne text-[13px] font-medium mt-0.5 truncate" style={{ color: '#F7F6F4' }}>{place.name}</p>
-          {place.address && (
-            <p className="font-mono text-[10px] mt-0.5 truncate" style={{ color: '#8C8884' }}>{place.address}</p>
-          )}
-        </div>
-      </div>
-
-      <div className="flex-1" />
-
-      <div className="px-4 pb-4 flex-shrink-0">
+      {/* CTA */}
+      <div className="px-3 pb-4 pt-2 flex-shrink-0" style={{ borderTop: '1px solid #201E1B' }}>
         <button
-          onClick={() => onRoute(selectedMode)}
-          className="w-full h-11 flex items-center justify-center gap-2 font-syne text-[13px] font-semibold transition-all active:scale-[0.98]"
-          style={{ borderRadius: 6, background: '#B8885A', border: '1px solid #B8885A', color: '#fff' }}
+          onClick={() => {
+            const altRoute = transitAlts.length > 1 && selectedAlt > 0 && transitAlts[selectedAlt]
+              ? { ...activeRoute, ...transitAlts[selectedAlt] }
+              : null
+            onRoute(selectedMode, plan ?? null, altRoute)
+          }}
+          className="w-full h-12 flex items-center justify-center gap-2.5 font-syne text-[13px] font-bold transition-all active:scale-[0.98]"
+          style={{
+            borderRadius: 8,
+            background: activeMode?.color ?? '#B8885A',
+            color: selectedMode === 'foot' ? '#fff' : '#000',
+          }}
         >
-          <Icons.route size={14} style={{ color: '#fff' }} />
-          Calcular ruta
+          {activeMode?.icon && <activeMode.icon size={14} style={{ color: selectedMode === 'foot' ? '#fff' : '#000' }} />}
+          Veure al mapa
         </button>
       </div>
     </div>
@@ -505,22 +754,35 @@ export default function PlaceView() {
   const [shared, setShared] = useState(false)
 
   const { data: enrich, loading: enrichLoading } = usePlaceEnrich(place)
+  const { plan: routePlan, loading: routePlanLoading, error: routePlanError, refetch: refetchRoutePlan } = useRoutePlan(place, userLocation)
 
   // Reset tab when place changes
   useEffect(() => { setTab('info') }, [place?.id])
 
   if (!place) return null
 
-  const handleRoute = (mode = 'foot') => {
+  const handleRoute = (mode = 'foot', plan = null, overrideRoute = null) => {
     const { setDestination, setOrigin, setMode, setChatRequest } = useRouteStore.getState()
     const origin      = userLocation ? { ...userLocation, label: 'La meva ubicació' } : null
     const destination = { lat: place.lat, lng: place.lng, label: place.name }
     setMode(mode)
     if (origin) setOrigin(origin)
     setDestination(destination)
-    setChatRequest({ origin, destination, mode, route: null })
+
+    if (plan?.options) {
+      // Inject pre-computed plan — SearchBar hydrates without re-fetching
+      const options = overrideRoute
+        ? { ...plan.options, [mode]: overrideRoute }
+        : plan.options
+      setChatRequest({ origin, destination, mode, plan: { ...plan, options }, route: null })
+    } else {
+      setChatRequest({ origin, destination, mode, route: null })
+    }
     close()
   }
+
+  // Direct route (from "Porta'm aquí") — uses foot mode, bypasses tab
+  const handleDirectRoute = () => handleRoute('foot')
 
   const handleCopy = () => {
     navigator.clipboard?.writeText(`${place.lat.toFixed(6)}, ${place.lng.toFixed(6)}`)
@@ -615,8 +877,16 @@ export default function PlaceView() {
             <HorarisTab place={place} enrich={enrich} enrichLoading={enrichLoading} />
           )}
           {showTabs && tab === 'ruta' && (
-            <RutaTab place={place} onRoute={handleRoute} />
+            <RutaTab
+              place={place}
+              onRoute={handleRoute}
+              plan={routePlan}
+              planLoading={routePlanLoading}
+              planError={routePlanError}
+              onRefetch={refetchRoutePlan}
+            />
           )}
+
 
           {/* Non-POI content */}
           {place.kind === 'beach' && <BeachBody place={place} />}
@@ -626,40 +896,54 @@ export default function PlaceView() {
 
       {/* Action bar — hide when ruta tab active (it has its own CTA) */}
       {!(showTabs && tab === 'ruta') && (
-        <div className="px-4 pt-2 pb-3.5 flex gap-2 flex-shrink-0" style={{ borderTop: '1px solid #201E1B' }}>
-          <button onClick={() => showTabs ? setTab('ruta') : handleRoute()}
-            className="flex-1 h-10 flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
-            style={{ borderRadius: 6, background: '#B8885A', border: '1px solid #B8885A' }}>
-            <Icons.navigation size={13} style={{ color: '#fff' }} />
-            <span className="font-syne text-[12px] font-semibold" style={{ color: '#fff' }}>Porta'm aquí</span>
+        <div className="px-4 pt-3 pb-4 flex-shrink-0 flex flex-col gap-2" style={{ borderTop: '1px solid #201E1B' }}>
+          {/* Primary CTA — goes directly to route (foot), bypasses tab selector */}
+          <button
+            onClick={handleDirectRoute}
+            className="w-full h-12 flex items-center justify-center gap-2.5 transition-all active:scale-[0.98]"
+            style={{ borderRadius: 8, background: '#B8885A', border: '1px solid #B8885A' }}
+          >
+            <Icons.navigation size={14} style={{ color: '#fff' }} />
+            <span className="font-syne text-[14px] font-semibold whitespace-nowrap" style={{ color: '#fff' }}>Porta'm aquí</span>
           </button>
-          
-          {(enrich?.website || place.meta?.website) && (
-            <a href={enrich?.website || place.meta?.website} target="_blank" rel="noopener noreferrer"
-              className="flex-1 h-10 flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]"
-              style={{ borderRadius: 6, background: '#211F1B', border: '1px solid #2C2926', color: '#F7F6F4' }}>
-              <Icons.external size={12} />
-              <span className="font-syne text-[12px] font-medium">Entrades / Web</span>
-            </a>
-          )}
 
-          {!(enrich?.website || place.meta?.website) && (
-            <button onClick={handleCopy}
-              className="h-10 px-3 flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]"
-              style={{ borderRadius: 6, background: '#211F1B', border: `1px solid ${copied ? '#B8885A' : '#2C2926'}`, color: copied ? '#B8885A' : '#8C8884' }}>
-              <Icons.copy size={12} />
-              <span className="font-mono text-[9px] uppercase tracking-[0.08em]">{copied ? 'Copiat' : 'Coords'}</span>
-            </button>
-          )}
+          {/* Secondary actions */}
+          <div className="flex gap-2">
+            {(enrich?.website || place.meta?.website) && (
+              <a
+                href={enrich?.website || place.meta?.website}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 h-10 flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+                style={{ borderRadius: 7, background: '#1C1A17', border: '1px solid #2C2926', color: '#F7F6F4' }}
+              >
+                <Icons.external size={12} />
+                <span className="font-syne text-[12px] font-medium whitespace-nowrap">Web / Entrades</span>
+              </a>
+            )}
 
-          {place.kind === 'poi' && (
-            <button onClick={handleShare}
-              className="h-10 px-3 flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]"
-              style={{ borderRadius: 6, background: '#211F1B', border: `1px solid ${shared ? '#4D84D4' : '#2C2926'}`, color: shared ? '#4D84D4' : '#8C8884' }}>
-              <Icons.external size={12} />
-              <span className="font-mono text-[9px] uppercase tracking-[0.08em]">{shared ? 'Copiat!' : 'Compartir'}</span>
-            </button>
-          )}
+            {!(enrich?.website || place.meta?.website) && (
+              <button
+                onClick={handleCopy}
+                className="flex-1 h-10 flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+                style={{ borderRadius: 7, background: '#1C1A17', border: `1px solid ${copied ? '#B8885A55' : '#2C2926'}`, color: copied ? '#B8885A' : '#8C8884' }}
+              >
+                <Icons.copy size={12} />
+                <span className="font-mono text-[10px] uppercase tracking-[0.08em]">{copied ? 'Copiat' : 'Coords'}</span>
+              </button>
+            )}
+
+            {place.kind === 'poi' && (
+              <button
+                onClick={handleShare}
+                className="flex-1 h-10 flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+                style={{ borderRadius: 7, background: '#1C1A17', border: `1px solid ${shared ? '#4D84D455' : '#2C2926'}`, color: shared ? '#4D84D4' : '#8C8884' }}
+              >
+                <Icons.external size={12} />
+                <span className="font-mono text-[10px] uppercase tracking-[0.08em]">{shared ? 'Copiat!' : 'Compartir'}</span>
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>

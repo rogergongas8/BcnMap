@@ -9,6 +9,7 @@ export const useDataStore = create((set) => ({
   events: [],
   disruptions: [],
   weather: null,
+  forecast: null,
   airQuality: null,
   lastUpdated: null,
 
@@ -20,5 +21,6 @@ export const useDataStore = create((set) => ({
   setEvents:       (data) => set({ events: data }),
   setDisruptions:  (data) => set({ disruptions: data }),
   setWeather:      (data) => set({ weather: data }),
+  setForecast:     (data) => set({ forecast: data }),
   setAirQuality:   (data) => set({ airQuality: data }),
 }))

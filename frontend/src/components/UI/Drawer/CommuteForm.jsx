@@ -1,22 +1,17 @@
 import React, { useState, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Icons } from '../icons'
 import { geocodeSearch } from '../../../utils/geocode'
 
 const MODES = [
-  { id: 'foot',   label: 'A peu',  Icon: Icons.walking, color: '#a78bfa' },
-  { id: 'bicing', label: 'Bicing', Icon: Icons.bike,    color: '#00ff88' },
-  { id: 'bus',    label: 'Bus',    Icon: Icons.bus,     color: '#00b4ff' },
-  { id: 'metro',  label: 'Metro',  Icon: Icons.metro,   color: '#ff6b35' },
-  { id: 'car',    label: 'Cotxe',  Icon: Icons.car,     color: '#ffaa00' },
+  { id: 'foot',   Icon: Icons.walking, color: '#a78bfa' },
+  { id: 'bicing', Icon: Icons.bike,    color: '#00ff88' },
+  { id: 'bus',    Icon: Icons.bus,     color: '#00b4ff' },
+  { id: 'metro',  Icon: Icons.metro,   color: '#ff6b35' },
+  { id: 'car',    Icon: Icons.car,     color: '#ffaa00' },
 ]
 
-const DAYS = [
-  { n: 1, label: 'Dl' }, { n: 2, label: 'Dt' }, { n: 3, label: 'Dc' },
-  { n: 4, label: 'Dj' }, { n: 5, label: 'Dv' }, { n: 6, label: 'Ds' },
-  { n: 7, label: 'Dg' },
-]
-
-function LocationInput({ label, value, onChange }) {
+function LocationInput({ label, value, onChange, placeholder }) {
   const [query, setQuery]       = useState(value?.label ?? '')
   const [suggestions, setSugg]  = useState([])
   const [searching, setSearching] = useState(false)
@@ -50,7 +45,7 @@ function LocationInput({ label, value, onChange }) {
         <input
           value={query}
           onChange={handleInput}
-          placeholder="Cerca una adreça..."
+          placeholder={placeholder}
           className="w-full px-3 py-2 font-mono text-[11px] rounded outline-none"
           style={{ background: '#1C1A17', border: '1px solid #2C2926', color: '#F7F6F4' }}
           onFocus={e => { e.currentTarget.style.borderColor = '#B8885A' }}
@@ -84,6 +79,7 @@ function LocationInput({ label, value, onChange }) {
 }
 
 export default function CommuteForm({ initial, onSubmit, onCancel }) {
+  const { t } = useTranslation()
   const [name,        setName]        = useState(initial?.name ?? '')
   const [mode,        setMode]        = useState(initial?.mode ?? 'bus')
   const [origin,      setOrigin]      = useState(
@@ -98,15 +94,17 @@ export default function CommuteForm({ initial, onSubmit, onCancel }) {
   const [saving,      setSaving]      = useState(false)
   const [error,       setError]       = useState(null)
 
+  const daysShort = t('drawer.commuteForm.daysShort', { returnObjects: true })
+
   const toggleDay = (n) => {
     setDays(prev => prev.includes(n) ? prev.filter(d => d !== n) : [...prev, n])
   }
 
   const handleSubmit = async () => {
-    if (!name.trim())  return setError('Posa un nom al trajecte')
-    if (!origin)       return setError('Selecciona l\'origen')
-    if (!dest)         return setError('Selecciona la destinació')
-    if (!days.length)  return setError('Selecciona almenys un dia')
+    if (!name.trim())  return setError(t('drawer.commuteForm.errorName'))
+    if (!origin)       return setError(t('drawer.commuteForm.errorOrigin'))
+    if (!dest)         return setError(t('drawer.commuteForm.errorDest'))
+    if (!days.length)  return setError(t('drawer.commuteForm.errorDays'))
 
     setSaving(true)
     setError(null)
@@ -125,7 +123,7 @@ export default function CommuteForm({ initial, onSubmit, onCancel }) {
         alert_minutes_before: alertMins,
       })
     } catch (e) {
-      setError(e.response?.data?.message ?? 'Error desant el trajecte')
+      setError(e.response?.data?.message ?? t('drawer.commuteForm.errorSave'))
       setSaving(false)
     }
   }
@@ -138,11 +136,11 @@ export default function CommuteForm({ initial, onSubmit, onCancel }) {
 
         {/* Name */}
         <div>
-          <label className="block font-mono text-[10px] mb-1" style={{ color: '#8C8884' }}>Nom del trajecte</label>
+          <label className="block font-mono text-[10px] mb-1" style={{ color: '#8C8884' }}>{t('drawer.commuteForm.name')}</label>
           <input
             value={name}
             onChange={e => setName(e.target.value)}
-            placeholder="Ex: Casa → Feina"
+            placeholder={t('drawer.commuteForm.namePlaceholder')}
             className="w-full px-3 py-2 font-mono text-[11px] rounded outline-none"
             style={{ background: '#1C1A17', border: '1px solid #2C2926', color: '#F7F6F4' }}
             onFocus={e => { e.currentTarget.style.borderColor = '#B8885A' }}
@@ -151,12 +149,12 @@ export default function CommuteForm({ initial, onSubmit, onCancel }) {
         </div>
 
         {/* Origin / Destination */}
-        <LocationInput label="Origen (casa)" value={origin} onChange={setOrigin} />
-        <LocationInput label="Destinació (feina)" value={dest} onChange={setDest} />
+        <LocationInput label={t('drawer.commuteForm.origin')} value={origin} onChange={setOrigin} placeholder={t('drawer.commuteForm.addressPlaceholder')} />
+        <LocationInput label={t('drawer.commuteForm.dest')} value={dest} onChange={setDest} placeholder={t('drawer.commuteForm.addressPlaceholder')} />
 
         {/* Mode */}
         <div>
-          <label className="block font-mono text-[10px] mb-1.5" style={{ color: '#8C8884' }}>Mode de transport</label>
+          <label className="block font-mono text-[10px] mb-1.5" style={{ color: '#8C8884' }}>{t('drawer.commuteForm.transport')}</label>
           <div className="flex gap-1.5">
             {MODES.map(m => (
               <button
@@ -170,7 +168,7 @@ export default function CommuteForm({ initial, onSubmit, onCancel }) {
                 }}
               >
                 <m.Icon size={12} />
-                <span className="font-mono text-[8px]">{m.label}</span>
+                <span className="font-mono text-[8px]">{t(`modes.${m.id}`)}</span>
               </button>
             ))}
           </div>
@@ -178,28 +176,31 @@ export default function CommuteForm({ initial, onSubmit, onCancel }) {
 
         {/* Days */}
         <div>
-          <label className="block font-mono text-[10px] mb-1.5" style={{ color: '#8C8884' }}>Dies de la setmana</label>
+          <label className="block font-mono text-[10px] mb-1.5" style={{ color: '#8C8884' }}>{t('drawer.commuteForm.days')}</label>
           <div className="flex gap-1">
-            {DAYS.map(d => (
-              <button
-                key={d.n}
-                onClick={() => toggleDay(d.n)}
-                className="flex-1 py-1.5 rounded font-mono text-[9px] font-medium transition-colors"
-                style={{
-                  background: days.includes(d.n) ? selectedMode.color + '18' : '#1C1A17',
-                  border: `1px solid ${days.includes(d.n) ? selectedMode.color + '55' : '#2C2926'}`,
-                  color: days.includes(d.n) ? selectedMode.color : '#8C8884',
-                }}
-              >
-                {d.label}
-              </button>
-            ))}
+            {daysShort.map((dayLabel, i) => {
+              const n = i + 1
+              return (
+                <button
+                  key={n}
+                  onClick={() => toggleDay(n)}
+                  className="flex-1 py-1.5 rounded font-mono text-[9px] font-medium transition-colors"
+                  style={{
+                    background: days.includes(n) ? selectedMode.color + '18' : '#1C1A17',
+                    border: `1px solid ${days.includes(n) ? selectedMode.color + '55' : '#2C2926'}`,
+                    color: days.includes(n) ? selectedMode.color : '#8C8884',
+                  }}
+                >
+                  {dayLabel}
+                </button>
+              )
+            })}
           </div>
         </div>
 
         {/* Arrival time */}
         <div>
-          <label className="block font-mono text-[10px] mb-1" style={{ color: '#8C8884' }}>Hora d'arribada</label>
+          <label className="block font-mono text-[10px] mb-1" style={{ color: '#8C8884' }}>{t('drawer.commuteForm.arrivalTime')}</label>
           <input
             type="time"
             value={arrivalTime}
@@ -214,7 +215,7 @@ export default function CommuteForm({ initial, onSubmit, onCancel }) {
         {/* Alert */}
         <div>
           <label className="block font-mono text-[10px] mb-1" style={{ color: '#8C8884' }}>
-            Avisar {alertMins} min abans
+            {t('drawer.commuteForm.alertBefore', { n: alertMins })}
           </label>
           <input
             type="range"
@@ -247,7 +248,7 @@ export default function CommuteForm({ initial, onSubmit, onCancel }) {
           onMouseEnter={e => { e.currentTarget.style.background = '#252320' }}
           onMouseLeave={e => { e.currentTarget.style.background = '#1C1A17' }}
         >
-          Cancel·lar
+          {t('misc.cancel')}
         </button>
         <button
           onClick={handleSubmit}
@@ -257,7 +258,7 @@ export default function CommuteForm({ initial, onSubmit, onCancel }) {
           onMouseEnter={e => { if (!saving) e.currentTarget.style.background = '#B8885A33' }}
           onMouseLeave={e => { if (!saving) e.currentTarget.style.background = '#B8885A22' }}
         >
-          {saving ? 'Desant...' : initial ? 'Desar canvis' : 'Crear trajecte'}
+          {saving ? t('drawer.commuteForm.saving') : initial ? t('drawer.commuteForm.saveChanges') : t('drawer.commuteForm.create')}
         </button>
       </div>
     </div>

@@ -5,7 +5,7 @@ import { useRouteStore } from '../../store/routeStore'
 import { useMapStore } from '../../store/mapStore'
 import { useDataStore } from '../../store/dataStore'
 import { useRoute } from '../../hooks/useRoute'
-import { fetchRoute, fetchMetroArrivals, addSavedRoute } from '../../services/api'
+import { fetchRoute, fetchMetroArrivals, fetchBusArrivals, addSavedRoute } from '../../services/api'
 import { useAuthStore } from '../../store/authStore'
 import { geocodeSearch } from '../../utils/geocode'
 
@@ -519,6 +519,31 @@ function useMetroArrivals(stationId) {
   return data
 }
 
+function useBusArrivals(stopId) {
+  const [data, setData] = useState({ loading: false, buses: null })
+  const ref = useRef(0)
+  useEffect(() => {
+    ref.current++
+    if (!stopId) { setData({ loading: false, buses: null }); return }
+    let cancelled = false
+    const load = async () => {
+      setData(prev => ({ loading: prev.buses == null, buses: prev.buses }))
+      try {
+        const r = await fetchBusArrivals(stopId)
+        if (cancelled) return
+        setData({ loading: false, buses: Array.isArray(r?.buses) ? r.buses : null })
+      } catch {
+        if (cancelled) return
+        setData({ loading: false, buses: null })
+      }
+    }
+    load()
+    const id = setInterval(load, 45000)
+    return () => { cancelled = true; clearInterval(id) }
+  }, [stopId])
+  return data
+}
+
 /* ─────────────────────────────────────────────────────────────────────
  * Sub-componente: nodo de estación dentro del timeline de RouteStepPanel
  * ───────────────────────────────────────────────────────────────────── */
@@ -570,13 +595,95 @@ function MetroArrivalsLine({ stationId, lines }) {
  * Sub-componente: panel detallado de pasos de la ruta activa (timeline)
  * ───────────────────────────────────────────────────────────────────── */
 
+// Arrivals for bus: "Próx. 3 min · 9 min" — line removed from chip, it's already in the badge
+function BusArrivalsChips({ stopId, lineFilter }) {
+  const { t } = useTranslation()
+  const { loading, buses } = useBusArrivals(stopId)
+
+  if (loading && !buses) return (
+    <span className="inline-flex items-center gap-1 h-4">
+      {[0,120,240].map(d => (
+        <span key={d} className="w-1 h-1 rounded-full animate-bounce"
+          style={{ background: '#00b4ff66', animationDelay: `${d}ms` }} />
+      ))}
+    </span>
+  )
+  if (!buses?.length) return null
+
+  const relevant = lineFilter ? buses.filter(b => b.line === lineFilter) : buses
+  const pool = relevant.length ? relevant : buses.slice(0, 2)
+  const allTimes = pool
+    .flatMap(b => (b.arrivals ?? []).slice(0, 2))
+    .filter(m => m != null)
+    .sort((a, b) => a - b)
+    .slice(0, 3)
+
+  if (!allTimes.length) return null
+
+  return (
+    <span className="inline-flex items-center gap-1 font-mono text-[10px]">
+      <span style={{ color: '#ffffff35' }}>Próx.</span>
+      {allTimes.map((m, i) => (
+        <React.Fragment key={i}>
+          {i > 0 && <span style={{ color: '#ffffff20' }}>·</span>}
+          <span className="font-bold tabular-nums" style={{ color: '#00b4ff' }}>
+            {m === 0 ? t('metro.now') : t('metro.min', { n: m })}
+          </span>
+        </React.Fragment>
+      ))}
+    </span>
+  )
+}
+
+// Metro arrivals: same clean format
+function MetroArrivalsChips({ stationId, lines }) {
+  const { t } = useTranslation()
+  const { loading, trains } = useMetroArrivals(stationId)
+
+  if (loading && !trains) return (
+    <span className="inline-flex items-center gap-1 h-4">
+      {[0,120,240].map(d => (
+        <span key={d} className="w-1 h-1 rounded-full animate-bounce"
+          style={{ background: '#ffffff44', animationDelay: `${d}ms` }} />
+      ))}
+    </span>
+  )
+  if (!trains?.length) return null
+
+  const relevant = lines?.length ? trains.filter(tr => lines.includes(tr.line)) : trains
+  const pool = relevant.length ? relevant : trains
+  const allTimes = pool
+    .flatMap(tr => (tr.arrivals ?? []).slice(0, 2))
+    .filter(m => m != null)
+    .sort((a, b) => a - b)
+    .slice(0, 3)
+
+  if (!allTimes.length) return null
+
+  return (
+    <span className="inline-flex items-center gap-1 font-mono text-[10px]">
+      <span style={{ color: '#ffffff35' }}>Próx.</span>
+      {allTimes.map((m, i) => (
+        <React.Fragment key={i}>
+          {i > 0 && <span style={{ color: '#ffffff20' }}>·</span>}
+          <span className="font-bold tabular-nums" style={{ color: '#a8ffde' }}>
+            {m === 0 ? t('metro.now') : t('metro.min', { n: m })}
+          </span>
+        </React.Fragment>
+      ))}
+    </span>
+  )
+}
+
+// ── Timeline layout: LEFT = 32px col (badge/line), RIGHT = content ────────
+
 function StepNodeOrigin({ label }) {
   return (
-    <div className="flex items-center gap-2.5">
-      <span className="w-[22px] flex justify-center flex-shrink-0">
-        <span className="w-2.5 h-2.5 rounded-full bg-white border border-white/40" />
+    <div className="flex items-center gap-3">
+      <span className="w-8 flex justify-center flex-shrink-0">
+        <span className="w-2 h-2 rounded-full" style={{ background: '#ffffff', boxShadow: '0 0 4px #ffffff88' }} />
       </span>
-      <span className="text-[12px] font-mono text-white/80 truncate">
+      <span className="font-syne text-[11px] font-medium text-white/55 truncate">
         {label ?? 'Mi ubicación'}
       </span>
     </div>
@@ -585,14 +692,11 @@ function StepNodeOrigin({ label }) {
 
 function StepNodeDest({ label }) {
   return (
-    <div className="flex items-center gap-2.5">
-      <span className="w-[22px] flex justify-center flex-shrink-0">
-        <span
-          className="w-2.5 h-2.5 rounded-full"
-          style={{ background: '#ff6b35', boxShadow: '0 0 6px #ff6b3577' }}
-        />
+    <div className="flex items-center gap-3">
+      <span className="w-8 flex justify-center flex-shrink-0">
+        <span className="w-2.5 h-2.5 rounded-full" style={{ background: '#ff6b35', boxShadow: '0 0 7px #ff6b3599' }} />
       </span>
-      <span className="text-[12px] font-mono text-white/80 truncate">
+      <span className="font-syne text-[13px] font-semibold text-white/90 truncate">
         {label ?? 'Destino'}
       </span>
     </div>
@@ -601,27 +705,53 @@ function StepNodeDest({ label }) {
 
 function StepNodeBicing({ name, bikes, ebikes, docks }) {
   return (
-    <div className="flex items-start gap-2.5">
-      <span className="w-[22px] flex justify-center flex-shrink-0 mt-0.5">
+    <div className="flex items-start gap-3">
+      <span className="w-8 flex justify-center flex-shrink-0 pt-0.5">
         <span
-          className="w-[18px] h-[18px] rounded-full flex items-center justify-center text-[#00ff88]"
-          style={{
-            background: 'rgba(0,255,136,0.08)',
-            boxShadow: '0 0 6px rgba(0,255,136,0.45), inset 0 0 0 1px rgba(0,255,136,0.55)',
-          }}
+          className="w-6 h-6 rounded-full flex items-center justify-center text-[#00ff88] flex-shrink-0"
+          style={{ background: 'rgba(0,255,136,0.10)', boxShadow: '0 0 6px rgba(0,255,136,0.4), inset 0 0 0 1px rgba(0,255,136,0.5)' }}
         >
-          <Icon.segBike size={10} />
+          <Icon.segBike size={11} />
         </span>
       </span>
-      <div className="flex-1 min-w-0">
-        <p className="text-[12px] font-mono text-white/80 truncate">{name}</p>
-        <p className="text-[10px] font-mono text-white/40">
-          {bikes != null && <span>{bikes} {bikes === 1 ? 'bici' : 'bicis'}</span>}
-          {ebikes != null && bikes != null && <span> · </span>}
-          {ebikes != null && <span>{ebikes} {ebikes === 1 ? 'e-bici' : 'e-bicis'}</span>}
-          {docks != null && (bikes != null || ebikes != null) && <span> · </span>}
-          {docks != null && <span>{docks} {docks === 1 ? 'muelle libre' : 'muelles libres'}</span>}
+      <div className="flex-1 min-w-0 py-0.5">
+        <p className="font-syne text-[12px] font-semibold text-white/85 truncate">{name}</p>
+        <p className="font-mono text-[10px] text-white/40 mt-0.5">
+          {bikes != null && `${bikes} ${bikes === 1 ? 'bici' : 'bicis'}`}
+          {ebikes != null && bikes != null && ' · '}
+          {ebikes != null && `${ebikes} e-bicis`}
+          {docks != null && (bikes != null || ebikes != null) && ' · '}
+          {docks != null && `${docks} muelles`}
         </p>
+      </div>
+    </div>
+  )
+}
+
+// Transit stop node — shared layout for metro and bus
+function TransitStopNode({ badge, badgeColor, badgeGlow, name, direction, dirColor, arrivals, t }) {
+  return (
+    <div className="flex items-start gap-3">
+      {/* Left: line badge */}
+      <span className="w-8 flex justify-center flex-shrink-0 pt-0.5">
+        <span
+          className="inline-flex items-center justify-center h-6 px-1.5 rounded-[5px] font-mono font-bold text-white text-[10px] min-w-[24px]"
+          style={{ background: badgeColor, boxShadow: `0 0 10px ${badgeGlow}` }}
+        >
+          {badge}
+        </span>
+      </span>
+      {/* Right: name + direction + arrivals */}
+      <div className="flex-1 min-w-0 py-0.5">
+        <p className="font-syne text-[13px] font-semibold text-white/90 truncate leading-tight">{name}</p>
+        <div className="flex items-center gap-2 mt-1 flex-wrap">
+          {direction && (
+            <span className="font-mono text-[9px] truncate" style={{ color: dirColor }}>
+              dir. {direction}
+            </span>
+          )}
+          {arrivals}
+        </div>
       </div>
     </div>
   )
@@ -630,113 +760,117 @@ function StepNodeBicing({ name, bikes, ebikes, docks }) {
 function StepNodeMetro({ name, lineNames, lineColors, stationId, direction }) {
   const { t } = useTranslation()
   const primary = lineNames?.[0]
-  const primaryColor = primary && lineColors?.[primary] ? lineColors[primary] : '#A855F7'
-  const bg = primaryColor.startsWith('#') ? primaryColor : '#' + primaryColor
+  const rawColor = primary && lineColors?.[primary] ? lineColors[primary] : 'A855F7'
+  const bg = rawColor.startsWith('#') ? rawColor : '#' + rawColor
 
   return (
-    <div className="flex items-start gap-2.5">
-      <span className="w-[22px] flex justify-center flex-shrink-0 mt-0.5">
-        <span
-          className="inline-flex items-center justify-center min-w-[22px] h-[18px] px-1 rounded text-[9px] font-mono font-bold text-white"
-          style={{ background: bg, boxShadow: `0 0 6px ${bg}88` }}
-        >
-          {primary ?? 'M'}
-        </span>
-      </span>
-      <div className="flex-1 min-w-0">
-        <p className="text-[12px] font-mono text-white/80 truncate">{name}</p>
-        {direction && (
-          <p className="text-[10px] font-mono truncate" style={{ color: bg + 'cc' }}>
-            {t('search.dir')} {direction}
-          </p>
-        )}
-        {stationId && (
-          <p className="mt-0.5">
-            <MetroArrivalsLine stationId={stationId} lines={lineNames} />
-          </p>
-        )}
-      </div>
-    </div>
+    <TransitStopNode
+      badge={primary ?? 'M'}
+      badgeColor={bg}
+      badgeGlow={bg + '66'}
+      name={name}
+      direction={direction}
+      dirColor={bg + 'bb'}
+      arrivals={stationId ? <MetroArrivalsChips stationId={stationId} lines={lineNames} /> : null}
+      t={t}
+    />
+  )
+}
+
+function StepNodeBus({ name, lineNames, stopId, direction }) {
+  const { t } = useTranslation()
+  const primary = lineNames?.[0]
+
+  return (
+    <TransitStopNode
+      badge={primary ?? 'B'}
+      badgeColor="#00b4ff"
+      badgeGlow="#00b4ff55"
+      name={name}
+      direction={direction}
+      dirColor="#00b4ffaa"
+      arrivals={stopId ? <BusArrivalsChips stopId={stopId} lineFilter={primary} /> : null}
+      t={t}
+    />
   )
 }
 
 function StepNodeTransfer({ name, fromLine, fromColor, toLine, toColor, toDirection, stationId }) {
   const { t } = useTranslation()
-  const toClr = toColor ?? '#B0ACA7'
+  const fromClr = fromColor ?? '#8C8884'
+  const toClr   = toColor   ?? '#8C8884'
+
   return (
-    <div className="flex items-start gap-2.5">
-      <span className="w-[22px] flex justify-center flex-shrink-0 mt-0.5">
+    <div className="flex items-start gap-3">
+      {/* Left: paired badges */}
+      <span className="w-8 flex justify-center flex-shrink-0 pt-0.5">
         <span className="flex items-center gap-0.5">
           <span
-            className="inline-flex items-center justify-center min-w-[18px] h-[15px] px-1 rounded text-[8px] font-mono font-bold text-white"
-            style={{ background: fromColor ?? '#B0ACA7', boxShadow: `0 0 4px ${fromColor ?? '#B0ACA7'}88` }}
+            className="inline-flex items-center justify-center h-5 px-1 rounded-[4px] font-mono font-bold text-white text-[9px] min-w-[18px]"
+            style={{ background: fromClr, boxShadow: `0 0 6px ${fromClr}55` }}
           >
-            {fromLine ?? 'M'}
+            {fromLine ?? '?'}
           </span>
-          <span className="text-white/30 text-[8px]">→</span>
+          <svg width="8" height="8" viewBox="0 0 8 8" style={{ color: '#ffffff30' }}>
+            <path d="M1 4h6M4 1l3 3-3 3" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+          </svg>
           <span
-            className="inline-flex items-center justify-center min-w-[18px] h-[15px] px-1 rounded text-[8px] font-mono font-bold text-white"
-            style={{ background: toClr, boxShadow: `0 0 4px ${toClr}88` }}
+            className="inline-flex items-center justify-center h-5 px-1 rounded-[4px] font-mono font-bold text-white text-[9px] min-w-[18px]"
+            style={{ background: toClr, boxShadow: `0 0 6px ${toClr}55` }}
           >
-            {toLine ?? 'M'}
+            {toLine ?? '?'}
           </span>
         </span>
       </span>
-      <div className="flex-1 min-w-0">
-        <p className="text-[12px] font-mono text-white/80 truncate">{name}</p>
-        <p className="text-[10px] font-mono text-white/35">{t('search.transfer')}
-          {toDirection && (
-            <span style={{ color: toClr + 'cc' }}> · {t('search.dir')} {toDirection}</span>
-          )}
-        </p>
+      {/* Right */}
+      <div className="flex-1 min-w-0 py-0.5">
+        <p className="font-syne text-[12px] font-semibold text-white/80 truncate leading-tight">{name}</p>
+        <span className="font-mono text-[9px] uppercase tracking-wide" style={{ color: '#ffffff30' }}>
+          {t('search.transfer')}
+          {toDirection && <span style={{ color: toClr + 'bb' }}> · dir. {toDirection}</span>}
+        </span>
         {stationId && (
-          <p className="mt-0.5">
-            <MetroArrivalsLine stationId={stationId} lines={[toLine].filter(Boolean)} />
-          </p>
+          <div className="mt-1">
+            <MetroArrivalsChips stationId={stationId} lines={[toLine].filter(Boolean)} />
+          </div>
         )}
       </div>
     </div>
   )
 }
 
+// Segment row: continuous colored line left, compact pill right
 function StepSegment({ seg }) {
   const SegIcon = SEG_ICONS[seg.type]
-  const isWalk  = seg.type === 'walk'
-  const isBike  = seg.type === 'bike'
   const isMetro = seg.type === 'metro'
   const isBus   = seg.type === 'bus'
-  const isCar   = seg.type === 'drive'
 
   let label = 'Tramo'
-  if (isWalk)  label = 'A pie'
-  else if (isBike)  label = 'Bicing'
-  else if (isCar)   label = 'Coche'
-  else if (isMetro) {
-    const ln = seg.meta?.lines?.[0]
-    label = ln ? `Metro ${ln}` : 'Metro'
-  }
-  else if (isBus) { const ln = seg.meta?.line; label = ln ? `Bus ${ln}` : 'Bus' }
+  if (seg.type === 'walk')  label = 'A pie'
+  else if (seg.type === 'bike')  label = 'Bicing'
+  else if (seg.type === 'drive') label = 'Coche'
+  else if (isMetro) { const ln = seg.meta?.lines?.[0]; label = ln ? `Metro ${ln}` : 'Metro' }
+  else if (isBus)   { const ln = seg.meta?.lines?.[0] ?? seg.meta?.line; label = ln ? `Bus ${ln}` : 'Bus' }
 
-  const color = seg.color ?? '#ffffff'
+  const color = seg.color ?? '#ffffff55'
 
   return (
-    <div className="flex items-center gap-2.5 py-1.5">
-      <span className="w-[22px] flex justify-center flex-shrink-0">
-        <span
-          className="w-px h-5"
-          style={{ background: color + '55' }}
-        />
+    <div className="flex items-center gap-3 py-0.5">
+      {/* Continuous spine line */}
+      <span className="w-8 flex justify-center flex-shrink-0">
+        <span className="w-[2px] rounded-full" style={{ height: 28, background: `linear-gradient(to bottom, ${color}66, ${color}33)` }} />
       </span>
-      <span className="inline-flex items-center gap-1.5 text-[11px] font-mono" style={{ color }}>
-        {SegIcon && <SegIcon />}
+      {/* Info pill */}
+      <span
+        className="inline-flex items-center gap-1.5 font-mono text-[10px] px-2 py-[3px] rounded-full"
+        style={{ color, background: color + '12', border: `1px solid ${color}25` }}
+      >
+        {SegIcon && <SegIcon size={9} />}
         <span>{label}</span>
-        <span className="text-white/30">·</span>
-        <span className="text-white/55">{fmtTime(seg.duration)}</span>
+        <span style={{ opacity: 0.3 }}>·</span>
+        <span className="font-bold tabular-nums">{fmtTime(seg.duration)}</span>
         {seg.distance != null && (
-          <>
-            <span className="text-white/30">·</span>
-            <span className="text-white/40">{fmtDist(seg.distance)}</span>
-          </>
+          <><span style={{ opacity: 0.3 }}>·</span><span style={{ opacity: 0.5 }}>{fmtDist(seg.distance)}</span></>
         )}
       </span>
     </div>
@@ -816,20 +950,37 @@ function RouteStepPanel({ segments, origin, destination, mode }) {
           bikes: null, ebikes: null, docks: m.docks_available })
       } else if (seg.type === 'walk' && (next.type === 'metro' || next.type === 'bus')) {
         const m = next.meta ?? {}
-        nodes.push({ kind: 'metro', name: m.from_station ?? 'Estació',
+        const isBus = next.type === 'bus'
+        nodes.push({
+          kind: isBus ? 'bus_stop' : 'metro',
+          name: m.from_station ?? (isBus ? 'Parada' : 'Estació'),
           lineNames: m.lines ?? [], lineColors: m.line_colors ?? {},
-          stationId: m.from_station_id ?? null, direction: m.direction ?? null })
+          stationId: m.from_station_id ?? null,
+          stopId: isBus ? (m.from_station_id ?? null) : null,
+          direction: m.direction ?? null,
+        })
       } else if ((seg.type === 'metro' || seg.type === 'bus') && (next.type === 'metro' || next.type === 'bus')) {
         const m = seg.meta ?? {}
-        nodes.push({ kind: 'transfer', name: m.to_station ?? 'Transbord',
+        const nextIsBus = next.type === 'bus'
+        nodes.push({
+          kind: 'transfer', name: m.to_station ?? 'Transbord',
           fromLine: seg.meta?.lines?.[0], fromColor: seg.color,
           toLine: next.meta?.lines?.[0], toColor: next.color,
-          toDirection: next.meta?.direction ?? null, stationId: m.to_station_id ?? null })
+          toDirection: next.meta?.direction ?? null,
+          stationId: nextIsBus ? null : (m.to_station_id ?? null),
+          toStopId: nextIsBus ? (next.meta?.from_station_id ?? null) : null,
+        })
       } else if ((seg.type === 'metro' || seg.type === 'bus') && next.type === 'walk') {
         const m = seg.meta ?? {}
-        nodes.push({ kind: 'metro', name: m.to_station ?? 'Estació',
+        const isBus = seg.type === 'bus'
+        nodes.push({
+          kind: isBus ? 'bus_stop' : 'metro',
+          name: m.to_station ?? (isBus ? 'Parada' : 'Estació'),
           lineNames: m.lines ?? [], lineColors: m.line_colors ?? {},
-          stationId: m.to_station_id ?? null, direction: null })
+          stationId: isBus ? null : (m.to_station_id ?? null),
+          stopId: isBus ? (m.to_station_id ?? null) : null,
+          direction: null,
+        })
       }
     }
   }
@@ -873,16 +1024,17 @@ function RouteStepPanel({ segments, origin, destination, mode }) {
       </div>
 
       {/* Steps */}
-      <div className="px-3 py-1.5 max-h-[240px] overflow-y-auto">
+      <div className="px-3 py-1.5 max-h-[280px] overflow-y-auto">
         {isSimpleRoute && allSteps.length > 0 ? (
           <NumberedSteps steps={allSteps} currentStep={isNavigating ? currentStepIndex : -1} />
         ) : (
-          <div className="flex flex-col py-1">
+          <div className="flex flex-col py-2 gap-1">
             {nodes.map((node, idx) => {
               if (node.kind === 'origin')   return <StepNodeOrigin   key={idx} label={node.label} />
               if (node.kind === 'dest')     return <StepNodeDest     key={idx} label={node.label} />
               if (node.kind === 'bicing')   return <StepNodeBicing   key={idx} name={node.name} bikes={node.bikes} ebikes={node.ebikes} docks={node.docks} />
               if (node.kind === 'metro')    return <StepNodeMetro    key={idx} name={node.name} lineNames={node.lineNames} lineColors={node.lineColors} stationId={node.stationId} direction={node.direction} />
+              if (node.kind === 'bus_stop') return <StepNodeBus      key={idx} name={node.name} lineNames={node.lineNames} lineColors={node.lineColors} stopId={node.stopId} direction={node.direction} />
               if (node.kind === 'transfer') return <StepNodeTransfer key={idx} name={node.name} fromLine={node.fromLine} fromColor={node.fromColor} toLine={node.toLine} toColor={node.toColor} toDirection={node.toDirection} stationId={node.stationId} />
               if (node.kind === 'segment')  return <StepSegment      key={idx} seg={node.seg} />
               return null

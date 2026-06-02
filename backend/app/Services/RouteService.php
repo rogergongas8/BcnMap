@@ -27,6 +27,10 @@ class RouteService
 
     public function planMultimodal(float $fromLat, float $fromLng, float $toLat, float $toLng, ?string $constraint = null, string $lang = 'ca'): array
     {
+        $cacheKey = 'plan:v1:' . md5(round($fromLat, 4) . ',' . round($fromLng, 4) . ',' . round($toLat, 4) . ',' . round($toLng, 4) . ',' . ($constraint ?? '') . ',' . $lang);
+        $cached = Cache::get($cacheKey);
+        if ($cached !== null) return $cached;
+
         $options = [];
         foreach (['foot', 'bicing', 'metro', 'bus', 'car'] as $mode) {
             try {
@@ -37,32 +41,91 @@ class RouteService
             }
         }
 
-        return [
+        $result = [
             'recommended' => $this->scoreRoutes($options, $constraint),
             'options'     => $options,
         ];
+
+        Cache::put($cacheKey, $result, 300); // 5 min — routes don't change faster
+
+        return $result;
     }
 
     private function scoreRoutes(array $options, ?string $constraint): string
     {
-        $weather    = Cache::get('weather_current');
-        $isRainy    = $weather && preg_match('/rain|lluvio|lluvia|shower/i', $weather['description'] ?? '');
-        $congestion = $this->currentCongestion();
-        $noMetro    = $constraint && preg_match('/sin metro|no metro/i', $constraint);
-        $noBici     = $constraint && preg_match('/sin bici|no bici/i', $constraint);
-        $noBus      = $constraint && preg_match('/sin bus|no bus/i', $constraint);
+        $weather    = Cache::get('weather_current_es')
+                  ?? Cache::get('weather_current_ca')
+                  ?? Cache::get('weather_current_en');
+        $desc       = strtolower($weather['description'] ?? '');
+        $windSpeed  = (float)($weather['wind_speed'] ?? 0);
+        $temp       = (float)($weather['temp'] ?? 20);
+
+        $isRainy    = (bool) preg_match('/rain|llovi|lluvia|shower|drizzle|llovizn|pluja|xàfec/i', $desc);
+        $isStormy   = (bool) preg_match('/storm|tormenta|thunder/i', $desc);
+        $isHot      = $temp >= 35;
+        $strongWind = $windSpeed >= 30;
+
+        $congestion     = $this->currentCongestion();
+        $congestionPenalty = 1.0 + max(0, min(1.5, ($congestion - 20) / 50));
+
+        $noMetro    = $constraint && preg_match('/sin metro|no metro|sense metro/i', $constraint);
+        $noBici     = $constraint && preg_match('/sin bici|no bici|sense bici/i', $constraint);
+        $noBus      = $constraint && preg_match('/sin bus|no bus|sense bus/i', $constraint);
+        $noCoche    = $constraint && preg_match('/sin coche|no coche|sense cotxe|a pie|a peu/i', $constraint);
+        $hurry      = $constraint && preg_match('/prisa|ràpid|rapido|urgent/i', $constraint);
+
+        // Walking distance = baseline for proximity thresholds
+        $walkDist    = (float)(($options['foot']['distance'] ?? 0));
+        $isVeryClose = $walkDist > 0 && $walkDist <= 600;   // < 600m: transit never makes sense
+        $isClose     = $walkDist > 0 && $walkDist <= 1500;  // < 1.5km: transit rarely worth it
 
         $scores = [];
         foreach ($options as $mode => $route) {
             if (!$route) { $scores[$mode] = PHP_INT_MAX; continue; }
             $score    = (float)($route['duration'] ?? PHP_INT_MAX);
             $distance = (float)($route['distance'] ?? 0);
-            if ($mode === 'car'    && $congestion > 60) $score *= 1.5;
-            if ($mode === 'bicing' && $isRainy)         $score *= 3.0;
-            if ($mode === 'foot'   && $distance > 3000) $score *= 1.8;
-            if ($mode === 'bicing' && $noBici)          $score  = PHP_INT_MAX;
-            if ($mode === 'metro'  && $noMetro)         $score  = PHP_INT_MAX;
-            if ($mode === 'bus'    && $noBus)           $score  = PHP_INT_MAX;
+
+            switch ($mode) {
+                case 'car':
+                    if ($isVeryClose)      $score  = PHP_INT_MAX; // never drive <600m
+                    elseif ($isClose)      $score *= 3.5;         // strong discourage <1.5km
+                    elseif ($congestion > 40) $score *= $congestionPenalty;
+                    if ($isRainy)          $score *= 1.15;
+                    if ($isStormy)         $score *= 1.3;
+                    if ($noCoche)          $score  = PHP_INT_MAX;
+                    break;
+                case 'bicing':
+                    if ($isRainy)          $score *= 3.0;
+                    if ($isStormy)         $score  = PHP_INT_MAX;
+                    if ($isHot)            $score *= 1.4;
+                    if ($strongWind)       $score *= 1.5;
+                    if ($noBici)           $score  = PHP_INT_MAX;
+                    break;
+                case 'foot':
+                    if ($isVeryClose)      $score *= 0.25; // strong preference when very close
+                    elseif ($isClose)      $score *= 0.6;
+                    elseif ($distance > 3000) $score *= 1.8;
+                    if ($isRainy)          $score *= 1.25;
+                    if ($isStormy)         $score *= 1.8;
+                    if ($isHot && !$isClose) $score *= 1.3;
+                    break;
+                case 'metro':
+                    if ($isVeryClose)      $score  = PHP_INT_MAX; // pointless for <600m
+                    elseif ($isClose)      $score *= 2.5;
+                    elseif (!$noMetro)     $score  *= 0.92;
+                    if ($noMetro)          $score  = PHP_INT_MAX;
+                    break;
+                case 'bus':
+                    if ($isVeryClose)      $score  = PHP_INT_MAX;
+                    elseif ($isClose)      $score *= 2.5;
+                    if ($noBus)            $score  = PHP_INT_MAX;
+                    if (!$isClose && $congestion > 40) $score *= 1.0 + max(0, ($congestion - 40) / 150);
+                    break;
+            }
+
+            // Con prisa: penalizar modos lentos aún más
+            if ($hurry && $mode === 'foot' && $distance > 1500) $score *= 1.5;
+
             $scores[$mode] = $score;
         }
 
@@ -101,7 +164,17 @@ class RouteService
 
             $data = $r->json();
             $congestion = $this->currentCongestion();
-            $penalty    = 1.0 + max(0, min(0.8, ($congestion - 20) / 100));
+            $weather    = Cache::get('weather_current_es')
+                       ?? Cache::get('weather_current_ca')
+                       ?? Cache::get('weather_current_en');
+            $desc       = strtolower($weather['description'] ?? '');
+            $isRainy    = (bool) preg_match('/rain|llovi|lluvia|shower|drizzle|llovizn|pluja|xàfec/i', $desc);
+            $isStormy   = (bool) preg_match('/storm|tormenta|thunder/i', $desc);
+
+            // 1.8 = factor base semàfors/cruïlles urbanes (Barcelona ~20 km/h real vs ~36 km/h Valhalla)
+            $penalty    = 1.8 + max(0, min(0.8, ($congestion - 20) / 100));
+            if ($isRainy)  $penalty *= 1.15;
+            if ($isStormy) $penalty *= 1.3;
 
             // Collect primary + alternates
             $routes = [$data['trip'] ?? null];
@@ -277,23 +350,25 @@ class RouteService
             return ['error' => 'bus_warming', 'mode' => 'bus', 'bus_graph_warming' => true];
         }
 
-        $originCandidates = $router->nearestStops($fromLat, $fromLng, 5, 800.0);
-        $destCandidates   = $router->nearestStops($toLat,   $toLng,   5, 800.0);
+        // Wider search: 10 stops from 1000m to catch more line variety (direct routes)
+        $originCandidates = $router->nearestStops($fromLat, $fromLng, 10, 1000.0);
+        $destCandidates   = $router->nearestStops($toLat,   $toLng,    5,  800.0);
 
         if (empty($originCandidates) || empty($destCandidates)) {
             return ['error' => 'no_stops_nearby', 'mode' => 'bus'];
         }
 
-        // Collect all unique-line-combo routes from origin candidates (up to 3 alternatives)
+        // Collect up to 4 unique-line-combo routes
         $candidates = [];
         foreach ($originCandidates as $orig) {
             $result = $router->route($orig, $toLat, $toLng);
             if (!$result) continue;
             $lineNames = array_map(fn($l) => $l['line_name'] ?? $l['line'], $result['legs']);
-            $lineSig   = implode('+', $lineNames);
-            if (isset($candidates[$lineSig])) continue;
-            $candidates[$lineSig] = ['result' => $result, 'origin' => $orig];
-            if (count($candidates) >= 3) break;
+            $fullSig   = implode('+', $lineNames);
+            if (!isset($candidates[$fullSig])) {
+                $candidates[$fullSig] = ['result' => $result, 'origin' => $orig];
+            }
+            if (count($candidates) >= 4) break;
         }
 
         if (empty($candidates)) {
@@ -391,16 +466,236 @@ class RouteService
             ];
         }
 
-        $best = $alternatives[0];
+        // Merge hybrid bus+metro alternatives with pure-bus ones, then filter
+        $hybridAlts = $this->hybridBusMetroAlternatives($fromLat, $fromLng, $toLat, $toLng, $router);
+        $allAlts    = array_merge($alternatives, $hybridAlts);
+        $rankedAlts = $this->filterAndRankAlternatives($allAlts, $straightLine);
 
+        // Fallback: if nothing passes the filter, keep only the fastest unfiltered option
+        if (empty($rankedAlts)) {
+            usort($allAlts, fn($a, $b) => $a['duration'] <=> $b['duration']);
+            $best = $allAlts[0];
+            return [
+                'segments'     => $best['segments'],
+                'distance'     => $best['distance'],
+                'duration'     => $best['duration'],
+                'mode'         => 'bus',
+                'inefficient'  => true,
+                'alternatives' => [$best],
+            ];
+        }
+
+        $best = $rankedAlts[0];
         return [
             'segments'     => $best['segments'],
             'distance'     => $best['distance'],
             'duration'     => $best['duration'],
             'mode'         => 'bus',
-            'inefficient'  => $best['inefficient'],
-            'alternatives' => $alternatives,
+            'inefficient'  => false,
+            'alternatives' => $rankedAlts,
         ];
+    }
+
+    /**
+     * Find bus→metro hybrid routes.
+     * Routes bus from origin to a metro station near the destination, then metro to dest.
+     * Uses BusRouter geometry (no Valhalla for bus legs) + 3 Valhalla walk calls per candidate.
+     */
+    private function hybridBusMetroAlternatives(
+        float $fromLat, float $fromLng, float $toLat, float $toLng,
+        BusRouter $busRouter
+    ): array {
+        $metroRouter   = new MetroRouter();
+        $allStations   = Cache::get('metro:stations', []);
+        $metroStations = array_values(array_filter($allStations, fn($s) => ($s['type'] ?? '') === 'metro'));
+        if (empty($metroStations)) return [];
+
+        // --- Destination stations (where metro ride ends) ---
+        usort($metroStations, fn($a, $b) =>
+            $this->haversine($toLat, $toLng, (float)$a['lat'], (float)$a['lng']) <=>
+            $this->haversine($toLat, $toLng, (float)$b['lat'], (float)$b['lng'])
+        );
+        $topDestStations = array_slice($metroStations, 0, 5);
+
+        // Lines that serve the destination (e.g. L5 for Sagrada Família)
+        $destLines = [];
+        foreach (array_slice($topDestStations, 0, 2) as $ds) {
+            foreach ($ds['lines'] ?? [] as $l) { $destLines[$l['name']] = true; }
+        }
+
+        // --- Transfer station pool ---
+        // Must be on a destination line, NOT at the destination (>300m),
+        // and not further from origin than 1.3× the total trip distance.
+        $origToDest = $this->haversine($fromLat, $fromLng, $toLat, $toLng);
+        $xferPool   = [];
+        foreach ($metroStations as $s) {
+            $dToDest = $this->haversine($toLat, $toLng, (float)$s['lat'], (float)$s['lng']);
+            if ($dToDest < 300) continue;  // too close to destination — no meaningful metro ride
+
+            $onDestLine = false;
+            foreach ($s['lines'] ?? [] as $l) {
+                if (isset($destLines[$l['name']])) { $onDestLine = true; break; }
+            }
+            if (!$onDestLine) continue;
+
+            $dToOrig = $this->haversine($fromLat, $fromLng, (float)$s['lat'], (float)$s['lng']);
+            if ($dToOrig > $origToDest * 1.3) continue;  // avoid backtracking
+
+            $xferPool[] = $s;
+        }
+
+        if (empty($xferPool)) return [];
+
+        // Sort by proximity to origin (closest = shortest walk to transfer)
+        usort($xferPool, fn($a, $b) =>
+            $this->haversine($fromLat, $fromLng, (float)$a['lat'], (float)$a['lng']) <=>
+            $this->haversine($fromLat, $fromLng, (float)$b['lat'], (float)$b['lng'])
+        );
+        $transferStations = array_slice($xferPool, 0, 5);
+
+        $originStops = $busRouter->nearestStops($fromLat, $fromLng, 4, 700.0);
+        if (empty($originStops)) return [];
+
+        $seen = []; $rawCandidates = [];
+
+        foreach ($transferStations as $xferStation) {
+            $xLat = (float)$xferStation['lat']; $xLng = (float)$xferStation['lng'];
+
+            foreach ($originStops as $origStop) {
+                $busResult = $busRouter->route($origStop, $xLat, $xLng);
+                if (!$busResult) continue;
+
+                $alight   = $busResult['alight_stop'];
+                $xferWalk = $this->haversine((float)$alight['lat'], (float)$alight['lng'], $xLat, $xLng);
+                if ($xferWalk > 500) continue;
+
+                // Best metro leg from transfer station to destination
+                $bestMLegs = null; $bestMScore = PHP_FLOAT_MAX; $bestDStn = null;
+                foreach ($topDestStations as $dStn) {
+                    if ($dStn['station_id'] === $xferStation['station_id']) continue;
+                    $mLegs = $metroRouter->route($xferStation, $dStn);
+                    if (!$mLegs) continue;
+                    $rT = array_sum(array_column($mLegs, 'route_time_s'));
+                    $wD = $this->haversine((float)$dStn['lat'], (float)$dStn['lng'], $toLat, $toLng);
+                    $sc = $rT + (count($mLegs) - 1) * 240 + $wD / 1.25;
+                    if ($sc < $bestMScore) { $bestMLegs = $mLegs; $bestMScore = $sc; $bestDStn = $dStn; }
+                }
+                if (!$bestMLegs || !$bestDStn) continue;
+
+                $busLines   = array_map(fn($l) => $l['line_name'] ?? $l['line'], $busResult['legs']);
+                $metroLines = array_map(fn($l) => $l['line'], $bestMLegs);
+                $sig        = implode('+', $busLines) . '→M' . implode('/', $metroLines);
+                if (isset($seen[$sig])) continue;
+                $seen[$sig] = true;
+
+                $rawCandidates[] = compact(
+                    'busResult', 'origStop', 'alight', 'xferStation', 'xferWalk',
+                    'bestMLegs', 'bestDStn', 'busLines', 'metroLines', 'sig'
+                );
+                if (count($rawCandidates) >= 4) break 2;
+            }
+        }
+
+        if (empty($rawCandidates)) return [];
+
+        // 3 Valhalla walk calls per candidate (to bus stop, transfer walk, from metro to dest)
+        $responses = Http::pool(function ($pool) use ($fromLat, $fromLng, $toLat, $toLng, $rawCandidates) {
+            $reqs = [];
+            foreach ($rawCandidates as $ci => $c) {
+                $oLat = (float)$c['origStop']['lat'];    $oLng = (float)$c['origStop']['lng'];
+                $aLat = (float)$c['alight']['lat'];      $aLng = (float)$c['alight']['lng'];
+                $xLat = (float)$c['xferStation']['lat']; $xLng = (float)$c['xferStation']['lng'];
+                $dLat = (float)$c['bestDStn']['lat'];    $dLng = (float)$c['bestDStn']['lng'];
+                $reqs[] = $pool->as("w1_{$ci}")->timeout(self::VALHALLA_TIMEOUT)->post($this->valhallaBase() . '/route', $this->walkBody($fromLat, $fromLng, $oLat, $oLng));
+                $reqs[] = $pool->as("wt_{$ci}")->timeout(self::VALHALLA_TIMEOUT)->post($this->valhallaBase() . '/route', $this->walkBody($aLat, $aLng, $xLat, $xLng));
+                $reqs[] = $pool->as("w2_{$ci}")->timeout(self::VALHALLA_TIMEOUT)->post($this->valhallaBase() . '/route', $this->walkBody($dLat, $dLng, $toLat, $toLng));
+            }
+            return $reqs;
+        });
+
+        $alternatives = [];
+        foreach ($rawCandidates as $ci => $c) {
+            $walk1 = isset($responses["w1_{$ci}"]) ? $this->parseValhalla($responses["w1_{$ci}"], 'walk') : null;
+            $walkT = isset($responses["wt_{$ci}"]) ? $this->parseValhalla($responses["wt_{$ci}"], 'walk') : null;
+            $walk2 = isset($responses["w2_{$ci}"]) ? $this->parseValhalla($responses["w2_{$ci}"], 'walk') : null;
+
+            $segs = [];
+
+            if ($walk1 && $walk1['distance'] > 20) {
+                $segs[] = ['type' => 'walk', 'geometry' => $walk1['geometry'], 'distance' => $walk1['distance'], 'duration' => $walk1['duration'], 'color' => self::COLORS['walk'], 'label' => 'Caminar a ' . ($c['origStop']['stop_name'] ?? 'parada'), 'meta' => ['stop_id' => $c['origStop']['stop_id'] ?? '', 'stop_name' => $c['origStop']['stop_name'] ?? '']];
+            }
+
+            foreach ($c['busResult']['legs'] as $leg) {
+                $from = $leg['from_stop']; $to = $leg['to_stop']; $recKey = $leg['rec_key'] ?? '';
+                $lineName = $leg['line_name'] ?? $leg['line'];
+                $geo  = $busRouter->legGeometry($from, $to, $recKey);
+                $dist = $busRouter->legDistance($from, $to, $recKey);
+                $dur  = ($dist / BusRouter::BUS_SPEED_MS) + 60;
+                $segs[] = ['type' => 'bus', 'geometry' => $geo, 'distance' => $dist, 'duration' => $dur, 'color' => self::COLORS['bus'], 'label' => 'Bus ' . $lineName, 'meta' => ['from_station_id' => $from['stop_id'] ?? '', 'from_station' => $from['stop_name'] ?? '', 'from_lat' => (float)$from['lat'], 'from_lng' => (float)$from['lng'], 'to_station_id' => $to['stop_id'] ?? '', 'to_station' => $to['stop_name'] ?? '', 'to_lat' => (float)$to['lat'], 'to_lng' => (float)$to['lng'], 'lines' => [$lineName], 'line_colors' => [$lineName => '00b4ff'], 'direction' => null]];
+            }
+
+            // Transfer walk: bus alight stop → metro station
+            if ($walkT && $walkT['distance'] > 20) {
+                $segs[] = ['type' => 'walk', 'geometry' => $walkT['geometry'], 'distance' => $walkT['distance'], 'duration' => $walkT['duration'], 'color' => self::COLORS['walk'], 'label' => 'Caminar a ' . ($c['xferStation']['station_name'] ?? 'metro')];
+            } elseif ($c['xferWalk'] > 5) {
+                $aLat = (float)$c['alight']['lat']; $aLng = (float)$c['alight']['lng'];
+                $xLat = (float)$c['xferStation']['lat']; $xLng = (float)$c['xferStation']['lng'];
+                $segs[] = ['type' => 'walk', 'geometry' => ['type' => 'LineString', 'coordinates' => [[$aLng, $aLat], [$xLng, $xLat]]], 'distance' => $c['xferWalk'], 'duration' => (int)($c['xferWalk'] / 1.25), 'color' => self::COLORS['walk'], 'label' => 'Caminar a ' . ($c['xferStation']['station_name'] ?? 'metro')];
+            }
+
+            // Metro legs
+            foreach ($c['bestMLegs'] as $mli => $mleg) {
+                $lineName   = $mleg['line'];
+                $from       = $mleg['from_station']; $to = $mleg['to_station'];
+                $geometry   = $metroRouter->legGeometry($lineName, $from, $to);
+                $color      = $metroRouter->lineColor($lineName);
+                $dist       = $this->haversine((float)$from['lat'], (float)$from['lng'], (float)$to['lat'], (float)$to['lng']);
+                $routeTimeS = $mleg['route_time_s'] ?? ($dist / 6.5);
+                $stopsCount = $mleg['stops_count'] ?? 1;
+                $dur        = $routeTimeS + ($stopsCount * 25) + 60 + ($mli > 0 ? 120 : 0);
+                $segs[] = ['type' => 'metro', 'geometry' => $geometry, 'distance' => $dist, 'duration' => $dur, 'color' => $color, 'label' => 'Metro ' . $lineName, 'meta' => ['from_station_id' => $from['station_id'], 'from_station' => $from['station_name'], 'from_lat' => (float)$from['lat'], 'from_lng' => (float)$from['lng'], 'to_station_id' => $to['station_id'], 'to_station' => $to['station_name'], 'to_lat' => (float)$to['lat'], 'to_lng' => (float)$to['lng'], 'lines' => [$lineName], 'line_colors' => [$lineName => ltrim($color, '#')], 'direction' => $metroRouter->terminus($lineName, $from, $to)]];
+            }
+
+            if ($walk2 && $walk2['distance'] > 20) {
+                $segs[] = ['type' => 'walk', 'geometry' => $walk2['geometry'], 'distance' => $walk2['distance'], 'duration' => $walk2['duration'], 'color' => self::COLORS['walk'], 'label' => 'Caminar al destino'];
+            }
+
+            $alternatives[] = [
+                'segments'    => $segs,
+                'distance'    => array_sum(array_column($segs, 'distance')),
+                'duration'    => array_sum(array_column($segs, 'duration')),
+                'lines_label' => implode(' → ', $c['busLines']) . ' → ' . implode('/', $c['metroLines']),
+                'transfers'   => count($c['busResult']['legs']) + count($c['bestMLegs']),
+                'is_hybrid'   => true,
+            ];
+        }
+
+        return $alternatives;
+    }
+
+    /**
+     * Filter alternatives to only efficient routes, sorted by duration.
+     * Removes routes slower than walking, with excessive detour, or too many transfers.
+     */
+    private function filterAndRankAlternatives(array $alternatives, float $straightLineDist): array
+    {
+        $walkEstimateSec = $straightLineDist / 1.25;
+
+        $filtered = array_filter($alternatives, function ($alt) use ($walkEstimateSec, $straightLineDist) {
+            $dur       = $alt['duration'] ?? PHP_INT_MAX;
+            $dist      = $alt['distance'] ?? 0;
+            $transfers = $alt['transfers'] ?? 0;
+
+            if ($dur   > $walkEstimateSec * 0.9)  return false; // no ahorra tiempo vs caminar
+            if ($dist  > $straightLineDist * 5.0) return false; // desvío excesivo
+            if ($transfers > 2)                    return false; // demasiados transbordos
+
+            return true;
+        });
+
+        usort($filtered, fn($a, $b) => $a['duration'] <=> $b['duration']);
+
+        return array_values(array_slice($filtered, 0, 3));
     }
 
     private function transitRoute(float $fromLat, float $fromLng, float $toLat, float $toLng): array
@@ -412,142 +707,165 @@ class RouteService
             return $this->singleSegment('pedestrian', $fromLat, $fromLng, $toLat, $toLng, 'walk');
         }
 
-        $originStation  = $this->nearestPoint($metroStations, $fromLat, $fromLng);
-        $destCandidates = array_values(array_filter($metroStations, fn($s) => $s['station_id'] !== ($originStation['station_id'] ?? null)));
-
-        if (!$originStation || empty($destCandidates)) {
-            return $this->singleSegment('pedestrian', $fromLat, $fromLng, $toLat, $toLng, 'walk');
-        }
-
         $router = new MetroRouter();
 
-        // Try the 5 nearest destination stations and keep the one with fewest transfers (then shortest duration)
+        // Sort by proximity to origin and try top 3 — the closest station isn't always on the fastest line
+        usort($metroStations, fn($a, $b) =>
+            $this->haversine($fromLat, $fromLng, (float)$a['lat'], (float)$a['lng']) <=>
+            $this->haversine($fromLat, $fromLng, (float)$b['lat'], (float)$b['lng'])
+        );
+        $topOrigins = array_slice($metroStations, 0, 3);
+
+        $destCandidates = $metroStations;
         usort($destCandidates, fn($a, $b) =>
             $this->haversine($toLat, $toLng, (float)$a['lat'], (float)$a['lng']) <=>
             $this->haversine($toLat, $toLng, (float)$b['lat'], (float)$b['lng'])
         );
         $topDest = array_slice($destCandidates, 0, 5);
 
-        $bestLegs      = null;
-        $bestTransfers = PHP_INT_MAX;
-        $bestDist      = PHP_FLOAT_MAX;
-        $destStation   = $topDest[0];
+        if (empty($topOrigins) || empty($topDest)) {
+            return $this->singleSegment('pedestrian', $fromLat, $fromLng, $toLat, $toLng, 'walk');
+        }
 
-        foreach ($topDest as $candidate) {
-            $legs = $router->route($originStation, $candidate);
-            if (!$legs) continue;
-            $transfers = count($legs) - 1;
-            $dist = $this->haversine((float)$candidate['lat'], (float)$candidate['lng'], $toLat, $toLng);
-            if ($transfers < $bestTransfers || ($transfers === $bestTransfers && $dist < $bestDist)) {
-                $bestLegs      = $legs;
-                $bestTransfers = $transfers;
-                $bestDist      = $dist;
-                $destStation   = $candidate;
+        // Collect top 3 candidates with unique line signatures
+        $rawCandidates = [];
+        $seen          = [];
+
+        foreach ($topOrigins as $origCandidate) {
+            $walkToOrig = $this->haversine($fromLat, $fromLng, (float)$origCandidate['lat'], (float)$origCandidate['lng']);
+            foreach ($topDest as $destCandidate) {
+                if ($origCandidate['station_id'] === $destCandidate['station_id']) continue;
+                $legs = $router->route($origCandidate, $destCandidate);
+                if (!$legs) continue;
+
+                $lineSig    = implode('→', array_column($legs, 'line'));
+                if (isset($seen[$lineSig])) continue;
+                $seen[$lineSig] = true;
+
+                $transfers  = count($legs) - 1;
+                $walkToDest = $this->haversine((float)$destCandidate['lat'], (float)$destCandidate['lng'], $toLat, $toLng);
+                $routeTimeS = array_sum(array_column($legs, 'route_time_s'));
+                $score      = $walkToOrig / 1.25 + $routeTimeS + $transfers * 240 + $walkToDest / 1.25;
+
+                $rawCandidates[] = compact('legs', 'score', 'origCandidate', 'destCandidate', 'lineSig');
+                if (count($rawCandidates) >= 5) break 2;
             }
         }
 
-        $legs = $bestLegs ?? [[
-            'line'         => ($originStation['lines'][0]['name'] ?? 'M'),
-            'from_station' => $originStation,
-            'to_station'   => $destStation,
-        ]];
+        if (empty($rawCandidates)) {
+            return $this->singleSegment('pedestrian', $fromLat, $fromLng, $toLat, $toLng, 'walk');
+        }
 
-        $firstFrom = $legs[0]['from_station'];
-        $lastTo    = $legs[count($legs) - 1]['to_station'];
-        $oLat = (float)$firstFrom['lat']; $oLng = (float)$firstFrom['lng'];
-        $dLat = (float)$lastTo['lat'];    $dLng = (float)$lastTo['lng'];
+        usort($rawCandidates, fn($a, $b) => $a['score'] <=> $b['score']);
+        $rawCandidates = array_slice($rawCandidates, 0, 3);
 
-        $responses = Http::pool(fn($pool) => [
-            $pool->as('walk1')->timeout(self::VALHALLA_TIMEOUT)->post($this->valhallaBase() . '/route', $this->walkBody($fromLat, $fromLng, $oLat, $oLng)),
-            $pool->as('walk2')->timeout(self::VALHALLA_TIMEOUT)->post($this->valhallaBase() . '/route', $this->walkBody($dLat, $dLng, $toLat, $toLng)),
-        ]);
+        // Parallel Valhalla walk requests (2 per candidate)
+        $responses = Http::pool(function ($pool) use ($fromLat, $fromLng, $toLat, $toLng, $rawCandidates) {
+            $reqs = [];
+            foreach ($rawCandidates as $ci => $c) {
+                $firstFrom = $c['legs'][0]['from_station'];
+                $lastTo    = $c['legs'][count($c['legs']) - 1]['to_station'];
+                $oLat = (float)$firstFrom['lat']; $oLng = (float)$firstFrom['lng'];
+                $dLat = (float)$lastTo['lat'];    $dLng = (float)$lastTo['lng'];
+                $reqs[] = $pool->as("w1_{$ci}")->timeout(self::VALHALLA_TIMEOUT)->post($this->valhallaBase() . '/route', $this->walkBody($fromLat, $fromLng, $oLat, $oLng));
+                $reqs[] = $pool->as("w2_{$ci}")->timeout(self::VALHALLA_TIMEOUT)->post($this->valhallaBase() . '/route', $this->walkBody($dLat, $dLng, $toLat, $toLng));
+            }
+            return $reqs;
+        });
 
-        $walk1 = $this->parseValhalla($responses['walk1'], 'walk');
-        $walk2 = $this->parseValhalla($responses['walk2'], 'walk');
+        // Build segments for each candidate
+        $alternatives    = [];
+        $straightLine    = $this->haversine($fromLat, $fromLng, $toLat, $toLng);
+        $walkEstimateSec = $straightLine / 1.25;
 
-        $segments = [];
+        foreach ($rawCandidates as $ci => $c) {
+            $legs      = $c['legs'];
+            $firstFrom = $legs[0]['from_station'];
+            $lastTo    = $legs[count($legs) - 1]['to_station'];
+            $walk1     = isset($responses["w1_{$ci}"]) ? $this->parseValhalla($responses["w1_{$ci}"], 'walk') : null;
+            $walk2     = isset($responses["w2_{$ci}"]) ? $this->parseValhalla($responses["w2_{$ci}"], 'walk') : null;
 
-        if ($walk1 && $walk1['distance'] > 20) {
-            $segments[] = [
-                'type' => 'walk', 'geometry' => $walk1['geometry'],
-                'distance' => $walk1['distance'], 'duration' => $walk1['duration'],
-                'color' => self::COLORS['walk'],
-                'label' => 'Caminar a ' . ($firstFrom['station_name'] ?? 'estación'),
-                'meta'  => [
-                    'station_id'   => $firstFrom['station_id'],
-                    'station_name' => $firstFrom['station_name'],
-                    'station_lat'  => $oLat, 'station_lng' => $oLng,
-                ],
+            $segs = [];
+
+            if ($walk1 && $walk1['distance'] > 20) {
+                $segs[] = [
+                    'type' => 'walk', 'geometry' => $walk1['geometry'],
+                    'distance' => $walk1['distance'], 'duration' => $walk1['duration'],
+                    'color' => self::COLORS['walk'],
+                    'label' => 'Caminar a ' . ($firstFrom['station_name'] ?? 'estación'),
+                    'meta'  => [
+                        'station_id'   => $firstFrom['station_id'],
+                        'station_name' => $firstFrom['station_name'],
+                        'station_lat'  => (float)$firstFrom['lat'], 'station_lng' => (float)$firstFrom['lng'],
+                    ],
+                ];
+            }
+
+            foreach ($legs as $leg) {
+                $lineName   = $leg['line'];
+                $from       = $leg['from_station'];
+                $to         = $leg['to_station'];
+                $geometry   = $router->legGeometry($lineName, $from, $to);
+                $color      = $router->lineColor($lineName);
+                $dist       = $this->haversine((float)$from['lat'], (float)$from['lng'], (float)$to['lat'], (float)$to['lng']);
+                $isFirst    = ($leg === $legs[0]);
+                $routeTimeS = $leg['route_time_s'] ?? ($dist / 6.5);
+                $stopsCount = $leg['stops_count'] ?? 1;
+                $dur        = $routeTimeS + ($stopsCount * 25) + 60 + ($isFirst ? 0 : 120);
+
+                $segs[] = [
+                    'type'     => 'metro', 'geometry' => $geometry,
+                    'distance' => $dist,   'duration'  => $dur,
+                    'color'    => $color,  'label'     => 'Metro ' . $lineName,
+                    'meta'     => [
+                        'from_station_id' => $from['station_id'], 'from_station' => $from['station_name'],
+                        'from_lat'        => (float)$from['lat'], 'from_lng'     => (float)$from['lng'],
+                        'to_station_id'   => $to['station_id'],   'to_station'   => $to['station_name'],
+                        'to_lat'          => (float)$to['lat'],   'to_lng'       => (float)$to['lng'],
+                        'lines'           => [$lineName],
+                        'line_colors'     => [$lineName => $color],
+                        'direction'       => $router->terminus($lineName, $from, $to),
+                    ],
+                ];
+            }
+
+            if ($walk2 && $walk2['distance'] > 20) {
+                $segs[] = [
+                    'type' => 'walk', 'geometry' => $walk2['geometry'],
+                    'distance' => $walk2['distance'], 'duration' => $walk2['duration'],
+                    'color' => self::COLORS['walk'], 'label' => 'Caminar al destino',
+                ];
+            }
+
+            $totalDist = array_sum(array_column($segs, 'distance'));
+            $totalDur  = array_sum(array_column($segs, 'duration'));
+            $transfers = count(array_filter($segs, fn($s) => $s['type'] === 'metro')) - 1;
+            $lineNames = array_column($legs, 'line');
+
+            $inefficient = $totalDur > $walkEstimateSec * 0.85
+                || $totalDist > $straightLine * 3.5
+                || $transfers >= 3;
+
+            $alternatives[] = [
+                'segments'    => $segs,
+                'distance'    => $totalDist,
+                'duration'    => $totalDur,
+                'transfers'   => max(0, $transfers),
+                'lines_label' => implode(' → ', $lineNames),
+                'inefficient' => $inefficient,
             ];
         }
 
-        foreach ($legs as $leg) {
-            $lineName = $leg['line'];
-            $from     = $leg['from_station'];
-            $to       = $leg['to_station'];
-            $geometry = $router->legGeometry($lineName, $from, $to);
-            $color    = $router->lineColor($lineName);
-            $dist     = $this->haversine((float)$from['lat'], (float)$from['lng'], (float)$to['lat'], (float)$to['lng']);
-            $dur      = ($dist / 25000) * 3600 + 120;
-            $isFirst  = ($leg === $legs[0]);
-
-            $segments[] = [
-                'type'     => 'metro',
-                'geometry' => $geometry,
-                'distance' => $dist,
-                'duration' => $isFirst ? $dur : $dur + 120,
-                'color'    => $color,
-                'label'    => 'Metro ' . $lineName,
-                'meta'     => [
-                    'from_station_id' => $from['station_id'],
-                    'from_station'    => $from['station_name'],
-                    'from_lat'        => (float)$from['lat'], 'from_lng' => (float)$from['lng'],
-                    'to_station_id'   => $to['station_id'],
-                    'to_station'      => $to['station_name'],
-                    'to_lat'          => (float)$to['lat'], 'to_lng' => (float)$to['lng'],
-                    'lines'           => [$lineName],
-                    'line_colors'     => [$lineName => $color],
-                    'direction'       => $router->terminus($lineName, $from, $to),
-                ],
-            ];
-        }
-
-        if ($walk2 && $walk2['distance'] > 20) {
-            $segments[] = [
-                'type' => 'walk', 'geometry' => $walk2['geometry'],
-                'distance' => $walk2['distance'], 'duration' => $walk2['duration'],
-                'color' => self::COLORS['walk'], 'label' => 'Caminar al destino',
-            ];
-        }
-
-        $totalDistance = array_sum(array_column($segments, 'distance'));
-        $totalDuration = array_sum(array_column($segments, 'duration'));
-
-        // Efficiency guard: compare against estimated walking time for the same crow-flies distance
-        $straightLine   = $this->haversine($fromLat, $fromLng, $toLat, $toLng);
-        $walkEstimateSec = $straightLine / 1.25; // 4.5 km/h walking speed
-        $transfers       = count(array_filter($segments, fn($s) => $s['type'] === 'metro')) - 1;
-
-        // Flag as inefficient when metro doesn't save meaningful time over walking,
-        // or when the routed distance is >3.5× the straight-line distance (excessive backtracking)
-        $inefficient = $totalDuration > $walkEstimateSec * 0.85
-            || $totalDistance > $straightLine * 3.5
-            || $transfers >= 3;
-
-        $inefficientReason = null;
-        if ($inefficient) {
-            if ($transfers >= 3) $inefficientReason = 'Muchos transbordos';
-            elseif ($totalDistance > $straightLine * 3.5) $inefficientReason = 'Ruta más larga que a pie';
-            else $inefficientReason = 'Similar tiempo que ir a pie';
-        }
+        $best = $alternatives[0];
 
         return [
-            'segments'          => $segments,
-            'distance'          => $totalDistance,
-            'duration'          => $totalDuration,
-            'mode'              => 'metro',
-            'inefficient'       => $inefficient,
-            'inefficient_reason'=> $inefficientReason,
+            'segments'     => $best['segments'],
+            'distance'     => $best['distance'],
+            'duration'     => $best['duration'],
+            'mode'         => 'metro',
+            'inefficient'  => $best['inefficient'],
+            'lines_label'  => $best['lines_label'],
+            'alternatives' => $alternatives,
         ];
     }
 
@@ -575,7 +893,7 @@ class RouteService
         ];
 
         // Cortado segments also block pedestrians (construction, accidents).
-        $closures = $this->closedSegmentMidpoints();
+        $closures = $this->trafficExcludeLocations(['cortado']);
         if (!empty($closures)) {
             $body['exclude_locations'] = $closures;
         }
@@ -603,7 +921,7 @@ class RouteService
             'directions_options' => ['units' => 'kilometers', 'language' => $this->lang],
         ];
 
-        $closures = $this->closedSegmentMidpoints();
+        $closures = $this->trafficExcludeLocations(['cortado']);
         if (!empty($closures)) {
             $body['exclude_locations'] = $closures;
         }
@@ -621,23 +939,17 @@ class RouteService
             'costing' => 'auto',
             'costing_options' => [
                 'auto' => [
-                    'use_highways' => 0.5,
+                    'use_highways' => 0.1,  // evitar rondes/autopistes urbanes — preferir xarxa de carrers
                     'use_tolls'    => 0.0,
+                    'top_speed'    => 50,   // límit urbà Barcelona (km/h)
                 ],
             ],
             'directions_options' => ['units' => 'kilometers', 'language' => $this->lang],
         ];
 
-        // Always exclude cortado (closed streets).
-        $exclude = $this->closedSegmentMidpoints(['cortado']);
-
-        // When global congestion is high, also route around congested segments.
-        $congestion = $this->currentCongestion();
-        if ($congestion >= 50) {
-            $extra = $this->closedSegmentMidpoints(['congestionado']);
-            $exclude = array_merge($exclude, $extra);
-        }
-
+        // Always exclude closed streets + congested segments.
+        // Using 3 points per segment (start + mid + end) for better Valhalla edge matching.
+        $exclude = $this->trafficExcludeLocations(['cortado', 'congestionado']);
         if (!empty($exclude)) {
             $body['exclude_locations'] = $exclude;
         }
@@ -685,13 +997,16 @@ class RouteService
     }
 
     /**
-     * Midpoints (+ endpoints) of all segments in the given estados.
-     * Passed to Valhalla as exclude_locations to avoid those road edges.
+     * Returns exclude_locations for Valhalla from traffic segments matching $estados.
+     * Uses start + midpoint + end (3 points per segment) so Valhalla snaps to the
+     * full road edge instead of just one point near the middle.
+     * Valhalla caps exclude_locations at 50, so we allow at most 16 segments × 3 = 48.
      */
-    private function closedSegmentMidpoints(array $estados = ['cortado']): array
+    private function trafficExcludeLocations(array $estados = ['cortado']): array
     {
         $traffic = Cache::get('traffic_current', []);
         $result  = [];
+        $count   = 0;
 
         foreach ($traffic as $t) {
             if (!in_array($t['estado'] ?? '', $estados, true)) continue;
@@ -703,12 +1018,16 @@ class RouteService
 
             if ($latS === 0.0 || $lngS === 0.0) continue;
 
-            // Valhalla caps exclude_locations at 50 — one midpoint per segment is enough
-            $result[] = ['lon' => ($lngS + $lngE) / 2, 'lat' => ($latS + $latE) / 2];
+            $result[] = ['lon' => $lngS,                  'lat' => $latS];
+            $result[] = ['lon' => ($lngS + $lngE) / 2,   'lat' => ($latS + $latE) / 2];
+            if ($latE !== 0.0 && $lngE !== 0.0) {
+                $result[] = ['lon' => $lngE, 'lat' => $latE];
+            }
+
+            if (++$count >= 16) break; // 16 segments × 3 pts = 48, within Valhalla's limit
         }
 
-        // Hard cap at 48 to stay safely under Valhalla's limit of 50
-        return array_slice($result, 0, 48);
+        return $result;
     }
 
     // ── Valhalla response parsing ─────────────────────────────────────────────
