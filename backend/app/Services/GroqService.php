@@ -51,8 +51,9 @@ REGLAS PARA EL CAMPO "suggestions" (OPCIONAL):
 - Máximo 3 items. Cada item tiene esta forma exacta:
   { "label": "Texto corto del botón", "action": "open_place", "name": "Nombre del lugar", "lat": float, "lng": float, "category": "categoria" }
   o para rutas directas: { "label": "Texto corto", "action": "route", "name": "Destino", "lat": float, "lng": float }
-- El label debe ser conciso (máx 5 palabras), sin emojis.
-- Si no hay sugerencias concretas que ofrecer, pon "suggestions": [].
+- El label debe ser conciso (máx 5 palabras), sin emojis. Si el evento tiene hora concreta, inclúyela: "Concierto Jazz · 20:00".
+- NUNCA incluyas un item en suggestions si no tienes coordenadas reales (lat/lng). Descarta el item en ese caso.
+- Si no hay sugerencias concretas con coordenadas, pon "suggestions": [].
 
 map_actions disponibles (incluye solo los relevantes, sin explicarlos en el reply):
 - { "type": "fly_to", "lat": 41.38, "lng": 2.17, "zoom": 14 }
@@ -99,10 +100,11 @@ PROMPT;
             $response = Http::withToken(config('services.groq.key'))
                 ->timeout(20)
                 ->post(self::API_URL, [
-                    'model'       => self::MODEL,
-                    'messages'    => $messages,
-                    'temperature' => 0.7,
-                    'max_tokens'  => 1024,
+                    'model'           => self::MODEL,
+                    'messages'        => $messages,
+                    'temperature'     => 0.7,
+                    'max_tokens'      => 1024,
+                    'response_format' => ['type' => 'json_object'],
                 ]);
 
             if (!$response->successful()) {
@@ -111,7 +113,7 @@ PROMPT;
             }
 
             $content = $response->json('choices.0.message.content', '{}');
-            $parsed  = json_decode($content, true);
+            $parsed  = $this->extractJson($content);
 
             if (!isset($parsed['reply'])) {
                 return ['reply' => $content, 'map_actions' => [], 'suggestions' => []];
@@ -127,6 +129,23 @@ PROMPT;
             Log::error('GroqService exception: ' . $e->getMessage());
             return $this->errorResponse();
         }
+    }
+
+    private function extractJson(string $content): ?array
+    {
+        // Try direct parse first
+        $parsed = json_decode($content, true);
+        if (is_array($parsed)) return $parsed;
+
+        // Find the first { ... } block in the response (model sometimes adds text before/after)
+        $start = strpos($content, '{');
+        $end   = strrpos($content, '}');
+        if ($start !== false && $end !== false && $end > $start) {
+            $parsed = json_decode(substr($content, $start, $end - $start + 1), true);
+            if (is_array($parsed)) return $parsed;
+        }
+
+        return null;
     }
 
     private function errorResponse(): array

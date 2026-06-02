@@ -19,7 +19,7 @@ class ChatController extends Controller
 
     // POI category keywords → Overpass category
     private const POI_KEYWORDS = [
-        'restaurant|restaurante|comer|menú|menu|cenar|cena|dinar|sopar|menjar' => 'restaurant',
+        'restaurant|restaurante|comer|menú|menu|cenar|cena|dinar|sopar|menjar|sushi|pizza|hamburguesa|tapas|italiano|mexicano|asiático' => 'restaurant',
         'café|cafetería|cafè|cafeteria|esmorzar|desayunar|cafè con leche'       => 'cafe',
         'bar|cerveza|vermut|copa|birra|birres|cañas|copes'                      => 'bar',
         'museo|museu|exposición|exposicio|exposició|galeria|galería'            => 'museum',
@@ -156,6 +156,6 @@ class ChatController extends Controller
         }
 
         return "\n\nLUGARES ENCONTRADOS PARA TU CONSULTA:\n" . implode("\n", $lines)
-            . "\nUsa estos lugares para responder. Menciona sus nombres reales.";
+            . "\nUsa estos lugares para responder. Menciona sus nombres reales. IMPORTANTE: Si los lugares no encajan exactamente con la búsqueda (ej. el usuario pide sushi y los lugares son restaurantes genéricos), adviértelo y NO inventes que ofrecen lo que el usuario pide.";
     }
 }

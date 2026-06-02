@@ -71,7 +71,7 @@ class PlaceEnrichService
         // and search often returns unrelated nearby landmarks.
         $wikiTitle = in_array($category, self::SKIP_WIKI_CATEGORIES, true)
             ? null
-            : $this->searchWikiTitle($name, $lat, $lng);
+            : $this->searchWikiTitle($name, $lat, $lng, $category);
 
         // ── 2. Lanzar llamadas en paralelo ───────────────────────────────────
         $poolRequests = [];
@@ -255,7 +255,7 @@ class PlaceEnrichService
 
     // ── Wikipedia: buscar título más relevante ───────────────────────────────
 
-    private function searchWikiTitle(string $name, float $lat, float $lng): ?string
+    private function searchWikiTitle(string $name, float $lat, float $lng, string $category): ?string
     {
         // Normalizar: quitar acentos/diéresis para mejor matching en Wikipedia
         $nameNorm = $this->normaliseForSearch($name);
@@ -267,14 +267,14 @@ class PlaceEnrichService
         ];
 
         foreach ($queries as $query) {
-            $title = $this->runWikiSearch($query, $name);
+            $title = $this->runWikiSearch($query, $name, $category);
             if ($title !== null) return $title;
         }
 
         return null;
     }
 
-    private function runWikiSearch(string $query, string $originalName): ?string
+    private function runWikiSearch(string $query, string $originalName, string $category): ?string
     {
         try {
             $response = Http::timeout(4)
@@ -335,7 +335,12 @@ class PlaceEnrichService
                 if (!empty($nameWords) && $sharedWords === 0 && $score < 5) continue;
 
                 // El snippet menciona Barcelona
-                if (str_contains($snippet, 'barcelona')) $score += 2;
+                if (str_contains($snippet, 'barcelona')) {
+                    $score += 2;
+                } elseif ($category === '') {
+                    // Penalizar si no tiene categoría y no menciona Barcelona (evita falsos positivos con nombres cortos)
+                    $score -= 3;
+                }
 
                 // Palabras clave de POI físico
                 foreach (['basílica', 'basilica', 'iglesia', 'museo', 'edificio', 'monumento',

@@ -86,14 +86,14 @@ export default function ChatInput({ onSend, isLoading }) {
         </div>
       )}
 
-      <div className="flex items-end gap-2 p-3">
+      <div className="flex items-center gap-2 p-3">
         {/* Mic */}
         {SpeechRecognition && (
           <button
             onClick={toggleVoice}
             disabled={isLoading}
             title={listening ? 'Aturar' : 'Parlar'}
-            className="w-8 h-8 flex items-center justify-center rounded-lg transition-all flex-shrink-0 mb-0.5 disabled:opacity-30"
+            className="w-8 h-8 flex items-center justify-center rounded-lg transition-all flex-shrink-0 disabled:opacity-30"
             style={{
               background: listening ? 'rgba(184,136,90,0.12)' : '#1E1C19',
               border: `1px solid ${listening ? '#B8885A55' : '#2C2926'}`,
@@ -126,6 +126,7 @@ export default function ChatInput({ onSend, isLoading }) {
             onChange={(e) => { if (!listening) setText(e.target.value) }}
             placeholder={listening ? 'Parla ara…' : 'Pregunta sobre Barcelona...'}
             rows={1}
+            autoFocus
             disabled={isLoading}
             readOnly={listening}
             className="w-full resize-none rounded-lg px-3 py-2 text-[12px] outline-none transition-all leading-relaxed disabled:opacity-40"
@@ -146,7 +147,7 @@ export default function ChatInput({ onSend, isLoading }) {
         <button
           onClick={() => submit()}
           disabled={!canSubmit}
-          className="w-8 h-8 flex items-center justify-center rounded-lg transition-all flex-shrink-0 mb-0.5 disabled:opacity-20 disabled:cursor-not-allowed"
+          className="w-8 h-8 flex items-center justify-center rounded-lg transition-all flex-shrink-0 disabled:opacity-20 disabled:cursor-not-allowed"
           style={{
             background: canSubmit ? '#B8885A' : '#1E1C19',
             border: `1px solid ${canSubmit ? '#B8885A' : '#2C2926'}`,

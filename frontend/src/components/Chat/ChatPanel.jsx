@@ -72,7 +72,7 @@ export default function ChatPanel() {
                     BCN Live AI
                   </p>
                   <p className="font-mono text-[9px] leading-tight mt-0.5" style={{ color: '#7D7975' }}>
-                    llama-3.1-8b · en línia
+                    llama-3.3-70b · en línia
                   </p>
                 </div>
               </div>

@@ -26,26 +26,23 @@ async function executeMapActions(actions) {
 
     } else if (action.type === 'open_place') {
       const pois = useNearbyStore.getState().pois
-      const nearby = pois.find(p =>
-        (action.lat != null && action.lng != null &&
-          Math.abs(p.lat - action.lat) < 0.0008 && Math.abs(p.lng - action.lng) < 0.0008) ||
-        p.name === action.name
+      const nearby = pois.find(p => p.name === action.name) ?? pois.find(p =>
+        action.lat != null && action.lng != null &&
+        Math.abs(p.lat - action.lat) < 0.0002 && Math.abs(p.lng - action.lng) < 0.0002
       )
       const target = nearby ?? (action.lat != null ? { lat: action.lat, lng: action.lng, name: action.name } : null)
       if (!target) continue
       flyTo({ lat: target.lat, lng: target.lng, zoom: 17 })
-      if (nearby) {
-        useDrawerStore.getState().openPlace({
-          kind:     'poi',
-          id:       nearby.id,
-          name:     nearby.name,
-          lat:      nearby.lat,
-          lng:      nearby.lng,
-          address:  nearby.address,
-          meta:     nearby,
-          category: action.category ? { label: action.category } : null,
-        })
-      }
+      useDrawerStore.getState().openPlace({
+        kind:     'poi',
+        id:       nearby?.id ?? null,
+        name:     nearby?.name ?? action.name,
+        lat:      target.lat,
+        lng:      target.lng,
+        address:  nearby?.address ?? null,
+        meta:     nearby ?? null,
+        category: action.category ? { label: action.category } : (nearby?.category ? { label: nearby.category } : null),
+      })
 
     } else if (action.type === 'plan_trip') {
       const userLoc = useMapStore.getState().userLocation
@@ -159,26 +156,36 @@ export function useChat() {
         ? data.suggestions
         : undefined
       addMessage('assistant', data.reply ?? 'Sin respuesta', suggestions ? { suggestions } : {})
-      await executeMapActions(data.map_actions)
-    } catch {
-      addMessage('assistant', 'Error conectando con el servidor. Comprueba que el backend está activo.')
+      executeMapActions(data.map_actions).catch(() => {})
+    } catch (err) {
+      const status = err?.response?.status
+      const isTimeout = err?.code === 'ECONNABORTED' || err?.message?.includes('timeout')
+      const msg = status === 429
+        ? 'Has enviat massa missatges seguits. Espera uns segons i torna-ho a intentar.'
+        : isTimeout
+          ? 'La consulta ha tardat massa. Torna-ho a intentar.'
+          : 'Error connectant amb el servidor. Comprova que el backend està actiu.'
+      addMessage('assistant', msg)
     } finally {
       setLoading(false)
     }
   }
 
-  async function executeSuggestionAction(suggestion) {
-    if (suggestion.action === 'open_place') {
-      await executeMapActions([
-        { type: 'fly_to', lat: suggestion.lat, lng: suggestion.lng, zoom: 16 },
-        { type: 'open_place', name: suggestion.name, lat: suggestion.lat, lng: suggestion.lng, category: suggestion.category ?? null },
-      ])
-    } else if (suggestion.action === 'route') {
-      await executeMapActions([
-        { type: 'plan_trip', origin_lat: null, origin_lng: null, origin_label: null, dest_lat: suggestion.lat, dest_lng: suggestion.lng, dest_label: suggestion.name, constraint: null },
-      ])
-    }
-  }
+  return { messages, isLoading, sendMessage }
+}
 
-  return { messages, isLoading, sendMessage, executeSuggestionAction }
+export async function executeSuggestionAction(suggestion) {
+  if (suggestion.action === 'open_place') {
+    if (suggestion.lat == null || suggestion.lng == null) return
+    await executeMapActions([
+      { type: 'fly_to', lat: suggestion.lat, lng: suggestion.lng, zoom: 16 },
+      { type: 'open_place', name: suggestion.name, lat: suggestion.lat, lng: suggestion.lng, category: suggestion.category ?? null },
+    ])
+  } else if (suggestion.action === 'route') {
+    await executeMapActions([
+      { type: 'plan_trip', origin_lat: null, origin_lng: null, origin_label: null, dest_lat: suggestion.lat, dest_lng: suggestion.lng, dest_label: suggestion.name, constraint: null },
+    ])
+  } else if (suggestion.action === 'show_events') {
+    useDrawerStore.getState().openEvents({ category: suggestion.category ?? null })
+  }
 }

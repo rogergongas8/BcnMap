@@ -104,8 +104,9 @@ class EventsService
                     [$lat, $lng] = $this->lookupVenueCoords($place);
                 }
 
-                $timetable = $this->cleanText($r['timetable'] ?? '');
-
+                // BCN Open Data does not include real event times — timetable and start_date
+                // only carry date information (time component is an API placeholder).
+                // Real times come from Ticketmaster/Songkick via EventsEnrichmentService.
                 $events[] = [
                     'title'     => $name,
                     'category'  => $category,
@@ -113,7 +114,8 @@ class EventsService
                     'district'  => $district,
                     'start'     => $start,
                     'end'       => $end,
-                    'timetable' => $timetable ?: null,
+                    'timetable' => null,
+                    'time'      => null,
                     'lat'       => $lat,
                     'lng'       => $lng,
                 ];
@@ -189,8 +191,8 @@ class EventsService
             $loc = array_filter([$e['place'], $e['district']]);
             if ($loc) $line .= ', ' . implode(', ', $loc);
 
-            if (!empty($e['timetable'])) {
-                $line .= '. Horario: ' . $e['timetable'];
+            if (!empty($e['time'])) {
+                $line .= '. Hora: ' . $e['time'];
             }
 
             $lines[] = $line;

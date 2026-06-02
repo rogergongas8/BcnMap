@@ -43,7 +43,7 @@ Route::prefix('v1')->group(function () {
     Route::get('/air-quality',     [AirQualityController::class, 'current']);
     Route::get('/city-context',    [CityContextController::class, 'index']);
 
-    Route::post('/chat',           [ChatController::class, 'send'])->middleware('throttle:20,1');
+    Route::post('/chat',           [ChatController::class, 'send'])->middleware(app()->isLocal() ? 'throttle:300,1' : 'throttle:60,1');
     Route::get('/route',           [RouteController::class, 'calculate'])->middleware('throttle:200,1');
     Route::get('/route/plan',      [RouteController::class, 'plan'])->middleware('throttle:40,1');
 

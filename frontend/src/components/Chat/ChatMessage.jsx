@@ -1,5 +1,6 @@
 import React from 'react'
 import { motion } from 'framer-motion'
+import { executeSuggestionAction } from '../../hooks/useChat'
 
 export default function ChatMessage({ message }) {
   const isUser = message.role === 'user'
@@ -25,7 +26,7 @@ export default function ChatMessage({ message }) {
         </div>
       )}
 
-      <div className={`flex flex-col gap-1 max-w-[82%] ${isUser ? 'items-end' : 'items-start'}`}>
+      <div className={`flex flex-col gap-1.5 max-w-[82%] ${isUser ? 'items-end' : 'items-start'}`}>
         <div
           className="px-3 py-2.5 rounded-xl text-[12px] leading-relaxed"
           style={isUser ? {
@@ -42,6 +43,42 @@ export default function ChatMessage({ message }) {
         >
           {message.text}
         </div>
+
+        {/* Suggestion chips */}
+        {!isUser && message.suggestions?.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.2, delay: 0.08 }}
+            className="flex flex-col gap-1.5 w-full"
+          >
+            {message.suggestions.map((s, i) => (
+              <button
+                key={i}
+                onClick={() => executeSuggestionAction(s)}
+                className="text-left px-3 py-2 font-mono text-[11px] transition-all"
+                style={{
+                  borderRadius: 8,
+                  background: 'rgba(184,136,90,0.06)',
+                  border: '1px solid rgba(184,136,90,0.2)',
+                  color: '#B8885A',
+                  width: '100%',
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = 'rgba(184,136,90,0.12)'
+                  e.currentTarget.style.borderColor = 'rgba(184,136,90,0.4)'
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = 'rgba(184,136,90,0.06)'
+                  e.currentTarget.style.borderColor = 'rgba(184,136,90,0.2)'
+                }}
+              >
+                {s.label}
+              </button>
+            ))}
+          </motion.div>
+        )}
+
         {time && (
           <span className="font-mono text-[9px] px-1" style={{ color: '#6B6865' }}>{time}</span>
         )}

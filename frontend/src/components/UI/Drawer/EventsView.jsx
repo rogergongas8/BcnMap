@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useRef } from 'react'
+import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Icons } from '../icons'
 import { useDataStore } from '../../../store/dataStore'
@@ -6,6 +6,8 @@ import { useMapStore } from '../../../store/mapStore'
 import { useChatStore } from '../../../store/chatStore'
 import { useRouteStore } from '../../../store/routeStore'
 import { useDrawerStore } from '../../../store/drawerStore'
+import { fetchRoutePlan } from '../../../services/api'
+import { addReminder, removeReminder, hasReminder } from '../../../hooks/useReminders'
 
 const CATEGORIES = [
   { id: null,          label: 'Tots' },
@@ -30,6 +32,19 @@ const CAT_LABELS = {
   gastronomia: 'Gastro', familia: 'Família', altres: 'Altres',
 }
 
+// Sources that sell tickets directly
+const TICKET_SOURCES = new Set(['ticketmaster', 'songkick'])
+
+function parseFirstTime(timetable) {
+  if (!timetable) return null
+  const m = timetable.match(/\b(\d{1,2}):(\d{2})\b/)
+  return m ? `${String(m[1]).padStart(2, '0')}:${m[2]}` : null
+}
+
+function getDisplayTime(event) {
+  return event.time ?? parseFirstTime(event.timetable)
+}
+
 function formatDate(start, end) {
   if (!start) return null
   const s = new Date(start + 'T00:00:00')
@@ -51,7 +66,6 @@ function SearchAndFilter({ search, onSearch, activeCategory, onCategory }) {
   const inputRef = React.useRef(null)
   return (
     <div className="flex flex-col gap-0" style={{ borderBottom: '1px solid #2C2926' }}>
-      {/* Text search */}
       <div className="px-3 pt-2.5 pb-2 flex items-center gap-2"
         style={{ borderBottom: '1px solid #201E1B' }}
       >
@@ -81,8 +95,7 @@ function SearchAndFilter({ search, onSearch, activeCategory, onCategory }) {
         )}
       </div>
 
-      {/* Category rail */}
-      <div className="px-3 py-2" >
+      <div className="px-3 py-2">
         <div className="flex gap-1.5 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
           {CATEGORIES.map(cat => {
             const isActive = activeCategory === cat.id
@@ -111,30 +124,71 @@ function SearchAndFilter({ search, onSearch, activeCategory, onCategory }) {
 }
 
 function EventRow({ event, expanded, onToggle, rowRef }) {
-  const flyTo               = useMapStore(s => s.flyTo)
-  const userLocation        = useMapStore(s => s.userLocation)
+  const flyTo                   = useMapStore(s => s.flyTo)
+  const userLocation            = useMapStore(s => s.userLocation)
   const openChatWithPromptNoFly = useChatStore(s => s.openChatWithPromptNoFly)
-  const setChatRequest      = useRouteStore(s => s.setChatRequest)
-  const color = CAT_COLOR[event.category] ?? CAT_COLOR.altres
+  const setChatRequest          = useRouteStore(s => s.setChatRequest)
 
-  const handleNavigate = () => {
-    if (!event.lat || !event.lng) return
-    const dest   = { lat: event.lat, lng: event.lng, label: event.place || event.title }
-    const origin = userLocation ? { lat: userLocation.lat, lng: userLocation.lng, label: 'Mi ubicación' } : null
-    setChatRequest({ origin, destination: dest, mode: 'foot' })
+  const [navigating,    setNavigating]    = useState(false)
+  const [reminded,      setReminded]      = useState(() => hasReminder(event))
+  const [reminderFlash, setReminderFlash] = useState(null) // 'added'|'denied'|'exists'|null
+
+  const color       = CAT_COLOR[event.category] ?? CAT_COLOR.altres
+  const displayTime = getDisplayTime(event)
+  const isTicket    = TICKET_SOURCES.has(event.source) && !!event.url
+  const hasUrl      = !!event.url
+  const hasCoords   = !!(event.lat && event.lng)
+
+  // ── Navigate: plan_trip for optimal mode ────────────────────────────────
+  const handleNavigate = useCallback(async () => {
+    if (!hasCoords) return
+    const dest = { lat: event.lat, lng: event.lng, label: event.place || event.title }
     flyTo({ lat: event.lat, lng: event.lng, zoom: 15 })
-  }
+
+    if (!userLocation) {
+      setChatRequest({ origin: null, destination: dest, mode: 'foot' })
+      return
+    }
+    const origin = { lat: userLocation.lat, lng: userLocation.lng, label: 'La meva ubicació' }
+    setNavigating(true)
+    try {
+      const plan = await fetchRoutePlan(origin.lat, origin.lng, dest.lat, dest.lng, null)
+      setChatRequest({ origin, destination: dest, mode: plan.recommended ?? 'foot', plan })
+    } catch {
+      setChatRequest({ origin, destination: dest, mode: 'foot' })
+    } finally {
+      setNavigating(false)
+    }
+  }, [event, userLocation, hasCoords, flyTo, setChatRequest])
+
+  // ── Reminder ─────────────────────────────────────────────────────────────
+  const handleReminder = useCallback(async () => {
+    if (reminded) {
+      removeReminder(event)
+      setReminded(false)
+      setReminderFlash(null)
+      return
+    }
+    const result = await addReminder(event)
+    if (result === 'added') {
+      setReminded(true)
+      setReminderFlash('added')
+      setTimeout(() => setReminderFlash(null), 2500)
+    } else if (result === 'denied') {
+      setReminderFlash('denied')
+      setTimeout(() => setReminderFlash(null), 3000)
+    } else if (result === 'exists') {
+      setReminded(true)
+    }
+  }, [event, reminded])
 
   const handleClick = () => {
     onToggle()
-    if (event.lat && event.lng) {
-      flyTo({ lat: event.lat, lng: event.lng, zoom: 16 })
-    }
+    if (hasCoords) flyTo({ lat: event.lat, lng: event.lng, zoom: 16 })
   }
 
   const sourceLabel = event.source === 'ticketmaster' ? 'Ticketmaster'
-    : event.source === 'songkick' ? 'Songkick'
-    : null
+    : event.source === 'songkick' ? 'Songkick' : null
 
   return (
     <li ref={rowRef} style={{ borderBottom: '1px solid #201E1B' }}>
@@ -152,12 +206,16 @@ function EventRow({ event, expanded, onToggle, rowRef }) {
             <p className="font-syne text-[13px] font-medium leading-snug" style={{ color: '#F7F6F4' }}>
               {event.title}
             </p>
-            <span
-              className="flex-shrink-0 mt-0.5 transition-transform"
-              style={{ color: '#7D7975', transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
-            >
-              <Icons.chevronDown size={11} />
-            </span>
+            <div className="flex items-center gap-1.5 flex-shrink-0 mt-0.5">
+              {reminded && (
+                <span title="Recordatori actiu" style={{ color: '#C98E2E' }}>
+                  <Icons.bell size={10} />
+                </span>
+              )}
+              <span className="transition-transform" style={{ color: '#7D7975', transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+                <Icons.chevronDown size={11} />
+              </span>
+            </div>
           </div>
           {event.place && (
             <p className="font-mono text-[10px] truncate mt-0.5" style={{ color: '#9A9692' }}>
@@ -174,7 +232,7 @@ function EventRow({ event, expanded, onToggle, rowRef }) {
             {event.start && (
               <span className="font-mono text-[9px]" style={{ color: '#8C8884' }}>
                 {formatDate(event.start, event.end)}
-                {event.time && ` · ${event.time}`}
+                {displayTime && ` · ${displayTime}h`}
               </span>
             )}
           </div>
@@ -211,14 +269,14 @@ function EventRow({ event, expanded, onToggle, rowRef }) {
                 </div>
               )}
 
-              {/* Date range */}
+              {/* Date range + extra dates */}
               {event.start && (
                 <div className="flex items-start gap-2">
                   <span style={{ color: '#8C8884', flexShrink: 0, marginTop: 1 }}><Icons.calendar size={11} /></span>
                   <div>
                     <p className="font-mono text-[10px]" style={{ color: '#B0ACA7' }}>
                       {formatDate(event.start, event.end)}
-                      {event.time && ` · ${event.time}h`}
+                      {displayTime && ` · ${displayTime}h`}
                     </p>
                     {(() => {
                       const extras = typeof event.extra_dates === 'string'
@@ -246,24 +304,32 @@ function EventRow({ event, expanded, onToggle, rowRef }) {
                 </p>
               )}
 
-              {/* Actions */}
+              {/* ── Actions ── */}
               <div className="flex flex-col gap-1.5 mt-1">
+
                 {/* Primary: navigate */}
-                {event.lat && event.lng && (
+                {hasCoords && (
                   <button
                     onClick={handleNavigate}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 font-syne text-[12px] font-semibold transition-colors"
+                    disabled={navigating}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 font-syne text-[12px] font-semibold transition-colors disabled:opacity-60"
                     style={{ borderRadius: 6, background: '#B8885A', color: '#fff' }}
-                    onMouseEnter={e => e.currentTarget.style.background = '#d4541f'}
-                    onMouseLeave={e => e.currentTarget.style.background = '#B8885A'}
+                    onMouseEnter={e => { if (!navigating) e.currentTarget.style.background = '#C9773A' }}
+                    onMouseLeave={e => { if (!navigating) e.currentTarget.style.background = '#B8885A' }}
                   >
-                    <Icons.navigation size={12} />
-                    Porta'm aquí
+                    {navigating
+                      ? <span className="w-3 h-3 border border-white/40 border-t-white rounded-full animate-spin" />
+                      : <Icons.navigation size={12} />
+                    }
+                    {navigating ? 'Calculant ruta…' : 'Porta\'m aquí'}
                   </button>
                 )}
 
+                {/* Secondary row: ticket/info + reminder + ask AI */}
                 <div className="flex gap-1.5">
-                  {event.url && (
+
+                  {/* Ticket / Més info — if URL exists; Google search fallback otherwise */}
+                  {hasUrl ? (
                     <a
                       href={event.url}
                       target="_blank"
@@ -273,10 +339,49 @@ function EventRow({ event, expanded, onToggle, rowRef }) {
                       onMouseEnter={e => e.currentTarget.style.background = color + '28'}
                       onMouseLeave={e => e.currentTarget.style.background = color + '18'}
                     >
-                      <Icons.forward size={11} />
-                      {event.source === 'ticketmaster' ? 'Entrades' : 'Més info'}
+                      {isTicket ? <Icons.ticket size={11} /> : <Icons.forward size={11} />}
+                      {isTicket ? 'Entrades' : 'Més info'}
+                    </a>
+                  ) : (
+                    <a
+                      href={`https://www.google.com/search?q=${encodeURIComponent([event.title, event.place, 'Barcelona', 'horari'].filter(Boolean).join(' '))}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 font-syne text-[11px] font-medium transition-colors"
+                      style={{ borderRadius: 6, background: '#1E1C19', border: '1px solid #2A2A2A', color: '#8C8884' }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = '#3D3A36'; e.currentTarget.style.color = '#B0ACA7' }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = '#2A2A2A'; e.currentTarget.style.color = '#8C8884' }}
+                    >
+                      <Icons.search size={11} />
+                      Cercar a Google
                     </a>
                   )}
+
+                  {/* Reminder bell */}
+                  {event.start && (
+                    <button
+                      onClick={handleReminder}
+                      title={reminded ? 'Eliminar recordatori' : 'Afegir recordatori'}
+                      className="flex items-center justify-center gap-1.5 py-2 px-3 font-syne text-[11px] font-medium transition-all"
+                      style={{
+                        borderRadius: 6,
+                        background: reminded ? 'rgba(201,142,46,0.12)' : '#211F1B',
+                        border: `1px solid ${reminded ? 'rgba(201,142,46,0.4)' : '#2A2A2A'}`,
+                        color: reminded ? '#C98E2E' : '#B0ACA7',
+                        flexShrink: 0,
+                      }}
+                      onMouseEnter={e => {
+                        if (!reminded) { e.currentTarget.style.borderColor = '#C98E2E'; e.currentTarget.style.color = '#C98E2E' }
+                      }}
+                      onMouseLeave={e => {
+                        if (!reminded) { e.currentTarget.style.borderColor = '#2A2A2A'; e.currentTarget.style.color = '#B0ACA7' }
+                      }}
+                    >
+                      <Icons.bell size={11} />
+                    </button>
+                  )}
+
+                  {/* Ask AI */}
                   <button
                     onClick={() => openChatWithPromptNoFly(`Explica'm més sobre "${event.title}"${event.place ? ` a ${event.place}` : ''}`)}
                     className="flex-1 flex items-center justify-center gap-1.5 py-2 font-syne text-[11px] font-medium transition-colors"
@@ -294,8 +399,24 @@ function EventRow({ event, expanded, onToggle, rowRef }) {
                     Preguntar
                   </button>
                 </div>
-              </div>
 
+                {/* Reminder feedback flash */}
+                <AnimatePresence>
+                  {reminderFlash && (
+                    <motion.p
+                      initial={{ opacity: 0, y: -4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0 }}
+                      className="font-mono text-[10px] text-center"
+                      style={{ color: reminderFlash === 'denied' ? '#D45555' : '#C98E2E' }}
+                    >
+                      {reminderFlash === 'added'  && 'Recordatori afegit · rebràs una notificació 30 min abans'}
+                      {reminderFlash === 'denied' && 'Cal permís de notificacions al navegador'}
+                    </motion.p>
+                  )}
+                </AnimatePresence>
+
+              </div>
             </div>
           </motion.div>
         )}
@@ -314,7 +435,6 @@ export default function EventsView() {
   const [searchQuery,    setSearchQuery]    = useState('')
   const [expandedId,     setExpandedId]     = useState(null)
   const rowRefs = useRef({})
-  const listRef = useRef(null)
 
   useEffect(() => {
     if (!focusedEventKey) return
@@ -345,7 +465,8 @@ export default function EventsView() {
       if (a.today && !b.today) return -1
       if (!a.today && b.today) return 1
       if (a.start && b.start && a.start !== b.start) return a.start.localeCompare(b.start)
-      if (a.time && b.time) return a.time.localeCompare(b.time)
+      const ta = getDisplayTime(a), tb = getDisplayTime(b)
+      if (ta && tb) return ta.localeCompare(tb)
       return 0
     })
   }, [events, activeCategory, searchQuery])

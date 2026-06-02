@@ -75,6 +75,7 @@ export const Icons = {
   star:        (p) => svg(p, <polygon points="12 2 15 9 22 10 17 15 18 22 12 18 6 22 7 15 2 10 9 9 12 2" />),
   calendar:    (p) => svg(p, <><rect x="3" y="4" width="18" height="17" rx="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="16" y1="2" x2="16" y2="6" /></>),
   ticket:      (p) => svg(p, <><path d="M3 9v-2a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v2a2 2 0 0 0 0 4v2a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-2a2 2 0 0 0 0-4z" /><line x1="12" y1="6" x2="12" y2="18" strokeDasharray="2 2" /></>),
+  bell:        (p) => svg(p, <><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></>),
   monument:    (p) => svg(p, <><path d="M5 21h14M7 21V8l5-5 5 5v13" /><line x1="10" y1="13" x2="14" y2="13" /></>),
   hotel:       (p) => svg(p, <><rect x="3" y="6" width="18" height="14" rx="1" /><line x1="3" y1="11" x2="21" y2="11" /><circle cx="8" cy="9" r="0.8" fill="currentColor" stroke="none" /><line x1="3" y1="15" x2="21" y2="15" /></>),
 

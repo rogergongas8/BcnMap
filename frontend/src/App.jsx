@@ -30,6 +30,7 @@ import NavigationHUD from './components/Route/NavigationHUD'
 import { useMapData } from './hooks/useMapData'
 import { useWebSocket } from './hooks/useWebSocket'
 import { useDeepLink } from './hooks/useDeepLink'
+import { checkAndFireReminders } from './hooks/useReminders'
 import { useDrawerStore } from './store/drawerStore'
 import { useChatStore } from './store/chatStore'
 import { useMapStore } from './store/mapStore'
@@ -55,6 +56,12 @@ function AppContent() {
   useWebSocket()
   useDeepLink()
   useMapPadding()
+
+  useEffect(() => {
+    checkAndFireReminders()
+    const id = setInterval(checkAndFireReminders, 60_000)
+    return () => clearInterval(id)
+  }, [])
 
   return (
     <div className="relative w-full h-full overflow-hidden" style={{ background: '#0e0e0e' }}>
