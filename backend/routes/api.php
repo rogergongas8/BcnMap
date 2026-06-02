@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\MetroController;
 use App\Http\Controllers\Api\PlaceEnrichController;
 use App\Http\Controllers\Api\PoiController;
 use App\Http\Controllers\Api\RouteController;
+use App\Http\Controllers\Api\CommuteController;
 use App\Http\Controllers\Api\SavedRouteController;
 use App\Http\Controllers\Api\TrafficController;
 use App\Http\Controllers\Api\WeatherController;
@@ -74,6 +75,12 @@ Route::prefix('v1')->group(function () {
         Route::get('/saved-routes',               [SavedRouteController::class, 'index']);
         Route::post('/saved-routes',              [SavedRouteController::class, 'store']);
         Route::delete('/saved-routes/{savedRoute}', [SavedRouteController::class, 'destroy']);
+
+        Route::get('/commutes',                         [CommuteController::class, 'index']);
+        Route::post('/commutes',                        [CommuteController::class, 'store']);
+        Route::put('/commutes/{commuteSchedule}',       [CommuteController::class, 'update']);
+        Route::delete('/commutes/{commuteSchedule}',    [CommuteController::class, 'destroy']);
+        Route::get('/commutes/{commuteSchedule}/status', [CommuteController::class, 'status']);
     });
 
     Route::fallback(fn (Request $r) => response()->json([

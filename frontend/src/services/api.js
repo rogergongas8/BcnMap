@@ -86,3 +86,10 @@ export const deleteFavorite  = (id) => api.delete(`/favorites/${id}`).then(r => 
 export const fetchSavedRoutes  = () => api.get('/saved-routes').then(r => r.data)
 export const addSavedRoute     = (data) => api.post('/saved-routes', data).then(r => r.data)
 export const deleteSavedRoute  = (id) => api.delete(`/saved-routes/${id}`).then(r => r.data)
+
+// Commute schedules
+export const fetchCommutes        = () => api.get('/commutes').then(r => r.data)
+export const createCommute        = (data) => api.post('/commutes', data).then(r => r.data)
+export const updateCommute        = (id, data) => api.put(`/commutes/${id}`, data).then(r => r.data)
+export const deleteCommute        = (id) => api.delete(`/commutes/${id}`).then(r => r.data)
+export const fetchCommuteStatus   = (id) => api.get(`/commutes/${id}/status`).then(r => r.data)

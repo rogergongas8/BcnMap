@@ -8,8 +8,9 @@ import {
   fetchFavorites, addFavorite, deleteFavorite,
   fetchSavedRoutes, addSavedRoute, deleteSavedRoute,
 } from '../../../services/api'
+import CommuteView from './CommuteView'
 
-const TAB = { favs: 'favs', routes: 'routes' }
+const TAB = { favs: 'favs', routes: 'routes', commutes: 'commutes' }
 
 function EmptyState({ icon: Icon, text }) {
   return (
@@ -146,8 +147,9 @@ export default function SavedView() {
       {/* Tabs */}
       <div className="flex px-3 pt-2.5 pb-0 gap-1" style={{ borderBottom: '1px solid #2C2926' }}>
         {[
-          { id: TAB.favs,   label: 'Favorits' },
-          { id: TAB.routes, label: 'Rutes' },
+          { id: TAB.favs,     label: 'Favorits' },
+          { id: TAB.routes,   label: 'Rutes' },
+          { id: TAB.commutes, label: 'Trajectes' },
         ].map(t => (
           <button
             key={t.id}
@@ -183,6 +185,8 @@ export default function SavedView() {
             ? <EmptyState icon={Icons.search} text="Encara no tens cap ruta guardada" />
             : <ul>{routes.map(r => <RouteRow key={r.id} route={r} onDelete={handleDeleteRoute} onLoad={handleLoadRoute} />)}</ul>
         )}
+
+        {tab === TAB.commutes && <CommuteView />}
       </div>
     </>
   )

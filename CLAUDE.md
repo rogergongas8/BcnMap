@@ -237,6 +237,11 @@ GET|POST        /api/v1/favorites
 DELETE          /api/v1/favorites/{id}
 GET|POST        /api/v1/saved-routes
 DELETE          /api/v1/saved-routes/{id}
+
+# Trajectes recurrents (auth:sanctum)
+GET|POST        /api/v1/commutes
+PUT|DELETE      /api/v1/commutes/{id}
+GET             /api/v1/commutes/{id}/status   ← leave_by, next_departure, travel_minutes
 ```
 
 ---
@@ -383,7 +388,7 @@ Tres temas en `MAP_THEMES` (MapContainer.jsx):
 | Descripción | Notas |
 |-------------|-------|
 | Predicciones por hora/día | `/api/v1/predictions?zone=X&hour=Y` usando snapshots PostgreSQL |
-| UI redesign | Screenshots en `/screenshots` (pendiente de crear carpeta) |
+| Smart Commute Notifications | Rutas recurrentes (home→work, días+hora), scheduler calcula "salir a X:XX" con datos TMB en tiempo real, Web Push notification via PWA |
 | Deploy | Vercel (frontend) + servidor VPS (backend + Docker) |
 
 ---
@@ -427,3 +432,7 @@ cd frontend && npm run build
 - **No abstraer** hasta que haya 3+ usos reales
 - Los datos del mapa siempre vienen del store de Zustand, nunca por props en cadena
 - Los stores no importan otros stores — coordinación en hooks o handlers
+
+## Forma de Trabajar con Roger
+
+- **Preguntar antes de editar:** Ante cualquier tarea de UI/UX o bug poco definido, leer el código relevante primero y luego hacer las preguntas necesarias al usuario antes de tocar nada. No implementar suposiciones.

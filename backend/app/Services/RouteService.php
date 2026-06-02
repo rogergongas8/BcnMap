@@ -272,162 +272,134 @@ class RouteService
         $router = new BusRouter();
 
         if ($router->isEmpty()) {
-            // Graph not yet built — trigger async build and return walking fallback
+            // Graph not yet built — trigger async build and return explicit warming error
             dispatch(fn() => (new BusRouter())->buildAndCache())->afterResponse();
-            return array_merge(
-                $this->singleSegment('pedestrian', $fromLat, $fromLng, $toLat, $toLng, 'walk'),
-                ['bus_graph_warming' => true]
-            );
+            return ['error' => 'bus_warming', 'mode' => 'bus', 'bus_graph_warming' => true];
         }
 
         $originCandidates = $router->nearestStops($fromLat, $fromLng, 5, 800.0);
         $destCandidates   = $router->nearestStops($toLat,   $toLng,   5, 800.0);
 
         if (empty($originCandidates) || empty($destCandidates)) {
-            return $this->singleSegment('pedestrian', $fromLat, $fromLng, $toLat, $toLng, 'walk');
+            return ['error' => 'no_stops_nearby', 'mode' => 'bus'];
         }
 
-        $bestResult    = null;
-        $bestTransfers = PHP_INT_MAX;
-        $bestOrigin    = $originCandidates[0];
-        $bestDest      = null;
-
-        // Try each origin candidate; A* finds the optimal alighting stop automatically
+        // Collect all unique-line-combo routes from origin candidates (up to 3 alternatives)
+        $candidates = [];
         foreach ($originCandidates as $orig) {
             $result = $router->route($orig, $toLat, $toLng);
             if (!$result) continue;
-            $transfers = count($result['legs']) - 1;
-            if ($transfers < $bestTransfers) {
-                $bestResult    = $result;
-                $bestTransfers = $transfers;
-                $bestOrigin    = $orig;
-                $bestDest      = $result['alight_stop'];
+            $lineNames = array_map(fn($l) => $l['line_name'] ?? $l['line'], $result['legs']);
+            $lineSig   = implode('+', $lineNames);
+            if (isset($candidates[$lineSig])) continue;
+            $candidates[$lineSig] = ['result' => $result, 'origin' => $orig];
+            if (count($candidates) >= 3) break;
+        }
+
+        if (empty($candidates)) {
+            return ['error' => 'no_route_found', 'mode' => 'bus'];
+        }
+
+        // Sort by transfers asc, then line count asc (prefer simpler routes first)
+        uasort($candidates, function ($a, $b) {
+            $ta = count($a['result']['legs']) - 1;
+            $tb = count($b['result']['legs']) - 1;
+            return $ta !== $tb ? $ta <=> $tb : count($a['result']['legs']) <=> count($b['result']['legs']);
+        });
+        $candidates = array_values($candidates);
+
+        // Pre-compute stop sequences for all candidates' legs
+        $allLegCoords = [];
+        foreach ($candidates as $ci => $cand) {
+            foreach ($cand['result']['legs'] as $li => $leg) {
+                $allLegCoords[$ci][$li] = $router->getStopsBetween(
+                    $leg['from_stop'], $leg['to_stop'], $leg['rec_key'] ?? ''
+                );
             }
         }
 
-        if (!$bestResult) {
-            return $this->singleSegment('pedestrian', $fromLat, $fromLng, $toLat, $toLng, 'walk');
-        }
-
-        $bestLegs = $bestResult['legs'];
-
-        $oLat = (float)$bestOrigin['lat']; $oLng = (float)$bestOrigin['lng'];
-        $dLat = (float)$bestDest['lat'];   $dLng = (float)$bestDest['lng'];
-
-        // Pre-compute stop sequences for each leg (used for Valhalla through-stop requests)
-        $legStopCoords = [];
-        foreach ($bestLegs as $i => $leg) {
-            $legStopCoords[$i] = $router->getStopsBetween(
-                $leg['from_stop'], $leg['to_stop'], $leg['rec_key'] ?? ''
-            );
-        }
-
-        // Fire walk segments + road-following bus leg geometry in one parallel pool
-        $responses = Http::pool(function ($pool) use ($fromLat, $fromLng, $oLat, $oLng, $dLat, $dLng, $toLat, $toLng, $legStopCoords) {
-            $requests = [
-                $pool->as('walk1')->timeout(self::VALHALLA_TIMEOUT)->post($this->valhallaBase() . '/route', $this->walkBody($fromLat, $fromLng, $oLat, $oLng)),
-                $pool->as('walk2')->timeout(self::VALHALLA_TIMEOUT)->post($this->valhallaBase() . '/route', $this->walkBody($dLat, $dLng, $toLat, $toLng)),
-            ];
-            foreach ($legStopCoords as $i => $stops) {
-                if (count($stops) >= 2) {
-                    $requests[] = $pool->as('bus_' . $i)
-                        ->timeout(self::VALHALLA_TIMEOUT)
-                        ->post($this->valhallaBase() . '/route', $this->busLegBody($stops));
+        // Fire all walk + bus leg geometry requests in one parallel pool
+        $responses = Http::pool(function ($pool) use ($fromLat, $fromLng, $toLat, $toLng, $candidates, $allLegCoords) {
+            $requests = [];
+            foreach ($candidates as $ci => $cand) {
+                $origin = $cand['origin'];
+                $alight = $cand['result']['alight_stop'];
+                $oLat = (float)$origin['lat']; $oLng = (float)$origin['lng'];
+                $dLat = (float)$alight['lat']; $dLng = (float)$alight['lng'];
+                $requests[] = $pool->as("w1_{$ci}")->timeout(self::VALHALLA_TIMEOUT)->post($this->valhallaBase() . '/route', $this->walkBody($fromLat, $fromLng, $oLat, $oLng));
+                $requests[] = $pool->as("w2_{$ci}")->timeout(self::VALHALLA_TIMEOUT)->post($this->valhallaBase() . '/route', $this->walkBody($dLat, $dLng, $toLat, $toLng));
+                foreach ($allLegCoords[$ci] ?? [] as $li => $stops) {
+                    if (count($stops) >= 2) {
+                        $requests[] = $pool->as("b_{$ci}_{$li}")->timeout(self::VALHALLA_TIMEOUT)->post($this->valhallaBase() . '/route', $this->busLegBody($stops));
+                    }
                 }
             }
             return $requests;
         });
 
-        $walk1 = $this->parseValhalla($responses['walk1'], 'walk');
-        $walk2 = $this->parseValhalla($responses['walk2'], 'walk');
+        // Build segments for each candidate
+        $alternatives = [];
+        $straightLine    = $this->haversine($fromLat, $fromLng, $toLat, $toLng);
+        $walkEstimateSec = $straightLine / 1.25;
 
-        $segments = [];
+        foreach ($candidates as $ci => $cand) {
+            $origin    = $cand['origin'];
+            $alight    = $cand['result']['alight_stop'];
+            $legs      = $cand['result']['legs'];
+            $transfers = count($legs) - 1;
+            $walk1     = isset($responses["w1_{$ci}"]) ? $this->parseValhalla($responses["w1_{$ci}"], 'walk') : null;
+            $walk2     = isset($responses["w2_{$ci}"]) ? $this->parseValhalla($responses["w2_{$ci}"], 'walk') : null;
 
-        if ($walk1 && $walk1['distance'] > 20) {
-            $segments[] = [
-                'type'     => 'walk',
-                'geometry' => $walk1['geometry'],
-                'distance' => $walk1['distance'],
-                'duration' => $walk1['duration'],
-                'color'    => self::COLORS['walk'],
-                'label'    => 'Caminar a ' . ($bestOrigin['stop_name'] ?? 'parada'),
-                'meta'     => [
-                    'stop_id'   => $bestOrigin['stop_id'],
-                    'stop_name' => $bestOrigin['stop_name'],
-                    'stop_lat'  => $oLat, 'stop_lng' => $oLng,
-                ],
-            ];
-        }
-
-        foreach ($bestLegs as $i => $leg) {
-            $from     = $leg['from_stop'];
-            $to       = $leg['to_stop'];
-            $recKey   = $leg['rec_key'] ?? '';
-            $lineName = $leg['line_name'] ?? $leg['line'];
-
-            // Prefer road-following Valhalla geometry; fall back to stop-sequence polyline
-            $busGeo = isset($responses['bus_' . $i])
-                ? $this->parseValhalla($responses['bus_' . $i], 'bus')
-                : null;
-
-            if ($busGeo) {
-                $geo  = $busGeo['geometry'];
-                $dist = $busGeo['distance'];
-                $dur  = $busGeo['duration'];
-            } else {
-                $geo  = $router->legGeometry($from, $to, $recKey);
-                $dist = $router->legDistance($from, $to, $recKey);
-                $dur  = ($dist / BusRouter::BUS_SPEED_MS) + 60;
+            $segs = [];
+            if ($walk1 && $walk1['distance'] > 20) {
+                $segs[] = ['type' => 'walk', 'geometry' => $walk1['geometry'], 'distance' => $walk1['distance'], 'duration' => $walk1['duration'], 'color' => self::COLORS['walk'], 'label' => 'Caminar a ' . ($origin['stop_name'] ?? 'parada'), 'meta' => ['stop_id' => $origin['stop_id'], 'stop_name' => $origin['stop_name'], 'stop_lat' => (float)$origin['lat'], 'stop_lng' => (float)$origin['lng']]];
             }
 
-            $segments[] = [
-                'type'     => 'bus',
-                'geometry' => $geo,
-                'distance' => $dist,
-                'duration' => $dur,
-                'color'    => self::COLORS['bus'],
-                'label'    => 'Bus ' . $lineName,
-                'meta'     => [
-                    'from_station_id' => $from['stop_id'],
-                    'from_station'    => $from['stop_name'] ?? '',
-                    'from_lat'        => (float)$from['lat'],
-                    'from_lng'        => (float)$from['lng'],
-                    'to_station_id'   => $to['stop_id'],
-                    'to_station'      => $to['stop_name'] ?? '',
-                    'to_lat'          => (float)$to['lat'],
-                    'to_lng'          => (float)$to['lng'],
-                    'lines'           => [$lineName],
-                    'line_colors'     => [$lineName => '00b4ff'],
-                    'direction'       => null,
-                ],
+            foreach ($legs as $li => $leg) {
+                $from     = $leg['from_stop'];
+                $to       = $leg['to_stop'];
+                $recKey   = $leg['rec_key'] ?? '';
+                $lineName = $leg['line_name'] ?? $leg['line'];
+                $busGeo   = isset($responses["b_{$ci}_{$li}"]) ? $this->parseValhalla($responses["b_{$ci}_{$li}"], 'bus') : null;
+
+                if ($busGeo) {
+                    $geo = $busGeo['geometry']; $dist = $busGeo['distance']; $dur = $busGeo['duration'];
+                } else {
+                    $geo = $router->legGeometry($from, $to, $recKey);
+                    $dist = $router->legDistance($from, $to, $recKey);
+                    $dur  = ($dist / BusRouter::BUS_SPEED_MS) + 60;
+                }
+
+                $segs[] = ['type' => 'bus', 'geometry' => $geo, 'distance' => $dist, 'duration' => $dur, 'color' => self::COLORS['bus'], 'label' => 'Bus ' . $lineName, 'meta' => ['from_station_id' => $from['stop_id'], 'from_station' => $from['stop_name'] ?? '', 'from_lat' => (float)$from['lat'], 'from_lng' => (float)$from['lng'], 'to_station_id' => $to['stop_id'], 'to_station' => $to['stop_name'] ?? '', 'to_lat' => (float)$to['lat'], 'to_lng' => (float)$to['lng'], 'lines' => [$lineName], 'line_colors' => [$lineName => '00b4ff'], 'direction' => null]];
+            }
+
+            if ($walk2 && $walk2['distance'] > 20) {
+                $segs[] = ['type' => 'walk', 'geometry' => $walk2['geometry'], 'distance' => $walk2['distance'], 'duration' => $walk2['duration'], 'color' => self::COLORS['walk'], 'label' => 'Caminar al destino'];
+            }
+
+            $totalDist = array_sum(array_column($segs, 'distance'));
+            $totalDur  = array_sum(array_column($segs, 'duration'));
+            $lineNames = array_map(fn($l) => $l['line_name'] ?? $l['line'], $legs);
+
+            $alternatives[] = [
+                'segments'    => $segs,
+                'distance'    => $totalDist,
+                'duration'    => $totalDur,
+                'lines_label' => implode(' → ', $lineNames),
+                'transfers'   => $transfers,
+                'inefficient' => $totalDur > $walkEstimateSec * 0.9 || $transfers >= 2,
             ];
         }
 
-        if ($walk2 && $walk2['distance'] > 20) {
-            $segments[] = [
-                'type'     => 'walk',
-                'geometry' => $walk2['geometry'],
-                'distance' => $walk2['distance'],
-                'duration' => $walk2['duration'],
-                'color'    => self::COLORS['walk'],
-                'label'    => 'Caminar al destino',
-            ];
-        }
-
-        $totalDistance = array_sum(array_column($segments, 'distance'));
-        $totalDuration = array_sum(array_column($segments, 'duration'));
-
-        // Flag as inefficient when bus doesn't save time over walking
-        $straightLine     = $this->haversine($fromLat, $fromLng, $toLat, $toLng);
-        $walkEstimateSec  = $straightLine / 1.25;
-        $inefficient      = $totalDuration > $walkEstimateSec * 0.9 || $bestTransfers >= 2;
+        $best = $alternatives[0];
 
         return [
-            'segments'    => $segments,
-            'distance'    => $totalDistance,
-            'duration'    => $totalDuration,
-            'mode'        => 'bus',
-            'inefficient' => $inefficient,
+            'segments'     => $best['segments'],
+            'distance'     => $best['distance'],
+            'duration'     => $best['duration'],
+            'mode'         => 'bus',
+            'inefficient'  => $best['inefficient'],
+            'alternatives' => $alternatives,
         ];
     }
 

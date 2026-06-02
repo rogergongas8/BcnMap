@@ -300,15 +300,26 @@ function SegmentSequence({ segments, metroLines }) {
  * Sub-componente: tarjeta de modo (Fase opciones)
  * ───────────────────────────────────────────────────────────────────── */
 
-function ModeCard({ mode, state, isActive, onClick, metroLines }) {
+function ModeCard({ mode, state, isActive, onClick, onPickAlternative, metroLines }) {
   const { t }    = useTranslation()
   const ModeIcon = MODE_ICONS[mode.id]
   const { color } = mode
   const data    = state?.data
   const loading = state?.loading
   const failed  = state?.error
+  const warming = state?.warming
 
-  const segs = data?.segments ?? []
+  const alternatives = data?.alternatives ?? []
+  const [selectedAlt, setSelectedAlt] = React.useState(0)
+
+  // Reset selected alt when data changes (new route calculated)
+  React.useEffect(() => { setSelectedAlt(0) }, [data])
+
+  const activeAlt  = alternatives.length > 0 ? (alternatives[selectedAlt] ?? alternatives[0]) : null
+  const segs       = activeAlt?.segments ?? data?.segments ?? []
+  const altDuration = activeAlt?.duration ?? data?.duration
+  const altDistance = activeAlt?.distance ?? data?.distance
+  const altInefficient = activeAlt?.inefficient ?? data?.inefficient
 
   // Resumen de meta de info contextual (estaciones, líneas)
   let metaLine = null
@@ -345,14 +356,19 @@ function ModeCard({ mode, state, isActive, onClick, metroLines }) {
   const trafficNote  = mode.id === 'car' ? (data?.traffic?.note ?? data?.segments?.[0]?.meta?.traffic_note) : null
   const congestion   = mode.id === 'car' ? (data?.traffic?.congestion ?? data?.segments?.[0]?.meta?.congestion) : null
   const trafficColor = congestion >= 80 ? '#ff3333' : congestion >= 60 ? '#ffcc00' : '#00ff88'
-  const inefficient  = data?.inefficient === true
+  const inefficient  = (altInefficient ?? data?.inefficient) === true
   const inefficientReason = data?.inefficient_reason
 
   const accentColor = isActive && !inefficient ? color : inefficient ? '#6B6865' : '#2C2926'
 
+  const handleAltClick = (e, idx) => {
+    e.stopPropagation()
+    setSelectedAlt(idx)
+    if (onPickAlternative && alternatives[idx]) onPickAlternative(alternatives[idx])
+  }
+
   return (
     <motion.button
-      layout
       onClick={onClick}
       whileTap={{ scale: 0.99 }}
       className="w-full text-left overflow-hidden flex transition-all"
@@ -393,7 +409,7 @@ function ModeCard({ mode, state, isActive, onClick, metroLines }) {
               )}
               {data && !inefficient && (
                 <span className="font-syne text-[13px] font-semibold" style={{ color: isActive ? color : '#F7F6F4' }}>
-                  {fmtTime(data.duration)}
+                  {fmtTime(altDuration ?? data.duration)}
                 </span>
               )}
               {data && inefficient && (
@@ -403,15 +419,20 @@ function ModeCard({ mode, state, isActive, onClick, metroLines }) {
                 </span>
               )}
               {loading && (
-                <span className="flex items-center gap-1">
-                  {[0, 150, 300].map(d => (
-                    <span key={d} className="w-1 h-1 rounded-full animate-bounce" style={{ background: color, animationDelay: `${d}ms` }} />
-                  ))}
-                </span>
+                <span className="w-3 h-3 rounded-full border border-t-transparent animate-spin flex-shrink-0" style={{ borderColor: color + '44', borderTopColor: 'transparent' }} />
               )}
-              {failed && <span className="font-mono text-[9px]" style={{ color: '#8C8884' }}>No disponible</span>}
+              {failed && !warming && <span className="font-mono text-[9px]" style={{ color: '#8C8884' }}>No disponible</span>}
+              {failed && warming && <span className="font-mono text-[9px]" style={{ color: '#B8885A' }}>Carregant xarxa...</span>}
             </div>
           </div>
+
+          {/* Loading skeleton — same height as loaded card to prevent reflow */}
+          {loading && (
+            <div className="mt-1.5 flex flex-col gap-1.5">
+              <div className="h-3 rounded animate-pulse" style={{ background: color + '18', width: '55%' }} />
+              <div className="h-2.5 rounded animate-pulse" style={{ background: '#2C2926', width: '35%' }} />
+            </div>
+          )}
 
           {data && segs.length > 0 && !inefficient && (
             <div className="mt-1.5">
@@ -423,13 +444,39 @@ function ModeCard({ mode, state, isActive, onClick, metroLines }) {
           )}
           {data && !inefficient && (
             <div className="mt-1 flex items-center gap-2 font-mono text-[10px]" style={{ color: '#8C8884' }}>
-              {data.distance != null && <span>{fmtDist(data.distance)}</span>}
+              {altDistance != null && <span>{fmtDist(altDistance)}</span>}
               {trafficNote && (
                 <span className="font-mono text-[9px] px-1.5 py-0.5" style={{ color: trafficColor, background: trafficColor + '18', borderRadius: 3 }}>
                   {trafficNote}
                 </span>
               )}
               {!trafficNote && metaLine && <span className="truncate">· {metaLine}</span>}
+            </div>
+          )}
+
+          {/* Alternatives selector — bus/metro only, when >1 option returned */}
+          {data && alternatives.length > 1 && (
+            <div className="mt-1.5 flex gap-1" onClick={e => e.stopPropagation()}>
+              {alternatives.map((alt, idx) => (
+                <button
+                  key={idx}
+                  onClick={(e) => handleAltClick(e, idx)}
+                  className="flex items-center gap-1 px-2 py-0.5 rounded font-mono text-[9px] transition-colors"
+                  style={{
+                    background: selectedAlt === idx ? color + '22' : '#1C1A17',
+                    border: `1px solid ${selectedAlt === idx ? color + '55' : '#2C2926'}`,
+                    color: selectedAlt === idx ? color : '#8C8884',
+                  }}
+                >
+                  <span>{alt.lines_label}</span>
+                  <span style={{ color: selectedAlt === idx ? color + 'aa' : '#5C5A56' }}>
+                    {fmtTime(alt.duration)}
+                  </span>
+                  {alt.transfers > 0 && (
+                    <span style={{ color: '#6B6865' }}>{alt.transfers}t</span>
+                  )}
+                </button>
+              ))}
             </div>
           )}
         </div>
@@ -1078,7 +1125,11 @@ export default function SearchBar({ embedded = false }) {
     setPreviews(prev => {
       const next = { ...prev }
       for (const r of results) {
-        if (r.error || r.data?.error) {
+        if (r.error) {
+          next[r.id] = { error: true }
+        } else if (r.data?.bus_graph_warming) {
+          next[r.id] = { error: true, warming: true }
+        } else if (r.data?.error) {
           next[r.id] = { error: true }
         } else {
           next[r.id] = { data: r.data }
@@ -1230,12 +1281,13 @@ export default function SearchBar({ embedded = false }) {
   /* ────────────────── Render embegut (TopBar) ────────────────── */
 
   if (embedded) {
-    // Absolute dropdown anchored 56px below the TopBar's top edge
+    // Absolute dropdown anchored 56px below the TopBar's top edge.
+    // Uses calc() centering instead of transform: translateX(-50%) because
+    // framer-motion takes over the transform property for its y animation.
     const dropdownStyle = {
       position: 'absolute',
       top: 56,
-      left: centeredLeft,
-      transform: 'translateX(-50%)',
+      left: 'calc(50% - 220px)', // 220px = half of 440px dropdown width
       zIndex: 60,
     }
 
@@ -1341,50 +1393,65 @@ export default function SearchBar({ embedded = false }) {
       boxShadow:    '0 2px 16px rgba(0,0,0,0.55)',
     }
 
+    const barTransition = { duration: 0.16, ease: [0.2, 0.7, 0.2, 1] }
+    const barWidth = phase === 'pill' ? 300 : 440
+    const barBorderColor = phase === 'options' && showActiveInPill
+      ? activeModeMeta.color + '55'
+      : '#2C2926'
+
     return (
       <>
-        {/* ── PILL inline ── */}
-        {phase === 'pill' && (
-          <div className="flex items-center gap-2 px-3 h-11" style={{ ...pillCard, width: 300 }}>
-            <button
-              onClick={showActiveInPill ? () => setPhase('options') : enterSearch}
-              className="flex-1 flex items-center gap-2.5 min-w-0 h-full transition-all"
-            >
-              {showActiveInPill ? (
+        {/* ── Persistent bar — CSS-transitions width, cross-fades content ── */}
+        <div
+          className="flex items-center px-3 h-11 overflow-hidden"
+          style={{
+            ...pillCard,
+            width: barWidth,
+            borderColor: barBorderColor,
+            transition: 'width 180ms cubic-bezier(0.4,0,0.2,1), border-color 180ms',
+          }}
+        >
+          {phase === 'pill' && (
+            <motion.div className="flex items-center gap-2.5 w-full min-w-0"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.1, delay: 0.06 }}>
+              <button
+                onClick={showActiveInPill ? () => setPhase('options') : enterSearch}
+                className="flex-1 flex items-center gap-2.5 min-w-0 h-full"
+              >
+                {showActiveInPill ? (
+                  <>
+                    <span className="w-2 h-2 rounded-full animate-pulse flex-shrink-0" style={{ background: activeModeMeta.color }} />
+                    <span className="font-syne text-[13px] font-medium truncate flex-1 text-left" style={{ color: '#F7F6F4' }}>
+                      {destPoint?.label ?? destination?.label ?? 'Destí'}
+                    </span>
+                    <span className="font-syne text-[13px] font-semibold flex-shrink-0" style={{ color: activeModeMeta.color }}>
+                      {fmtTime(route.duration)}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <Icon.search size={14} style={{ color: '#7D7975', flexShrink: 0 }} />
+                    <span className="font-syne text-[13px]" style={{ color: '#8C8884' }}>{t('search.placeholder')}</span>
+                  </>
+                )}
+              </button>
+              {showActiveInPill && (
                 <>
-                  <span className="w-2 h-2 rounded-full animate-pulse flex-shrink-0" style={{ background: activeModeMeta.color }} />
-                  <span className="font-syne text-[13px] font-medium truncate flex-1 text-left" style={{ color: '#F7F6F4' }}>
-                    {destPoint?.label ?? destination?.label ?? 'Destí'}
-                  </span>
-                  <span className="font-syne text-[13px] font-semibold flex-shrink-0" style={{ color: activeModeMeta.color }}>
-                    {fmtTime(route.duration)}
-                  </span>
-                </>
-              ) : (
-                <>
-                  <Icon.search size={14} style={{ color: '#7D7975', flexShrink: 0 }} />
-                  <span className="font-syne text-[13px]" style={{ color: '#8C8884' }}>{t('search.placeholder')}</span>
+                  <div className="w-px h-5 flex-shrink-0" style={{ background: '#2C2926' }} />
+                  <button onClick={shareRoute} title="Copiar enllaç"
+                    className="w-8 h-8 flex items-center justify-center rounded-md transition-all flex-shrink-0"
+                    style={{ color: shareToast ? '#B8885A' : '#8C8884', background: shareToast ? '#B8885A1A' : 'transparent' }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none">{shareIconContent}</svg>
+                  </button>
                 </>
               )}
-            </button>
-            {showActiveInPill && (
-              <>
-                <div className="w-px h-5 flex-shrink-0" style={{ background: '#2C2926' }} />
-                <button onClick={shareRoute} title="Copiar enllaç"
-                  className="w-8 h-8 flex items-center justify-center rounded-md transition-all flex-shrink-0"
-                  style={{ color: shareToast ? '#B8885A' : '#8C8884', background: shareToast ? '#B8885A1A' : 'transparent' }}
-                >
-                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none">{shareIconContent}</svg>
-                </button>
-              </>
-            )}
-          </div>
-        )}
+            </motion.div>
+          )}
 
-        {/* ── SEARCH inline ── */}
-        {phase === 'search' && (
-          <>
-            <div className="flex items-center gap-2.5 px-3 h-11" style={{ ...pillCard, width: 440 }}>
+          {phase === 'search' && (
+            <motion.div className="flex items-center gap-2.5 w-full min-w-0"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.1, delay: 0.08 }}>
               <button onClick={exitToPill} className="flex items-center justify-center flex-shrink-0 transition-colors" style={{ color: '#8C8884' }}
                 onMouseEnter={e => { e.currentTarget.style.color = '#F7F6F4' }} onMouseLeave={e => { e.currentTarget.style.color = '#8C8884' }}
               ><Icon.back size={14} /></button>
@@ -1407,24 +1474,12 @@ export default function SearchBar({ embedded = false }) {
                   <Icon.close size={11} />
                 </button>
               )}
-            </div>
-            {/* Suggestions dropdown */}
-            {(destLoading || destSugg.length > 0) && (
-              <div style={{ ...dropdownStyle, width: 440, maxWidth: '92vw' }}>
-                <div style={{ background: '#151210', border: '1px solid #2C2926', borderRadius: 8, overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,0.7)' }}>
-                  <SuggestionList items={destSugg} loading={destLoading} query={destQuery} onPick={handlePickDestination} />
-                </div>
-              </div>
-            )}
-          </>
-        )}
+            </motion.div>
+          )}
 
-        {/* ── OPTIONS inline header ── */}
-        {phase === 'options' && (
-          <>
-            <div className="flex items-center gap-2.5 px-3 h-11"
-              style={{ ...pillCard, width: 440, borderColor: showActiveInPill ? activeModeMeta.color + '55' : '#2C2926' }}
-            >
+          {phase === 'options' && (
+            <motion.div className="flex items-center gap-2 w-full min-w-0"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.1, delay: 0.08 }}>
               <button onClick={() => setPhase('search')} className="flex items-center justify-center flex-shrink-0 transition-colors" style={{ color: '#8C8884' }}
                 onMouseEnter={e => { e.currentTarget.style.color = '#F7F6F4' }} onMouseLeave={e => { e.currentTarget.style.color = '#8C8884' }}
               ><Icon.back size={14} /></button>
@@ -1446,13 +1501,35 @@ export default function SearchBar({ embedded = false }) {
               <button onClick={exitToPill} className="w-8 h-8 flex items-center justify-center flex-shrink-0 transition-colors rounded-md" style={{ color: '#8C8884' }}
                 onMouseEnter={e => { e.currentTarget.style.color = '#F7F6F4' }} onMouseLeave={e => { e.currentTarget.style.color = '#8C8884' }}
               ><Icon.close size={11} /></button>
-            </div>
-            {/* Options dropdown */}
-            <div style={{ ...dropdownStyle, width: 440, maxWidth: '94vw' }}>
+            </motion.div>
+          )}
+        </div>
+
+        {/* ── Dropdowns — fade in below bar ── */}
+        <AnimatePresence>
+          {phase === 'search' && (destLoading || destSugg.length > 0) && (
+            <motion.div
+              key="suggestions-dropdown"
+              style={{ ...dropdownStyle, width: 440, maxWidth: '92vw' }}
+              initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.16, ease: [0.2, 0.7, 0.2, 1] }}
+            >
+              <div style={{ background: '#151210', border: '1px solid #2C2926', borderRadius: 8, overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,0.7)' }}>
+                <SuggestionList items={destSugg} loading={destLoading} query={destQuery} onPick={handlePickDestination} />
+              </div>
+            </motion.div>
+          )}
+          {phase === 'options' && (
+            <motion.div
+              key="options-dropdown"
+              style={{ ...dropdownStyle, width: 440, maxWidth: '94vw' }}
+              initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.18, ease: [0.2, 0.7, 0.2, 1] }}
+            >
               {optionsDropdownJSX}
-            </div>
-          </>
-        )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </>
     )
   }

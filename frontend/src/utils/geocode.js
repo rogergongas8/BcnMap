@@ -73,6 +73,11 @@ export async function geocodeSearch(q, limit = 8) {
       .filter(r => {
         if (seen.has(r.label)) return false
         seen.add(r.label)
+        // Deduplicate by normalized name — strips Catalan/Spanish articles so
+        // "la Sagrada Família" and "Sagrada Família" collapse into one entry.
+        const nameKey = r.main.toLowerCase().trim().replace(/^(la |el |els |les |l'|los |las |the )/i, '')
+        if (seen.has(nameKey)) return false
+        seen.add(nameKey)
         return true
       })
   } catch { return [] }
