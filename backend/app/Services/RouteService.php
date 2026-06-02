@@ -41,6 +41,25 @@ class RouteService
             }
         }
 
+        $walkDist = $options['foot']['distance'] ?? 0;
+        $isVeryClose = $walkDist > 0 && $walkDist <= 600;
+        $isClose     = $walkDist > 0 && $walkDist <= 1200;
+
+        foreach ($options as $mode => &$route) {
+            if (!$route) continue;
+            
+            $route['inefficient'] = false;
+            
+            if ($isVeryClose && in_array($mode, ['car', 'metro', 'bus', 'bicing'])) {
+                $route['inefficient'] = true;
+                $route['inefficient_reason'] = 'El trajecte és molt curt, anar a peu és més ràpid i eficient.';
+            } elseif ($isClose && in_array($mode, ['metro', 'bus', 'car'])) {
+                $route['inefficient'] = true;
+                $route['inefficient_reason'] = 'El trajecte és curt, anar a peu o en bicing és més eficient.';
+            }
+        }
+        unset($route);
+
         $result = [
             'recommended' => $this->scoreRoutes($options, $constraint),
             'options'     => $options,

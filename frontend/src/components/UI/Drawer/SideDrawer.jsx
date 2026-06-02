@@ -38,7 +38,7 @@ export default function SideDrawer() {
           animate={{ x: 0, opacity: 1 }}
           exit={{ x: -360, opacity: 0 }}
           transition={{ type: 'tween', duration: 0.25, ease: [0.2, 0.7, 0.2, 1] }}
-          className="absolute top-14 left-3 z-30 w-[340px] flex flex-col overflow-hidden shadow-[0_4px_32px_rgba(0,0,0,0.5)]"
+          className="absolute top-14 left-3 z-30 w-[340px] flex flex-col overflow-hidden shadow-[0_4px_32px_rgba(0,0,0,0.5)] pointer-events-auto"
           style={{
             maxHeight: isLimited ? 'min(580px, calc(100dvh - 80px))' : 'calc(100dvh - 56px)',
             background: '#151210', border: '1px solid #2C2926', borderRadius: 8,

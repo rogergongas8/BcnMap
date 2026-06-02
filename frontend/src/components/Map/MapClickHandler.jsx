@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useMapStore } from '../../store/mapStore'
 import { useDrawerStore } from '../../store/drawerStore'
+import { useContextMenuStore } from '../../store/contextMenuStore'
 import { reverseGeocode } from '../../utils/reverseGeocode'
 
 const INTERACTIVE_LAYER_PATTERNS = [
@@ -47,7 +48,19 @@ export default function MapClickHandler() {
     }
 
     mapInstance.on('click', handler)
-    return () => { mapInstance.off('click', handler) }
+    
+    const contextHandler = (e) => {
+      e.preventDefault()
+      const { lng, lat } = e.lngLat
+      const { x, y } = e.point
+      useContextMenuStore.getState().openMenu(x, y, lng, lat)
+    }
+    mapInstance.on('contextmenu', contextHandler)
+
+    return () => { 
+      mapInstance.off('click', handler)
+      mapInstance.off('contextmenu', contextHandler)
+    }
   }, [mapInstance, openPlace])
 
   return null

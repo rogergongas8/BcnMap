@@ -6,6 +6,7 @@ import { useMapStore } from '../../../store/mapStore'
 import { useRouteStore } from '../../../store/routeStore'
 import { fetchPlaceEnrich, fetchRoutePlan } from '../../../services/api'
 import { sharePlaceUrl } from '../../../hooks/useDeepLink'
+import { useTranslation } from 'react-i18next'
 
 /* ── Skeleton ───────────────────────────────────────────────────────────── */
 
@@ -365,9 +366,29 @@ function HorarisTab({ place, enrich, enrichLoading }) {
     )
   }
 
+  const { t, i18n } = useTranslation()
+  const lang = i18n.language || 'es'
+
+  const dayMap = {
+    'Mo': lang === 'ca' ? 'Dl' : (lang === 'en' ? 'Mo' : 'Lu'),
+    'Tu': lang === 'ca' ? 'Dt' : (lang === 'en' ? 'Tu' : 'Ma'),
+    'We': lang === 'ca' ? 'Dc' : (lang === 'en' ? 'We' : 'Mi'),
+    'Th': lang === 'ca' ? 'Dj' : (lang === 'en' ? 'Th' : 'Ju'),
+    'Fr': lang === 'ca' ? 'Dv' : (lang === 'en' ? 'Fr' : 'Vi'),
+    'Sa': lang === 'ca' ? 'Ds' : (lang === 'en' ? 'Sa' : 'Sá'),
+    'Su': lang === 'ca' ? 'Dg' : (lang === 'en' ? 'Su' : 'Do'),
+    'PH': lang === 'ca' ? 'Festius' : (lang === 'en' ? 'PH' : 'Festivos'),
+    'off': lang === 'ca' ? 'tancat' : (lang === 'en' ? 'off' : 'cerrado'),
+  }
+
+  // Replace English abbreviations with localized ones
+  const localizedHours = typeof hours === 'string'
+    ? hours.replace(/\b(Mo|Tu|We|Th|Fr|Sa|Su|PH|off)\b/g, match => dayMap[match])
+    : hours
+
   // Parse "Mo-Fr 09:00-20:00; Sa 09:00-14:00" style or plain text
-  const lines = typeof hours === 'string'
-    ? hours.split(';').map(s => s.trim()).filter(Boolean)
+  const lines = typeof localizedHours === 'string'
+    ? localizedHours.split(';').map(s => s.trim()).filter(Boolean)
     : []
 
   return (
@@ -923,14 +944,16 @@ export default function PlaceView() {
             )}
 
             {!(enrich?.website || place.meta?.website) && (
-              <button
-                onClick={handleCopy}
+              <a
+                href={`https://www.google.com/search?q=${encodeURIComponent(place.name + ' Barcelona')}`}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="flex-1 h-10 flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
-                style={{ borderRadius: 7, background: '#1C1A17', border: `1px solid ${copied ? '#B8885A55' : '#2C2926'}`, color: copied ? '#B8885A' : '#8C8884' }}
+                style={{ borderRadius: 7, background: '#1C1A17', border: '1px solid #2C2926', color: '#F7F6F4' }}
               >
-                <Icons.copy size={12} />
-                <span className="font-mono text-[10px] uppercase tracking-[0.08em]">{copied ? 'Copiat' : 'Coords'}</span>
-              </button>
+                <Icons.search size={12} />
+                <span className="font-syne text-[12px] font-medium whitespace-nowrap">Cercar a Web</span>
+              </a>
             )}
 
             {place.kind === 'poi' && (

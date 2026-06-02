@@ -261,7 +261,7 @@ export default function CityHud() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -6, scale: 0.97 }}
             transition={{ duration: 0.15, ease: [0.25, 0.46, 0.45, 0.94] }}
-            className="absolute top-full left-0 mt-2 z-[60]"
+            className="absolute top-full left-0 mt-2 z-[60] pointer-events-auto"
             onMouseEnter={show}
             onMouseLeave={hide}
           >

@@ -44,6 +44,15 @@ async function executeMapActions(actions) {
         category: action.category ? { label: action.category } : (nearby?.category ? { label: nearby.category } : null),
       })
 
+    } else if (action.type === 'show_pois') {
+      if (Array.isArray(action.pois)) {
+        const mapped = action.pois.map((p, i) => ({
+          ...p,
+          id: p.id ?? `chat_poi_${i}_${p.lat}_${p.lng}`,
+        }))
+        useNearbyStore.getState().setPois(mapped)
+      }
+
     } else if (action.type === 'plan_trip') {
       const userLoc = useMapStore.getState().userLocation
 

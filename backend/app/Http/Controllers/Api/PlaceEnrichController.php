@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Services\FoursquareService;
 use App\Services\PlaceEnrichService;
+use App\Services\GroqService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -16,6 +17,7 @@ class PlaceEnrichController extends Controller
     public function __construct(
         private PlaceEnrichService $enrichService,
         private FoursquareService  $foursquareService,
+        private GroqService        $groqService,
     ) {}
 
     public function enrich(Request $request): JsonResponse
@@ -46,11 +48,33 @@ class PlaceEnrichController extends Controller
             : null;
 
         // Wikipedia/Wikimedia: descripción + fotos para landmarks (skipped for commercial POIs)
-        $wiki = $this->enrichService->enrich($name, $lat, $lng, $category);
+        $isCommercial = in_array($category, ['restaurant', 'cafe', 'bar', 'bakery', 'supermarket', 'pharmacy', 'bank', 'shop', 'butcher', 'hairdresser', ''], true);
+        $wiki = $isCommercial ? null : $this->enrichService->enrich($name, $lat, $lng, $category);
 
-        $data = $this->merge($fsq, $wiki);
+        $data = $this->merge($fsq, $wiki) ?? [
+            'photos'      => [],
+            'description' => null,
+            'rating'      => null,
+            'price'       => null,
+            'is_open_now' => null,
+            'website'     => null,
+            'phone'       => null,
+            'hours'       => null,
+            'wiki_url'    => null,
+            'sources'     => [],
+        ];
 
-        Cache::put($cacheKey, $data, 86400); // 24h — same as individual service caches
+        if (empty($data['description'])) {
+            $aiDesc = $this->groqService->generatePlaceDescription($name, $category, $lang);
+            if ($aiDesc) {
+                $data['description'] = $aiDesc;
+                if (!in_array('AI Generated', $data['sources'], true)) {
+                    $data['sources'][] = 'AI Generated';
+                }
+            }
+        }
+
+        Cache::put($cacheKey, $data, 2592000); // 30 days
 
         return response()->json(['data' => $data]);
     }

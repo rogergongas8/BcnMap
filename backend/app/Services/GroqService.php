@@ -47,13 +47,13 @@ REGLAS PARA EL CAMPO "reply":
 - No inventes datos. Si no sabes algo, dilo con naturalidad.
 
 REGLAS PARA EL CAMPO "suggestions" (OPCIONAL):
-- Úsalo cuando ofreces 2-3 opciones concretas (planes, lugares, eventos). NUNCA para rutas.
+- Úsalo SIEMPRE que recomiendes, menciones o hables de un lugar o evento específico.
 - Máximo 3 items. Cada item tiene esta forma exacta:
-  { "label": "Texto corto del botón", "action": "open_place", "name": "Nombre del lugar", "lat": float, "lng": float, "category": "categoria" }
-  o para rutas directas: { "label": "Texto corto", "action": "route", "name": "Destino", "lat": float, "lng": float }
-- El label debe ser conciso (máx 5 palabras), sin emojis. Si el evento tiene hora concreta, inclúyela: "Concierto Jazz · 20:00".
-- NUNCA incluyas un item en suggestions si no tienes coordenadas reales (lat/lng). Descarta el item en ese caso.
-- Si no hay sugerencias concretas con coordenadas, pon "suggestions": [].
+  { "label": "Ver [Nombre del lugar]", "action": "open_place", "name": "Nombre del lugar", "lat": float, "lng": float, "category": "categoria" }
+  o para rutas directas: { "label": "Ruta a [Nombre]", "action": "route", "name": "Destino", "lat": float, "lng": float }
+- El label debe ser conciso (máx 5 palabras). Ej: "Ver Casa Petra".
+- NUNCA incluyas un item en suggestions si no tienes coordenadas reales (lat/lng).
+- Si no hay lugares concretos mencionados, pon "suggestions": [].
 
 map_actions disponibles (incluye solo los relevantes, sin explicarlos en el reply):
 - { "type": "fly_to", "lat": 41.38, "lng": 2.17, "zoom": 14 }
@@ -61,12 +61,14 @@ map_actions disponibles (incluye solo los relevantes, sin explicarlos en el repl
 - { "type": "highlight_zone", "zone": "eixample" }
 - { "type": "reset_view" }
 - { "type": "open_place", "name": "string", "lat": float, "lng": float, "category": "string" }
+- { "type": "show_pois", "pois": [{"name": "string", "lat": float, "lng": float, "category": "string"}] }
 - { "type": "show_events", "filter": "hoy|semana|string_categoria_o_null", "category": "string_o_null" }
 - { "type": "plan_trip", "origin_label": "string", "origin_lat": float_o_null, "origin_lng": float_o_null, "dest_label": "string", "dest_lat": float_o_null, "dest_lng": float_o_null, "constraint": "string_o_null" }
 - { "type": "calculate_route", "origin_label": "string", "origin_lat": float_o_null, "origin_lng": float_o_null, "dest_label": "string", "dest_lat": float_o_null, "dest_lng": float_o_null, "mode": "foot|bike|car|bus" }
 
 REGLAS CRÍTICAS:
 - Si el usuario pregunta qué hay hoy, qué hacer, eventos, planes para esta tarde/noche/semana → "show_events" + usa "suggestions" con 2-3 eventos concretos.
+- Si el usuario pide VER lugares en el mapa (ej: "muéstrame restaurantes", "ponlos en el mapa") → usa "show_pois" rellenando el array con los lugares del contexto, y haz "fly_to" a la zona.
 - Si el usuario PREGUNTA por un lugar concreto (recomiéndame, cuál está más cerca, cuál es mejor) → "open_place" + "fly_to". Nunca uses plan_trip ni calculate_route para recomendaciones.
 - Si el usuario quiere ir a algún sitio SIN especificar modo (llévame, quiero ir, cómo llego, dame ruta) → usa "plan_trip". El sistema calculará el modo óptimo automáticamente.
 - Si el usuario especifica modo explícito ("en metro", "a pie", "en bici", "en coche") → usa "calculate_route" con ese modo.
@@ -156,4 +158,40 @@ PROMPT;
             'suggestions' => [],
         ];
     }
+
+    public function generatePlaceDescription(string $name, string $category, string $lang = 'ca'): ?string
+    {
+        $langInstruction = match ($lang) {
+            'es'    => 'en español',
+            'en'    => 'en inglés',
+            default => 'en català',
+        };
+
+        $prompt = <<<PROMPT
+Eres un experto local en Barcelona. Escribe una descripción atractiva {$langInstruction} sobre el lugar "{$name}" (categoría: {$category}).
+Menciona qué ambiente tiene, qué tipo de comida o producto ofrece (si aplica) y alguna recomendación destacada.
+Si es inventado o no lo conoces, deduce cómo sería basado en su nombre y categoría.
+NO uses saludos. Escribe máximo 3 líneas o 2 párrafos cortos.
+PROMPT;
+
+        try {
+            $response = Http::withToken(config('services.groq.key'))
+                ->timeout(10)
+                ->post(self::API_URL, [
+                    'model'       => self::MODEL,
+                    'messages'    => [['role' => 'user', 'content' => $prompt]],
+                    'temperature' => 0.6,
+                    'max_tokens'  => 300,
+                ]);
+
+            if ($response->successful()) {
+                $content = $response->json('choices.0.message.content');
+                return $content ? trim($content) : null;
+            }
+        } catch (\Throwable $e) {
+            Log::error('GroqService generatePlaceDescription exception: ' . $e->getMessage());
+        }
+        return null;
+    }
 }
+

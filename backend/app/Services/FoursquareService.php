@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use Illuminate\Support\Facades\Cache;
+use App\Models\PlaceCache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -13,7 +13,7 @@ class FoursquareService
     private const SEARCH_URL  = 'https://places-api.foursquare.com/places/search';
     private const PHOTOS_URL  = 'https://places-api.foursquare.com/places/%s/photos';
     private const API_VERSION = '2025-06-17';
-    private const CACHE_TTL   = 86400;
+    private const CACHE_TTL   = 2592000; // 30 days
 
     private function headers(): array
     {
@@ -32,16 +32,40 @@ class FoursquareService
 
     public function findPlace(string $name, float $lat, float $lng, string $lang = 'ca'): ?array
     {
-        $cacheKey = 'fsq:place:v2:' . md5($name . $lat . $lng . $lang);
+        $hash = md5($name . round($lat, 4) . round($lng, 4) . $lang);
+        $placeCache = PlaceCache::where('hash_key', $hash)->first();
 
-        $cached = Cache::get($cacheKey);
-        if ($cached !== null) return $cached;
-
-        $result = $this->fetchPlace($name, $lat, $lng, $lang);
-        if ($result !== null) {
-            Cache::put($cacheKey, $result, self::CACHE_TTL);
+        // 1. If we have it in DB and it's less than 30 days old, return it instantly
+        if ($placeCache && $placeCache->last_fetched_at && $placeCache->last_fetched_at->diffInDays(now()) < 30) {
+            return $placeCache->data;
         }
-        return $result;
+
+        // 2. Fetch from Foursquare API
+        $result = $this->fetchPlace($name, $lat, $lng, $lang);
+
+        if ($result !== null) {
+            // 3a. Save or update the DB backup
+            PlaceCache::updateOrCreate(
+                ['hash_key' => $hash],
+                [
+                    'name' => $name,
+                    'lat' => $lat,
+                    'lng' => $lng,
+                    'lang' => $lang,
+                    'data' => $result,
+                    'last_fetched_at' => now(),
+                ]
+            );
+            return $result;
+        }
+
+        // 3b. THE SUPERPOWER: If Foursquare fails/times out, but we have an old DB backup, use it!
+        if ($placeCache) {
+            Log::info("Foursquare API failed for {$name}. Falling back to old database cache.");
+            return $placeCache->data;
+        }
+
+        return null;
     }
 
     private function fetchPlace(string $name, float $lat, float $lng, string $lang = 'ca'): ?array

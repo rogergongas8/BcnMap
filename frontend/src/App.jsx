@@ -3,6 +3,7 @@ import MapContainer from './components/Map/MapContainer'
 import MapControls from './components/Map/MapControls'
 import CameraControls from './components/Map/CameraControls'
 import MapClickHandler from './components/Map/MapClickHandler'
+import MapContextMenu from './components/Map/MapContextMenu'
 
 import TrafficLayer from './components/Map/layers/TrafficLayer'
 import BicingLayer from './components/Map/layers/BicingLayer'
@@ -30,6 +31,7 @@ import NavigationHUD from './components/Route/NavigationHUD'
 import { useMapData } from './hooks/useMapData'
 import { useWebSocket } from './hooks/useWebSocket'
 import { useDeepLink } from './hooks/useDeepLink'
+import { useShortcuts } from './hooks/useShortcuts'
 import { checkAndFireReminders } from './hooks/useReminders'
 import { useDrawerStore } from './store/drawerStore'
 import { useChatStore } from './store/chatStore'
@@ -40,12 +42,19 @@ import { useMapStore } from './store/mapStore'
 function useMapPadding() {
   const view      = useDrawerStore(s => s.view)
   const isLoaded  = useMapStore(s => s.isLoaded)
+  const chatOpen = useChatStore(s => s.isOpen)
   const setMapPadding = useMapStore(s => s.setMapPadding)
 
   useEffect(() => {
     if (!isLoaded) return
-    setMapPadding({ top: 56, left: 0, right: 0, bottom: 0 })
-  }, [view, isLoaded, setMapPadding])
+    // Adjust padding so Mapbox centers the map dynamically in the visible space
+    setMapPadding({ 
+      top: 56, 
+      left: 0, 
+      right: 0, 
+      bottom: 0 
+    })
+  }, [view, chatOpen, isLoaded, setMapPadding])
 }
 
 function AppContent() {
@@ -55,6 +64,7 @@ function AppContent() {
   useMapData()
   useWebSocket()
   useDeepLink()
+  useShortcuts()
   useMapPadding()
 
   useEffect(() => {
@@ -68,6 +78,7 @@ function AppContent() {
       {/* ── Map (fills everything, topbar sits above) ── */}
       <MapContainer />
       <MapClickHandler />
+      <MapContextMenu />
 
       {/* ── Map data layers ── */}
       <TrafficLayer />

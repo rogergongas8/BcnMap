@@ -15,8 +15,8 @@ export default function PinLayer() {
   useEffect(() => {
     if (!mapInstance) return
 
-    // Show for: map-click pin OR pending destination
-    const isMapPin      = view === 'place' && place?.kind === 'pin'
+    // Show for: any place opened in the drawer (from chat, map click, search) OR pending destination
+    const isMapPin      = view === 'place' && place?.lat && place?.lng
     const isPendingDest = destination && !route
 
     if (!isMapPin && !isPendingDest) {

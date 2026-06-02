@@ -198,12 +198,12 @@ function ProfileBtn() {
       <AnimatePresence>
         {open && (
           <motion.div
-            initial={{ opacity: 0, y: -4, scale: 0.97 }}
+            initial={{ opacity: 0, y: -6, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -4, scale: 0.97 }}
-            transition={{ duration: 0.14 }}
-            className="absolute top-11 right-0 w-[180px] z-[60] overflow-hidden"
-            style={{ background: '#151210', border: '1px solid #2C2926', borderRadius: 8, boxShadow: '0 8px 32px rgba(0,0,0,0.7)' }}
+            exit={{ opacity: 0, y: -6, scale: 0.95 }}
+            transition={{ duration: 0.15, ease: 'easeOut' }}
+            className="absolute top-11 right-0 w-[180px] z-[60] overflow-hidden pointer-events-auto"
+            style={{ ...CARD_STYLE }}
           >
             <div className="px-3.5 py-3" style={{ borderBottom: '1px solid #201E1B' }}>
               <p className="font-syne text-[12px] font-medium truncate" style={{ color: '#F7F6F4' }}>{user?.name}</p>
@@ -245,7 +245,7 @@ export default function TopBar({ children }) {
   const hasDisruptions     = disruptions.length > 0
 
   return (
-    <div className="absolute top-0 left-0 right-0 z-50 flex items-center h-14 px-3 gap-2.5 overflow-visible pointer-events-none">
+    <div className="absolute top-0 left-0 right-0 z-[60] flex items-center h-14 px-3 gap-2.5 overflow-visible pointer-events-none">
       {/* ── SearchBar: centered in viewport ── */}
       <div className="absolute inset-0 flex items-center justify-center overflow-visible pointer-events-none">
         <div className="pointer-events-auto overflow-visible">
@@ -253,7 +253,7 @@ export default function TopBar({ children }) {
         </div>
       </div>
 
-      {/* ── Left: action buttons ── */}
+      {/* ── Left: Main navigation / feature toggles ── */}
       <div className="flex items-center gap-1 px-1.5 flex-shrink-0 pointer-events-auto" style={{ ...CARD_STYLE, height: 44 }}>
         <IconBtn active={nearbyActive}      onClick={() => nearbyActive      ? close() : openNearby()}      icon={Icons.search}   label={t('topbar.nearby')} />
         <IconBtn active={savedActive}       onClick={() => savedActive       ? close() : openSaved()}       icon={Icons.bookmark} label={t('topbar.saved')} />
@@ -270,7 +270,7 @@ export default function TopBar({ children }) {
       <div className="flex-1 pointer-events-none" />
 
       {/* ── Right: Lang + Profile + Chat ── */}
-      <div className="flex items-center gap-1 px-1.5 flex-shrink-0 pointer-events-auto" style={{ ...CARD_STYLE, height: 44 }}>
+      <div className="flex items-center gap-1 px-1.5 flex-shrink-0 pointer-events-auto transition-opacity" style={{ ...CARD_STYLE, height: 44, opacity: chatOpen ? 0 : 1, pointerEvents: chatOpen ? 'none' : 'auto' }}>
         <LangToggle />
         <div style={{ width: 1, height: 16, background: '#2C2926', flexShrink: 0, margin: '0 2px' }} />
         <ProfileBtn />
