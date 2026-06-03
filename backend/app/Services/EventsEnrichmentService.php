@@ -195,8 +195,9 @@ class EventsEnrichmentService
             $start = $event['start'] ?? null;
             $end   = $event['end']   ?? null;
 
-            if ($start && $start > $cutoff) continue;
-            if ($end   && $end   < $today)  continue;
+            $effectiveEnd = $end ?? $start;
+            if ($start        && $start       > $cutoff) continue;
+            if ($effectiveEnd && $effectiveEnd < $today)  continue;
 
             $lat = isset($event['lat']) && is_numeric($event['lat']) ? (float) $event['lat'] : null;
             $lng = isset($event['lng']) && is_numeric($event['lng']) ? (float) $event['lng'] : null;

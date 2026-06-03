@@ -17,6 +17,7 @@ export default function ChatPanel() {
   const { isOpen, toggleChat, clearChat, pendingPrompt, clearPendingPrompt } = useChatStore()
   const { messages, isLoading, sendMessage } = useChat()
   const { route } = useRouteStore()
+  const dropdownOpen = useRouteStore(s => s.dropdownOpen)
   const bottomRef = useRef(null)
 
   useEffect(() => {

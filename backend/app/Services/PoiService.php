@@ -82,7 +82,7 @@ class PoiService
     /**
      * Busca POIs por nombre vía Nominatim, restringido al área de Barcelona.
      */
-    public function searchByName(string $query, ?float $lat = null, ?float $lng = null): array
+    public function searchByName(string $query, ?float $lat = null, ?float $lng = null, bool $sortByDistance = true): array
     {
         $query = trim($query);
         if (mb_strlen($query) < 2) {
@@ -93,7 +93,7 @@ class PoiService
             $params = [
                 'q'              => $query,
                 'format'         => 'json',
-                'limit'          => 12,
+                'limit'          => 20,
                 'viewbox'        => self::BCN_VIEWBOX,
                 'bounded'        => 1,
                 'countrycodes'   => 'es',
@@ -150,7 +150,7 @@ class PoiService
                 ];
             }
 
-            if ($lat !== null && $lng !== null) {
+            if ($lat !== null && $lng !== null && $sortByDistance) {
                 usort(
                     $results,
                     fn ($a, $b) => ($a['distance_m'] ?? PHP_INT_MAX) <=> ($b['distance_m'] ?? PHP_INT_MAX)
@@ -162,6 +162,12 @@ class PoiService
             Log::warning('PoiService searchByName exception: ' . $e->getMessage());
             return [];
         }
+    }
+
+    public function nearbyKeyword(string $keyword, float $lat, float $lng, int $radiusM = 1500): array
+    {
+        $cacheKey = sprintf('pois_kw:%s:%s:%d:%s', number_format($lat, 4, '.', ''), number_format($lng, 4, '.', ''), $radiusM, $keyword);
+        return Cache::remember($cacheKey, self::CACHE_TTL, fn () => $this->fetchKeywordFromOverpass($keyword, $lat, $lng, $radiusM));
     }
 
     // ── Internals ────────────────────────────────────────────────────────────
@@ -250,6 +256,87 @@ class PoiService
             Log::warning('PoiService Overpass exception: ' . $e->getMessage());
             return [];
         }
+    }
+
+    private function fetchKeywordFromOverpass(string $keyword, float $lat, float $lng, int $radiusM): array
+    {
+        try {
+            $latStr = number_format($lat, 6, '.', '');
+            $lngStr = number_format($lng, 6, '.', '');
+            
+            // Map common keywords to english for cuisine tag if possible
+            $cuisineKw = match(strtolower($keyword)) {
+                'hamburguesa' => 'burger',
+                'mexicano' => 'mexican',
+                'indio' => 'indian',
+                'asiático' => 'asian',
+                'vegetariano' => 'vegetarian',
+                default => $keyword
+            };
+
+            $clauses = [
+                sprintf('node["amenity"="restaurant"]["name"~"(?i)%s"](around:%d,%s,%s);', $keyword, $radiusM, $latStr, $lngStr),
+                sprintf('way["amenity"="restaurant"]["name"~"(?i)%s"](around:%d,%s,%s);', $keyword, $radiusM, $latStr, $lngStr),
+                sprintf('node["cuisine"~"(?i)%s"](around:%d,%s,%s);', $cuisineKw, $radiusM, $latStr, $lngStr),
+                sprintf('way["cuisine"~"(?i)%s"](around:%d,%s,%s);', $cuisineKw, $radiusM, $latStr, $lngStr),
+            ];
+
+            $query = '[out:json][timeout:20];(' . implode('', $clauses) . ');out center tags;';
+
+            $response = Http::timeout(25)
+                ->withHeaders(['User-Agent' => self::USER_AGENT, 'Accept' => 'application/json'])
+                ->asForm()
+                ->post(self::OVERPASS, ['data' => $query]);
+
+            if (!$response->successful()) return [];
+
+            return $this->parseOverpassResponse($response->json() ?? [], $lat, $lng);
+        } catch (\Throwable $e) {
+            Log::warning('PoiService nearbyKeyword exception: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    private function parseOverpassResponse(array $data, float $lat, float $lng): array
+    {
+        $elements = $data['elements'] ?? [];
+        $results = [];
+        $seen = [];
+
+        foreach ($elements as $el) {
+            $tags = $el['tags'] ?? [];
+            $name = trim((string) ($tags['name'] ?? ''));
+            if ($name === '') continue;
+
+            $pLat = $el['lat'] ?? $el['center']['lat'] ?? null;
+            $pLng = $el['lon'] ?? $el['center']['lon'] ?? null;
+            if ($pLat === null || $pLng === null) continue;
+
+            $pLat = (float) $pLat;
+            $pLng = (float) $pLng;
+
+            $dedupeKey = mb_strtolower($name) . '|' . round($pLat, 4) . ',' . round($pLng, 4);
+            if (isset($seen[$dedupeKey])) continue;
+            $seen[$dedupeKey] = true;
+
+            $results[] = [
+                'id'            => ($el['type'] ?? 'n') . '_' . ($el['id'] ?? uniqid()),
+                'category'      => 'restaurant',
+                'name'          => $name,
+                'lat'           => $pLat,
+                'lng'           => $pLng,
+                'address'       => $this->buildOsmAddress($tags),
+                'phone'         => $tags['phone'] ?? $tags['contact:phone'] ?? null,
+                'website'       => $tags['website'] ?? $tags['contact:website'] ?? null,
+                'opening_hours' => $tags['opening_hours'] ?? null,
+                'cuisine'       => $tags['cuisine'] ?? null,
+                'wheelchair'    => $tags['wheelchair'] ?? null,
+                'distance_m'    => (int) round($this->haversineM($lat, $lng, $pLat, $pLng)),
+            ];
+        }
+
+        usort($results, fn ($a, $b) => ($a['distance_m'] ?? 0) <=> ($b['distance_m'] ?? 0));
+        return $results;
     }
 
     private function categoryFromTags(array $tags, array $requestedCategories): ?string

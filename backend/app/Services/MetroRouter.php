@@ -11,7 +11,7 @@ class MetroRouter
     private array $lineData      = [];   // line_name  => {color, geometry}
     private array $lineSortedIds = [];   // line_name  => [station_id, ...] sorted along geometry
 
-    private const TRANSFER_PENALTY_S = 240; // 4 min per line change
+    private const TRANSFER_PENALTY_S = 360; // 6 min per line change — discourages unnecessary transfers
     private const METRO_SPEED_MS     = 6.5; // ~23 km/h average including stops
 
     public function __construct()

@@ -369,12 +369,14 @@ class RouteService
             return ['error' => 'bus_warming', 'mode' => 'bus', 'bus_graph_warming' => true];
         }
 
-        // Wider search: 10 stops from 1000m to catch more line variety (direct routes)
-        $originCandidates = $router->nearestStops($fromLat, $fromLng, 10, 1000.0);
-        $destCandidates   = $router->nearestStops($toLat,   $toLng,    5,  800.0);
+        // Wider search to catch more line variety (direct routes)
+        $originCandidates = $router->nearestStops($fromLat, $fromLng, 12, 1200.0);
+        $destCandidates   = $router->nearestStops($toLat,   $toLng,    5,  900.0);
 
         if (empty($originCandidates) || empty($destCandidates)) {
-            return ['error' => 'no_stops_nearby', 'mode' => 'bus'];
+            // Trigger a graph rebuild in case it's stale, then return warming signal
+            dispatch(fn() => (new BusRouter())->buildAndCache())->afterResponse();
+            return ['error' => 'bus_warming', 'mode' => 'bus', 'bus_graph_warming' => true];
         }
 
         // Collect up to 4 unique-line-combo routes
@@ -391,7 +393,9 @@ class RouteService
         }
 
         if (empty($candidates)) {
-            return ['error' => 'no_route_found', 'mode' => 'bus'];
+            // Graph might be stale — trigger rebuild and tell client to retry
+            dispatch(fn() => (new BusRouter())->buildAndCache())->afterResponse();
+            return ['error' => 'bus_warming', 'mode' => 'bus', 'bus_graph_warming' => true];
         }
 
         // Sort by transfers asc, then line count asc (prefer simpler routes first)
@@ -712,9 +716,32 @@ class RouteService
             return true;
         });
 
-        usort($filtered, fn($a, $b) => $a['duration'] <=> $b['duration']);
+        // Remove Pareto-dominated routes: if route A is faster AND has fewer or equal transfers than route B,
+        // route B is completely useless and should be hidden.
+        $nonDominated = [];
+        foreach ($filtered as $cand) {
+            $isDominated = false;
+            foreach ($filtered as $other) {
+                if ($cand === $other) continue;
+                $candDur = $cand['duration'];
+                $candXfer = $cand['transfers'];
+                $otherDur = $other['duration'];
+                $otherXfer = $other['transfers'];
+                
+                // Si la otra ruta es estrictamente mejor (o igual de rápida y menos transbordos, o más rápida e igual/menos transbordos)
+                if (($otherDur < $candDur && $otherXfer <= $candXfer) || ($otherDur <= $candDur && $otherXfer < $candXfer)) {
+                    $isDominated = true;
+                    break;
+                }
+            }
+            if (!$isDominated) {
+                $nonDominated[] = $cand;
+            }
+        }
 
-        return array_values(array_slice($filtered, 0, 3));
+        usort($nonDominated, fn($a, $b) => $a['duration'] <=> $b['duration']);
+
+        return array_values(array_slice($nonDominated, 0, 3));
     }
 
     private function transitRoute(float $fromLat, float $fromLng, float $toLat, float $toLng): array
@@ -728,19 +755,20 @@ class RouteService
 
         $router = new MetroRouter();
 
-        // Sort by proximity to origin and try top 3 — the closest station isn't always on the fastest line
+        // Try top 5 origin stations — wider pool catches lines that aren't the closest but are faster
         usort($metroStations, fn($a, $b) =>
             $this->haversine($fromLat, $fromLng, (float)$a['lat'], (float)$a['lng']) <=>
             $this->haversine($fromLat, $fromLng, (float)$b['lat'], (float)$b['lng'])
         );
-        $topOrigins = array_slice($metroStations, 0, 3);
+        $topOrigins = array_slice($metroStations, 0, 5);
 
+        // Top 3 dest stations — fewer candidates reduces chance of picking a station that overshoots
         $destCandidates = $metroStations;
         usort($destCandidates, fn($a, $b) =>
             $this->haversine($toLat, $toLng, (float)$a['lat'], (float)$a['lng']) <=>
             $this->haversine($toLat, $toLng, (float)$b['lat'], (float)$b['lng'])
         );
-        $topDest = array_slice($destCandidates, 0, 5);
+        $topDest = array_slice($destCandidates, 0, 3);
 
         if (empty($topOrigins) || empty($topDest)) {
             return $this->singleSegment('pedestrian', $fromLat, $fromLng, $toLat, $toLng, 'walk');
@@ -764,7 +792,18 @@ class RouteService
                 $transfers  = count($legs) - 1;
                 $walkToDest = $this->haversine((float)$destCandidate['lat'], (float)$destCandidate['lng'], $toLat, $toLng);
                 $routeTimeS = array_sum(array_column($legs, 'route_time_s'));
-                $score      = $walkToOrig / 1.25 + $routeTimeS + $transfers * 240 + $walkToDest / 1.25;
+
+                // Overshoot penalty: if the destination station is "past" the actual destination
+                // (i.e. the user would walk back toward the origin), double the walking time penalty.
+                $dirLat = $toLat - $fromLat;
+                $dirLng = $toLng - $fromLng;
+                $stToDestLat = $toLat - (float)$destCandidate['lat'];
+                $stToDestLng = $toLng - (float)$destCandidate['lng'];
+                $dot = $dirLat * $stToDestLat + $dirLng * $stToDestLng;
+                $walkDestSec = $walkToDest / 1.25;
+                $overshootPenalty = $dot < 0 ? $walkDestSec * 2.0 : 0;
+
+                $score = $walkToOrig / 1.25 + $routeTimeS + $transfers * 360 + $walkDestSec + $overshootPenalty;
 
                 $rawCandidates[] = compact('legs', 'score', 'origCandidate', 'destCandidate', 'lineSig');
                 if (count($rawCandidates) >= 5) break 2;
@@ -856,35 +895,40 @@ class RouteService
                 ];
             }
 
-            $totalDist = array_sum(array_column($segs, 'distance'));
-            $totalDur  = array_sum(array_column($segs, 'duration'));
-            $transfers = count(array_filter($segs, fn($s) => $s['type'] === 'metro')) - 1;
-            $lineNames = array_column($legs, 'line');
-
-            $inefficient = $totalDur > $walkEstimateSec * 0.85
-                || $totalDist > $straightLine * 3.5
-                || $transfers >= 3;
-
             $alternatives[] = [
                 'segments'    => $segs,
-                'distance'    => $totalDist,
-                'duration'    => $totalDur,
-                'transfers'   => max(0, $transfers),
-                'lines_label' => implode(' → ', $lineNames),
-                'inefficient' => $inefficient,
+                'distance'    => array_sum(array_column($segs, 'distance')),
+                'duration'    => array_sum(array_column($segs, 'duration')),
+                'transfers'   => count(array_filter($segs, fn($s) => $s['type'] === 'metro')) - 1,
+                'lines_label' => implode(' → ', array_column($legs, 'line')),
             ];
         }
 
-        $best = $alternatives[0];
+        $rankedAlts = $this->filterAndRankAlternatives($alternatives, $straightLine);
+
+        if (empty($rankedAlts)) {
+            usort($alternatives, fn($a, $b) => $a['duration'] <=> $b['duration']);
+            $best = $alternatives[0];
+            return [
+                'segments'     => $best['segments'],
+                'distance'     => $best['distance'],
+                'duration'     => $best['duration'],
+                'mode'         => 'metro',
+                'inefficient'  => true,
+                'lines_label'  => $best['lines_label'],
+                'alternatives' => [$best],
+            ];
+        }
+
+        $best = $rankedAlts[0];
 
         return [
             'segments'     => $best['segments'],
             'distance'     => $best['distance'],
             'duration'     => $best['duration'],
             'mode'         => 'metro',
-            'inefficient'  => $best['inefficient'],
-            'lines_label'  => $best['lines_label'],
-            'alternatives' => $alternatives,
+            'inefficient'  => false,
+            'alternatives' => $rankedAlts,
         ];
     }
 

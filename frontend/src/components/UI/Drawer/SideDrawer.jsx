@@ -2,6 +2,8 @@ import React, { useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import { useDrawerStore } from '../../../store/drawerStore'
+import { useRouteStore } from '../../../store/routeStore'
+import { useChatStore } from '../../../store/chatStore'
 import { Icons } from '../icons'
 import NearbyView from './NearbyView'
 import PlaceView from './PlaceView'
@@ -18,6 +20,8 @@ const ICONS = {
 
 export default function SideDrawer() {
   const { view, close } = useDrawerStore()
+  const dropdownOpen = useRouteStore(s => s.dropdownOpen)
+  const chatOpen = useChatStore(s => s.isOpen)
   const { t } = useTranslation()
 
   const TITLES = {
@@ -34,11 +38,11 @@ export default function SideDrawer() {
       {view && (
         <motion.aside
           key="side-drawer"
-          initial={{ x: -360, opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          exit={{ x: -360, opacity: 0 }}
+          initial={{ x: 360, opacity: 0 }}
+          animate={{ x: chatOpen ? -340 : 0, opacity: 1 }}
+          exit={{ x: 360, opacity: 0 }}
           transition={{ type: 'tween', duration: 0.25, ease: [0.2, 0.7, 0.2, 1] }}
-          className="absolute top-14 left-3 z-30 w-[340px] flex flex-col overflow-hidden shadow-[0_4px_32px_rgba(0,0,0,0.5)] pointer-events-auto"
+          className="absolute top-14 right-3 z-30 w-[340px] flex flex-col overflow-hidden shadow-[0_4px_32px_rgba(0,0,0,0.5)] pointer-events-auto"
           style={{
             maxHeight: isLimited ? 'min(580px, calc(100dvh - 80px))' : 'calc(100dvh - 56px)',
             background: '#151210', border: '1px solid #2C2926', borderRadius: 8,

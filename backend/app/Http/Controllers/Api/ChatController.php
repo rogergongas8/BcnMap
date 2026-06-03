@@ -25,7 +25,14 @@ class ChatController extends Controller
         'museo|museu|exposición|exposicio|exposició|galeria|galería'            => 'museum',
         'farmacia|farmàcia|medicament|medicamento|parafarmacia'                 => 'pharmacy',
         'supermercado|supermercat|compra|mercat|supermarket'                    => 'supermarket',
+        'hospital|urgencias|urgència|urgencies|clínica|clinica|metge|médico|ambulatori|ambulatorio|CAP|centre mèdic' => 'hospital',
     ];
+
+    // Categories that need a larger search radius (km)
+    private const POI_RADIUS = [
+        'hospital' => 3000,
+    ];
+    private const POI_RADIUS_DEFAULT = 800;
 
     public function __construct(
         private GroqService              $groq,
@@ -63,12 +70,42 @@ class ChatController extends Controller
         // Proactive POI search: if message matches a category, fetch real POIs
         $proactivePois = [];
         if ($userLat !== null && $userLng !== null) {
-            $poiCategory = $this->detectPoiCategory($userMessage);
-            if ($poiCategory !== null) {
-                $proactivePois = array_slice(
-                    $this->pois->nearby($userLat, $userLng, 800, [$poiCategory]),
-                    0, 8,
-                );
+            $history = $request->input('conversation_history', []);
+            $specificMatch = $this->detectSpecificQuery($userMessage, $history);
+            
+            if ($specificMatch !== null) {
+                $searchLat = $userLat;
+                $searchLng = $userLng;
+                
+                // If the user specified a location, find its coordinates first
+                if ($specificMatch['has_location'] && !empty($specificMatch['location'])) {
+                    $locResults = $this->pois->searchByName($specificMatch['location']);
+                    if (!empty($locResults)) {
+                        $searchLat = $locResults[0]['lat'];
+                        $searchLng = $locResults[0]['lng'];
+                        
+                        $locPoi = $locResults[0];
+                        $locPoi['name'] = 'Referencia: ' . $locPoi['name'];
+                        $locPoi['category'] = 'monument';
+                        $proactivePois[] = $locPoi;
+                    }
+                }
+                
+                // Sort by distance to the chosen center (GPS or landmark)
+                $specificPois = array_slice($this->pois->searchByName($specificMatch['query'], $searchLat, $searchLng, true), 0, 15);
+                $proactivePois = array_merge($proactivePois, $specificPois);
+            }
+            
+            if (empty($proactivePois)) {
+                $poiCategory = $this->detectPoiCategory($userMessage, $history);
+                if ($poiCategory !== null) {
+                    $radius = self::POI_RADIUS[$poiCategory] ?? self::POI_RADIUS_DEFAULT;
+                    $genericPois = array_slice(
+                        $this->pois->nearby($userLat, $userLng, $radius, [$poiCategory]),
+                        0, 12,
+                    );
+                    $proactivePois = array_merge($proactivePois, $genericPois);
+                }
             }
         }
 
@@ -104,13 +141,53 @@ class ChatController extends Controller
         return response()->json($result);
     }
 
-    private function detectPoiCategory(string $msg): ?string
+    private function detectPoiCategory(string $msg, array $history = []): ?string
     {
         foreach (self::POI_KEYWORDS as $pattern => $category) {
             if (preg_match("/{$pattern}/iu", $msg)) {
                 return $category;
             }
         }
+        
+        // Search backwards in history if current message has no category
+        foreach (array_reverse($history) as $h) {
+            if (($h['role'] ?? '') === 'user') {
+                foreach (self::POI_KEYWORDS as $pattern => $category) {
+                    if (preg_match("/{$pattern}/iu", $h['content'] ?? '')) {
+                        return $category;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    private function detectSpecificQuery(string $msg, array $history = []): ?array
+    {
+        $keywords = ['sushi', 'pizza', 'hamburguesa', 'burger', 'tapas', 'mexicano', 'asiático', 'paella', 'kebab', 'indio', 'vegetariano'];
+        $keywordsStr = implode('|', $keywords);
+        
+        $barrios = 'sagrada familia|gracia|gràcia|eixample|sants|born|raval|gotic|gótico|poblenou|barceloneta|carmel|clot|sant antoni|les corts|sarria|sarrià|sant gervasi|tibidabo|montjuic|montjuïc|camp nou|plaça catalunya|plaza cataluña|arc de triomf';
+        
+        $fullText = $msg;
+        foreach (array_reverse($history) as $h) {
+            if (($h['role'] ?? '') === 'user') {
+                $fullText = ($h['content'] ?? '') . ' ' . $fullText;
+            }
+        }
+        
+        // Try to match keyword + a known location
+        $patternLoc = '/\b(' . $keywordsStr . ')\b.*?\b(' . $barrios . ')\b/iu';
+        if (preg_match($patternLoc, $fullText, $m)) {
+            return ['query' => $m[1], 'location' => $m[2], 'has_location' => true];
+        }
+        
+        // Fallback to just the keyword
+        $pattern = '/\b(' . $keywordsStr . ')\b/iu';
+        if (preg_match($pattern, $fullText, $m)) {
+            return ['query' => $m[1], 'has_location' => false];
+        }
+        
         return null;
     }
 

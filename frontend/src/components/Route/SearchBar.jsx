@@ -920,8 +920,13 @@ function NumberedSteps({ steps, currentStep }) {
 function RouteStepPanel({ segments, origin, destination, mode }) {
   const { t } = useTranslation()
   const { isNavigating, startNavigation, stopNavigation, currentStepIndex } = useRouteStore()
-  const canNavigate = (mode === 'foot' || mode === 'bicing') && segments?.[0]?.steps?.length > 0
+  const preferences   = useAuthStore(s => s.preferences)
+  const canNavigate   = (mode === 'foot' || mode === 'bicing') && segments?.[0]?.steps?.length > 0
   const isSimpleRoute = segments?.length <= 2 && (mode === 'foot' || mode === 'bicing')
+
+  const firstSeg       = segments?.[0]
+  const hasLongWalk    = firstSeg?.type === 'walk' && firstSeg?.duration > (preferences?.max_walk_minutes ?? 15) * 60
+  const showBicingHint = hasLongWalk && preferences?.has_bicing === true && (mode === 'metro' || mode === 'bus')
 
   if (!segments?.length) return null
 
@@ -1023,6 +1028,17 @@ function RouteStepPanel({ segments, origin, destination, mode }) {
         )}
       </div>
 
+      {/* Bicing hint */}
+      {showBicingHint && (
+        <div className="mx-3 mt-2 px-3 py-2 rounded-lg flex items-start gap-2.5"
+          style={{ background: 'rgba(0,255,136,0.06)', border: '1px solid rgba(0,255,136,0.2)' }}>
+          <span className="w-1.5 h-1.5 rounded-full mt-1 flex-shrink-0" style={{ background: '#00ff88' }} />
+          <p className="font-mono text-[10px] leading-snug" style={{ color: '#00ff88aa' }}>
+            Amb Bicing cobriries els primers {Math.round(firstSeg.duration / 60)} min a peu en ~{Math.round(firstSeg.duration / 60 / 3.5)} min. Considera la ruta Bicing.
+          </p>
+        </div>
+      )}
+
       {/* Steps */}
       <div className="px-3 py-1.5 max-h-[280px] overflow-y-auto">
         {isSimpleRoute && allSteps.length > 0 ? (
@@ -1050,7 +1066,7 @@ function RouteStepPanel({ segments, origin, destination, mode }) {
  * Sub-componente: campo de texto con sugerencias (Fase opciones)
  * ───────────────────────────────────────────────────────────────────── */
 
-function PointField({ value, onChange, onPickSuggestion, onMyLocation, placeholder, dot }) {
+function PointField({ value, onChange, onPickSuggestion, onMyLocation, placeholder, dot, onFocus }) {
   const [focused, setFocused] = useState(false)
   const { results, loading } = useDebouncedSuggestions(focused ? value : '')
 
@@ -1063,7 +1079,7 @@ function PointField({ value, onChange, onPickSuggestion, onMyLocation, placehold
           placeholder={placeholder}
           value={value}
           onChange={e => onChange(e.target.value)}
-          onFocus={() => setFocused(true)}
+          onFocus={() => { setFocused(true); if (onFocus) onFocus(); }}
           onBlur={() => setTimeout(() => setFocused(false), 180)}
         />
         {onMyLocation && (
@@ -1168,10 +1184,21 @@ export default function SearchBar({ embedded = false }) {
     setRoute, setLoading, setError,
     clearRoute,
     chatRequest, clearChatRequest,
+    setDropdownOpen,
   } = useRouteStore()
 
   /* Fase interna: 'pill' | 'search' | 'options' */
   const [phase, setPhase] = useState('pill')
+
+  // Sync dropdown visibility to routeStore so SideDrawer/ChatPanel can react
+  useEffect(() => { 
+    setDropdownOpen(phase !== 'pill')
+    if (phase !== 'pill') {
+      import('../../store/drawerStore').then(({ useDrawerStore }) => {
+        useDrawerStore.getState().close()
+      })
+    }
+  }, [phase])
 
   /* Inputs */
   const [destQuery,   setDestQuery]   = useState('')
@@ -1203,6 +1230,22 @@ export default function SearchBar({ embedded = false }) {
   useEffect(() => {
     if (originPoint?.label) setOriginQuery(originPoint.label)
   }, [originPoint])
+
+  // Sync routeStore origin/destination updates back to local SearchBar state
+  // (e.g. when picking a point on the map via MapClickHandler)
+  useEffect(() => {
+    if (origin && (!originPoint || origin.lat !== originPoint.lat || origin.lng !== originPoint.lng)) {
+      setOriginPoint(origin)
+      setOriginQuery(origin.label ?? '')
+    }
+  }, [origin])
+
+  useEffect(() => {
+    if (destination && (!destPoint || destination.lat !== destPoint.lat || destination.lng !== destPoint.lng)) {
+      setDestPoint(destination)
+      setDestQuery(destination.label ?? '')
+    }
+  }, [destination])
 
   // Reacts to chat-triggered routes: open options phase with pre-filled data.
   useEffect(() => {
@@ -1299,6 +1342,17 @@ export default function SearchBar({ embedded = false }) {
     if (planHydratedRef.current) { planHydratedRef.current = false; return }
     computePreviews(originPoint, destPoint)
   }, [phase, originPoint, destPoint, computePreviews])
+
+  // Sync the active route automatically when its preview completes
+  useEffect(() => {
+    if (phase !== 'options' || !route) return
+    const activePreview = previews[mode]
+    if (activePreview?.data && activePreview.data !== route) {
+      setRoute(activePreview.data)
+      setLoading(false)
+      setError(null)
+    }
+  }, [previews, mode, phase, route, setRoute, setLoading, setError])
 
   /* ────────────────── Acciones ────────────────── */
 
@@ -1433,13 +1487,11 @@ export default function SearchBar({ embedded = false }) {
   /* ────────────────── Render embegut (TopBar) ────────────────── */
 
   if (embedded) {
-    // Absolute dropdown anchored 56px below the TopBar's top edge.
-    // Uses calc() centering instead of transform: translateX(-50%) because
-    // framer-motion takes over the transform property for its y animation.
+    // Dropdown anchored to left edge — same position as SideDrawer (left-3, top-14).
     const dropdownStyle = {
       position: 'absolute',
-      top: 56,
-      left: 'calc(50% - 220px)', // 220px = half of 440px dropdown width
+      top: 60,   // 56px topbar + 4px gap
+      left: 12,
       zIndex: 60,
     }
 
@@ -1462,7 +1514,7 @@ export default function SearchBar({ embedded = false }) {
         >
           <PointField value={originQuery} onChange={v => { setOriginQuery(v); if (!v) setOriginPoint(null) }}
             onPickSuggestion={handlePickOriginSuggestion} onMyLocation={handleMyLocationOrigin}
-            placeholder={t('search.origin')} dot="#00b4ff"
+            placeholder={t('search.origin')} dot="#00b4ff" onFocus={() => useRouteStore.getState().setPicking('origin')}
           />
           <div className="flex items-center gap-2 px-1">
             <div className="flex-1 h-px" style={{ background: '#2C2926' }} />
@@ -1474,7 +1526,7 @@ export default function SearchBar({ embedded = false }) {
           </div>
           <PointField value={destQuery} onChange={v => { setDestQuery(v); if (!v) setDestPoint(null) }}
             onPickSuggestion={handlePickDestSuggestionInOptions}
-            placeholder={t('search.destination')} dot="#ff6b35"
+            placeholder={t('search.destination')} dot="#ff6b35" onFocus={() => useRouteStore.getState().setPicking('destination')}
           />
         </div>
 
@@ -1525,7 +1577,7 @@ export default function SearchBar({ embedded = false }) {
 
         {/* ── FOOTER: CTA — always visible at bottom ── */}
         {route?.segments?.length > 0 && !isLoading && (
-          <div className="px-3 py-2.5 flex gap-2"
+          <div className="px-3 py-2.5 flex gap-2 md:hidden"
             style={{ flexShrink: 0, borderTop: '1px solid #201E1B' }}
           >
             <button onClick={() => setPhase('pill')}
@@ -1546,7 +1598,7 @@ export default function SearchBar({ embedded = false }) {
     }
 
     const barTransition = { duration: 0.16, ease: [0.2, 0.7, 0.2, 1] }
-    const barWidth = phase === 'pill' ? 300 : 440
+    const barWidth = phase === 'pill' ? 300 : 380
     const barBorderColor = phase === 'options' && showActiveInPill
       ? activeModeMeta.color + '55'
       : '#2C2926'
@@ -1662,7 +1714,7 @@ export default function SearchBar({ embedded = false }) {
           {phase === 'search' && (destLoading || destSugg.length > 0) && (
             <motion.div
               key="suggestions-dropdown"
-              style={{ ...dropdownStyle, width: 440, maxWidth: '92vw' }}
+              style={{ ...dropdownStyle, width: 380, maxWidth: 'calc(100vw - 24px)' }}
               initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
               transition={{ duration: 0.16, ease: [0.2, 0.7, 0.2, 1] }}
             >
@@ -1674,7 +1726,7 @@ export default function SearchBar({ embedded = false }) {
           {phase === 'options' && (
             <motion.div
               key="options-dropdown"
-              style={{ ...dropdownStyle, width: 440, maxWidth: '94vw' }}
+              style={{ ...dropdownStyle, width: 380, maxWidth: 'calc(100vw - 24px)' }}
               initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
               transition={{ duration: 0.18, ease: [0.2, 0.7, 0.2, 1] }}
             >
@@ -1968,7 +2020,7 @@ export default function SearchBar({ embedded = false }) {
 
               {/* ── FOOTER: CTA — always visible at bottom ── */}
               {route?.segments?.length > 0 && !isLoading && (
-                <div className="px-3 py-2.5 flex gap-2"
+                <div className="px-3 py-2.5 flex gap-2 md:hidden"
                   style={{ flexShrink: 0, borderTop: '1px solid #201E1B' }}
                 >
                   <button

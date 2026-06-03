@@ -15,10 +15,14 @@ export const useRouteStore = create((set) => ({
   currentStepIndex: 0,
   offRoute:         false,
 
+  // True while phase !== 'pill' — used to hide SideDrawer / ChatPanel
+  dropdownOpen: false,
+
   // Signal set by the chat to open the SearchBar with pre-filled data.
   // SearchBar consumes and clears it.
   chatRequest:  null,     // { origin, destination, mode, route } | null
 
+  setDropdownOpen: (b) => set({ dropdownOpen: b }),
   togglePanel:    () => set(s => ({ isOpen: !s.isOpen, picking: null, error: null })),
   closePanel:     () => set({ isOpen: false, picking: null, origin: null, destination: null, route: null, error: null, isNavigating: false, currentStepIndex: 0 }),
   setMode:        (mode) => set({ mode, route: null }),

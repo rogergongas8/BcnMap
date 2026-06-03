@@ -11,6 +11,7 @@ import { useAuthStore } from '../../store/authStore'
 import { useLangStore } from '../../store/langStore'
 import { useAuth } from '../../hooks/useAuth'
 import LoginModal from './LoginModal'
+import PreferencesModal from './PreferencesModal'
 import CityHud from './CityHud'
 
 const THEME_IDS  = ['dark', 'voyager', 'minimal']
@@ -161,8 +162,9 @@ function ProfileBtn() {
   const { t }              = useTranslation()
   const { isLogged, user } = useAuthStore()
   const { logout }         = useAuth()
-  const [open, setOpen]    = useState(false)
-  const [showLogin, setShowLogin] = useState(false)
+  const [open, setOpen]      = useState(false)
+  const [showLogin, setShowLogin]   = useState(false)
+  const [showPrefs, setShowPrefs]   = useState(false)
   const ref = useRef(null)
 
   useEffect(() => {
@@ -196,6 +198,12 @@ function ProfileBtn() {
       >{initials}</button>
 
       <AnimatePresence>
+        {showPrefs && (
+          <PreferencesModal onClose={() => setShowPrefs(false)} />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {open && (
           <motion.div
             initial={{ opacity: 0, y: -6, scale: 0.95 }}
@@ -209,6 +217,13 @@ function ProfileBtn() {
               <p className="font-syne text-[12px] font-medium truncate" style={{ color: '#F7F6F4' }}>{user?.name}</p>
               <p className="font-mono text-[10px] truncate mt-0.5" style={{ color: '#8C8884' }}>{user?.email}</p>
             </div>
+            <button
+              onClick={() => { setOpen(false); setShowPrefs(true) }}
+              className="w-full text-left px-3.5 py-2.5 font-mono text-[11px] transition-colors"
+              style={{ color: '#B0ACA7', borderBottom: '1px solid #201E1B' }}
+              onMouseEnter={e => { e.currentTarget.style.color = '#F7F6F4'; e.currentTarget.style.background = '#211F1B' }}
+              onMouseLeave={e => { e.currentTarget.style.color = '#B0ACA7'; e.currentTarget.style.background = 'transparent' }}
+            >Preferències</button>
             <button
               onClick={async () => { setOpen(false); await logout() }}
               className="w-full text-left px-3.5 py-2.5 font-mono text-[11px] transition-colors"
@@ -246,58 +261,100 @@ export default function TopBar({ children }) {
 
   return (
     <div className="absolute top-0 left-0 right-0 z-[60] flex items-center h-14 px-3 gap-2.5 overflow-visible pointer-events-none">
-      {/* ── SearchBar: centered in viewport ── */}
-      <div className="absolute inset-0 flex items-center justify-center overflow-visible pointer-events-none">
-        <div className="pointer-events-auto overflow-visible">
-          {children}
-        </div>
+
+      {/* ── Left: SearchBar pill (left-aligned, aligns with dropdown at left:12) ── */}
+      <div className="flex-shrink-0 pointer-events-auto overflow-visible">
+        {children}
       </div>
 
-      {/* ── Left: Main navigation / feature toggles ── */}
-      <div className="flex items-center gap-1 px-1.5 flex-shrink-0 pointer-events-auto" style={{ ...CARD_STYLE, height: 44 }}>
+      {/* ── Spacer ── */}
+      <div className="flex-1 pointer-events-none" />
+
+      {/* ── Nav toggles — fade+slide left when chat opens ── */}
+      <div
+        className="flex items-center gap-1 px-1.5 flex-shrink-0 pointer-events-auto"
+        style={{
+          ...CARD_STYLE,
+          height: 44,
+          opacity:       chatOpen ? 0 : 1,
+          transform:     chatOpen ? 'translateX(-12px)' : 'translateX(0)',
+          pointerEvents: chatOpen ? 'none' : 'auto',
+          transition:    'opacity 0.22s ease, transform 0.22s ease',
+        }}
+      >
         <IconBtn active={nearbyActive}      onClick={() => nearbyActive      ? close() : openNearby()}      icon={Icons.search}   label={t('topbar.nearby')} />
         <IconBtn active={savedActive}       onClick={() => savedActive       ? close() : openSaved()}       icon={Icons.bookmark} label={t('topbar.saved')} />
         <IconBtn active={eventsActive}      onClick={() => eventsActive      ? close() : openEvents()}      icon={Icons.calendar} label={t('topbar.events')} />
         <IconBtn active={disruptionsActive} onClick={() => disruptionsActive ? close() : openDisruptions()} icon={Icons.alert}    label={t('topbar.disruptions')} badge={hasDisruptions} badgeColor="#D45555" />
       </div>
 
-      {/* ── Weather HUD pill ── */}
-      <div className="flex items-center flex-shrink-0 pointer-events-auto" style={{ ...CARD_STYLE, height: 44 }}>
+      {/* ── Weather — fade+slide left when chat opens ── */}
+      <div
+        className="flex items-center flex-shrink-0 pointer-events-auto"
+        style={{
+          ...CARD_STYLE,
+          height: 44,
+          opacity:       chatOpen ? 0 : 1,
+          transform:     chatOpen ? 'translateX(-12px)' : 'translateX(0)',
+          pointerEvents: chatOpen ? 'none' : 'auto',
+          transition:    'opacity 0.22s ease, transform 0.22s ease',
+        }}
+      >
         <CityHud />
       </div>
 
-      {/* ── Center: truly centered in viewport ── */}
-      <div className="flex-1 pointer-events-none" />
-
-      {/* ── Right: Lang + Profile + Chat ── */}
-      <div className="flex items-center gap-1 px-1.5 flex-shrink-0 pointer-events-auto transition-opacity" style={{ ...CARD_STYLE, height: 44, opacity: chatOpen ? 0 : 1, pointerEvents: chatOpen ? 'none' : 'auto' }}>
+      {/* ── Lang + Profile — slides left and fades when chat opens ── */}
+      <div
+        className="flex items-center gap-1 px-1.5 flex-shrink-0 pointer-events-auto"
+        style={{
+          ...CARD_STYLE,
+          height: 44,
+          opacity:        chatOpen ? 0 : 1,
+          transform:      chatOpen ? 'translateX(-12px)' : 'translateX(0)',
+          pointerEvents:  chatOpen ? 'none' : 'auto',
+          transition:     'opacity 0.22s ease, transform 0.22s ease',
+        }}
+      >
         <LangToggle />
         <div style={{ width: 1, height: 16, background: '#2C2926', flexShrink: 0, margin: '0 2px' }} />
         <ProfileBtn />
-        <button
-          onClick={toggleChat}
-          title={t('topbar.chat')}
-          className="relative w-9 h-9 flex items-center justify-center rounded-lg transition-all flex-shrink-0"
-          style={{
-            background: chatOpen ? '#B8885A1A' : 'transparent',
-            border: `1px solid ${chatOpen ? '#B8885A' : 'transparent'}`,
-            color: chatOpen ? '#B8885A' : '#8C8884',
-          }}
-          onMouseEnter={e => { if (!chatOpen) { e.currentTarget.style.color = '#B0ACA7' } }}
-          onMouseLeave={e => { if (!chatOpen) { e.currentTarget.style.color = '#8C8884' } }}
-        >
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-            <path d="M8 1.5C4.41 1.5 1.5 4.02 1.5 7.12c0 1.64.73 3.11 1.9 4.14L3 14.5l3.88-1.94c.35.07.72.1 1.12.1 3.59 0 6.5-2.52 6.5-5.54S11.59 1.5 8 1.5Z"
-              stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" fill="none"/>
-            <circle cx="5.5" cy="7.5" r="0.8" fill="currentColor"/>
-            <circle cx="8"   cy="7.5" r="0.8" fill="currentColor"/>
-            <circle cx="10.5" cy="7.5" r="0.8" fill="currentColor"/>
-          </svg>
-          {hasUnread && !chatOpen && (
-            <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full" style={{ background: '#B8885A' }} />
-          )}
-        </button>
       </div>
+
+      {/* ── Chat toggle — always visible, switches icon when open ── */}
+      <button
+        onClick={toggleChat}
+        title={t('topbar.chat')}
+        className="relative w-9 h-9 flex items-center justify-center rounded-lg transition-all flex-shrink-0 pointer-events-auto"
+        style={{
+          background:   chatOpen ? '#B8885A1A' : '#211F1B',
+          border:       `1px solid ${chatOpen ? '#B8885A' : '#2C2926'}`,
+          color:        chatOpen ? '#B8885A' : '#8C8884',
+        }}
+        onMouseEnter={e => { if (!chatOpen) { e.currentTarget.style.borderColor = '#3D3A36'; e.currentTarget.style.color = '#B0ACA7' } }}
+        onMouseLeave={e => { if (!chatOpen) { e.currentTarget.style.borderColor = '#2C2926'; e.currentTarget.style.color = '#8C8884' } }}
+      >
+        {chatOpen ? (
+          /* × close icon when chat is open */
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+            <line x1="3.5" y1="3.5" x2="12.5" y2="12.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+            <line x1="12.5" y1="3.5" x2="3.5" y2="12.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+          </svg>
+        ) : (
+          /* chat bubble icon when closed */
+          <>
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <path d="M8 1.5C4.41 1.5 1.5 4.02 1.5 7.12c0 1.64.73 3.11 1.9 4.14L3 14.5l3.88-1.94c.35.07.72.1 1.12.1 3.59 0 6.5-2.52 6.5-5.54S11.59 1.5 8 1.5Z"
+                stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" fill="none"/>
+              <circle cx="5.5" cy="7.5" r="0.8" fill="currentColor"/>
+              <circle cx="8"   cy="7.5" r="0.8" fill="currentColor"/>
+              <circle cx="10.5" cy="7.5" r="0.8" fill="currentColor"/>
+            </svg>
+            {hasUnread && (
+              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full" style={{ background: '#B8885A' }} />
+            )}
+          </>
+        )}
+      </button>
     </div>
   )
 }

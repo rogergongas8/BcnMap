@@ -14,7 +14,19 @@ export const useDrawerStore = create((set) => ({
   openDisruptions:    () => set({ view: 'disruptions',  place: null, focusedEventKey: null, eventsCategory: null }),
   openEventFocused:   (key) => set({ view: 'events', place: null, focusedEventKey: key }),
   clearEventFocus:    () => set({ focusedEventKey: null }),
-  openPlace:          (place) => set({ view: 'place', place }),
+  openPlace: (place) => {
+    import('./routeStore').then(({ useRouteStore }) => {
+      const rs = useRouteStore.getState()
+      if (rs.isOpen || rs.dropdownOpen) {
+        const target = rs.picking || 'destination'
+        const pt = { lat: place.lat, lng: place.lng, label: place.name || 'Ubicación' }
+        if (target === 'origin') rs.setOrigin(pt)
+        else rs.setDestination(pt)
+      } else {
+        set({ view: 'place', place })
+      }
+    })
+  },
   back:               () => set((s) => ({ view: s.place ? 'nearby' : null, place: null })),
   close:              () => set({ view: null, place: null, focusedEventKey: null, eventsCategory: null }),
 }))

@@ -88,6 +88,10 @@ export const fetchSavedRoutes  = () => api.get('/saved-routes').then(r => r.data
 export const addSavedRoute     = (data) => api.post('/saved-routes', data).then(r => r.data)
 export const deleteSavedRoute  = (id) => api.delete(`/saved-routes/${id}`).then(r => r.data)
 
+// Preferences
+export const getPreferences    = () => api.get('/auth/preferences').then(r => r.data)
+export const updatePreferences = (prefs) => api.put('/auth/preferences', prefs).then(r => r.data)
+
 // Commute schedules
 export const fetchCommutes        = () => api.get('/commutes').then(r => r.data)
 export const createCommute        = (data) => api.post('/commutes', data).then(r => r.data)

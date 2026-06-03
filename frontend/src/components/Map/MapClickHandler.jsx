@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useMapStore } from '../../store/mapStore'
+import { useRouteStore } from '../../store/routeStore'
 import { useDrawerStore } from '../../store/drawerStore'
 import { useContextMenuStore } from '../../store/contextMenuStore'
 import { reverseGeocode } from '../../utils/reverseGeocode'
@@ -25,6 +26,23 @@ export default function MapClickHandler() {
 
       const { lng, lat } = e.lngLat
       const token = ++tokenRef.current
+
+      const rs = useRouteStore.getState()
+      if (rs.isOpen || rs.dropdownOpen) {
+        // If route panel is open, intercept click to update routing points
+        const target = rs.picking || 'destination'
+        const pt = { lat, lng, label: 'Buscando dirección…' }
+        if (target === 'origin') rs.setOrigin(pt)
+        else rs.setDestination(pt)
+        
+        const result = await reverseGeocode(lat, lng)
+        if (token !== tokenRef.current) return
+        
+        const label = result.main || 'Ubicación'
+        if (target === 'origin') rs.setOrigin({ lat, lng, label })
+        else rs.setDestination({ lat, lng, label })
+        return
+      }
 
       openPlace({
         kind: 'pin',

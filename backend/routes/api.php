@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\PlaceEnrichController;
 use App\Http\Controllers\Api\PoiController;
 use App\Http\Controllers\Api\RouteController;
 use App\Http\Controllers\Api\CommuteController;
+use App\Http\Controllers\Api\PreferencesController;
 use App\Http\Controllers\Api\SavedRouteController;
 use App\Http\Controllers\Api\TrafficController;
 use App\Http\Controllers\Api\WeatherController;
@@ -82,6 +83,9 @@ Route::prefix('v1')->group(function () {
         Route::put('/commutes/{commuteSchedule}',       [CommuteController::class, 'update']);
         Route::delete('/commutes/{commuteSchedule}',    [CommuteController::class, 'destroy']);
         Route::get('/commutes/{commuteSchedule}/status', [CommuteController::class, 'status']);
+
+        Route::get('/auth/preferences', [PreferencesController::class, 'show']);
+        Route::put('/auth/preferences', [PreferencesController::class, 'update']);
     });
 
     Route::fallback(fn (Request $r) => response()->json([

@@ -52,8 +52,8 @@ REGLAS PARA EL CAMPO "suggestions" (OPCIONAL):
   { "label": "Ver [Nombre del lugar]", "action": "open_place", "name": "Nombre del lugar", "lat": float, "lng": float, "category": "categoria" }
   o para rutas directas: { "label": "Ruta a [Nombre]", "action": "route", "name": "Destino", "lat": float, "lng": float }
 - El label debe ser conciso (máx 5 palabras). Ej: "Ver Casa Petra".
-- NUNCA incluyas un item en suggestions si no tienes coordenadas reales (lat/lng).
-- Si no hay lugares concretos mencionados, pon "suggestions": [].
+- NUNCA incluyas un item en suggestions de lugares que no aparezcan exactamente en los DATOS ACTUALES. No inventes lugares ni coordenadas.
+- Si no hay lugares concretos mencionados en el contexto, pon "suggestions": [].
 
 map_actions disponibles (incluye solo los relevantes, sin explicarlos en el reply):
 - { "type": "fly_to", "lat": 41.38, "lng": 2.17, "zoom": 14 }
@@ -68,7 +68,8 @@ map_actions disponibles (incluye solo los relevantes, sin explicarlos en el repl
 
 REGLAS CRÍTICAS:
 - Si el usuario pregunta qué hay hoy, qué hacer, eventos, planes para esta tarde/noche/semana → "show_events" + usa "suggestions" con 2-3 eventos concretos.
-- Si el usuario pide VER lugares en el mapa (ej: "muéstrame restaurantes", "ponlos en el mapa") → usa "show_pois" rellenando el array con los lugares del contexto, y haz "fly_to" a la zona.
+- Si vas a sugerir lugares al usuario o el usuario pide ver lugares → DEBES usar OBLIGATORIAMENTE "show_pois" rellenando el array con TODOS los lugares relevantes de los DATOS ACTUALES, y haz "fly_to" a la zona.
+- REFERENCIA VISUAL: Si el usuario pidió buscar cerca de un monumento, parque o lugar famoso (ej. "Sagrada Familia", "Parc Güell"), INVENTA un POI para ese monumento usando sus coordenadas exactas e inclúyelo dentro del array de "show_pois" junto a los resultados. Ponle category: "monument" o similar, para que el usuario vea el punto de referencia en el mapa.
 - Si el usuario PREGUNTA por un lugar concreto (recomiéndame, cuál está más cerca, cuál es mejor) → "open_place" + "fly_to". Nunca uses plan_trip ni calculate_route para recomendaciones.
 - Si el usuario quiere ir a algún sitio SIN especificar modo (llévame, quiero ir, cómo llego, dame ruta) → usa "plan_trip". El sistema calculará el modo óptimo automáticamente.
 - Si el usuario especifica modo explícito ("en metro", "a pie", "en bici", "en coche") → usa "calculate_route" con ese modo.
@@ -86,6 +87,11 @@ REGLAS PARA plan_trip y calculate_route:
 - Para destinos de dirección (ej: "Sant Antoni Maria Claret 57"): usa dest_label con la dirección, deja dest_lat/dest_lng en null.
 - Si el lugar aparece en POIS CERCANOS o EVENTOS, usa sus coordenadas exactas.
 - En "constraint" de plan_trip incluye todo lo que el usuario mencione sobre preferencias o restricciones.
+
+REGLAS ANTI-ALUCINACIONES (ESTRICTAS):
+- ESTÁ TOTALMENTE PROHIBIDO INVENTAR LUGARES, RESTAURANTES O EVENTOS.
+- Si el usuario pide recomendaciones (ej: "quiero sushi", "recomiéndame un bar") y NO HAY opciones en "LUGARES ENCONTRADOS PARA TU CONSULTA" ni en "POIS CERCANOS", debes decir que no encuentras lugares de ese tipo en la zona.
+- NUNCA uses "open_place", "show_pois" o "suggestions" para lugares que no existen en tu contexto. NO INVENTES coordenadas.
 PROMPT;
 
         $messages = [['role' => 'system', 'content' => $systemPrompt]];

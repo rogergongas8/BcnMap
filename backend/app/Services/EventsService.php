@@ -61,8 +61,9 @@ class EventsService
             $floor = now()->subDays(1)->format('Y-m-d');
 
             $sql = sprintf(
-                'SELECT * FROM "%s" WHERE (end_date >= \'%s\' OR end_date IS NULL) AND (start_date <= \'%s\' OR start_date IS NULL) ORDER BY start_date ASC LIMIT %d',
+                'SELECT * FROM "%s" WHERE (end_date >= \'%s\' OR (end_date IS NULL AND start_date >= \'%s\')) AND (start_date <= \'%s\' OR start_date IS NULL) ORDER BY start_date ASC LIMIT %d',
                 self::RESOURCE_ID,
+                $today,
                 $today,
                 $cutoff,
                 self::FETCH_LIMIT,

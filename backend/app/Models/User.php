@@ -11,7 +11,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['name', 'email', 'password'])]
+#[Fillable(['name', 'email', 'password', 'preferences'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -27,7 +27,19 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
-            'password' => 'hashed',
+            'password'          => 'hashed',
+            'preferences'       => 'array',
         ];
+    }
+
+    public function getPreferences(): array
+    {
+        $defaults = [
+            'has_bicing'       => false,
+            'preferred_modes'  => ['metro', 'bus', 'bicing', 'foot', 'car'],
+            'avoid_modes'      => [],
+            'max_walk_minutes' => 15,
+        ];
+        return array_merge($defaults, $this->preferences ?? []);
     }
 }

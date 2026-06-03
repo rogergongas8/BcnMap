@@ -4,8 +4,9 @@ import { Icons, POI_CATEGORY_COLORS } from '../icons'
 import { useDrawerStore } from '../../../store/drawerStore'
 import { useMapStore } from '../../../store/mapStore'
 import { useRouteStore } from '../../../store/routeStore'
-import { fetchPlaceEnrich, fetchRoutePlan } from '../../../services/api'
+import { fetchPlaceEnrich, fetchRoutePlan, addFavorite } from '../../../services/api'
 import { sharePlaceUrl } from '../../../hooks/useDeepLink'
+import { useAuthStore } from '../../../store/authStore'
 import { useTranslation } from 'react-i18next'
 
 /* ── Skeleton ───────────────────────────────────────────────────────────── */
@@ -773,6 +774,10 @@ export default function PlaceView() {
   const [tab,    setTab]    = useState('info')
   const [copied, setCopied] = useState(false)
   const [shared, setShared] = useState(false)
+  
+  const isLogged = useAuthStore(s => s.isLogged)
+  const [isSaving, setIsSaving] = useState(false)
+  const [isSaved, setIsSaved] = useState(false)
 
   const { data: enrich, loading: enrichLoading } = usePlaceEnrich(place)
   const { plan: routePlan, loading: routePlanLoading, error: routePlanError, refetch: refetchRoutePlan } = useRoutePlan(place, userLocation)
@@ -820,6 +825,28 @@ export default function PlaceView() {
     }
     setShared(true)
     setTimeout(() => setShared(false), 1800)
+  }
+
+  const handleSave = () => {
+    if (!isLogged) {
+      alert('Inicia sessió per guardar llocs a favorits.')
+      return
+    }
+    setIsSaving(true)
+    addFavorite({
+      name: place.name,
+      lat: place.lat,
+      lng: place.lng,
+      address: place.address ?? place.meta?.address ?? '',
+      category: place.category?.id ?? 'place'
+    }).then(() => {
+      setIsSaved(true)
+      setTimeout(() => setIsSaved(false), 2000)
+    }).catch(e => {
+      console.error('Error saving favorite', e)
+    }).finally(() => {
+      setIsSaving(false)
+    })
   }
 
   const catId  = place.category?.id ?? 'attraction'
@@ -966,6 +993,16 @@ export default function PlaceView() {
                 <span className="font-mono text-[10px] uppercase tracking-[0.08em]">{shared ? 'Copiat!' : 'Compartir'}</span>
               </button>
             )}
+
+            <button
+              onClick={handleSave}
+              disabled={isSaving || isSaved}
+              className="flex-1 h-10 flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+              style={{ borderRadius: 7, background: '#1C1A17', border: `1px solid ${isSaved ? '#3CB88755' : '#2C2926'}`, color: isSaved ? '#3CB887' : '#8C8884' }}
+            >
+              {isSaved ? <Icons.check size={12} /> : <Icons.pin size={12} />}
+              <span className="font-syne text-[12px] font-medium whitespace-nowrap">{isSaved ? 'Guardat' : 'Guardar'}</span>
+            </button>
           </div>
         </div>
       )}

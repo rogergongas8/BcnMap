@@ -216,13 +216,25 @@ export default function CommuteView() {
       )}
 
       {!loading && commutes.length === 0 && (
-        <div className="px-6 py-12 flex flex-col items-center text-center gap-2">
-          <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: '#211F1B', color: '#8C8884' }}>
-            <Icons.route size={15} />
+        <div className="px-6 py-12 flex flex-col items-center text-center gap-3">
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(184,136,90,0.1)', border: '1px solid rgba(184,136,90,0.2)' }}>
+            <Icons.route size={20} style={{ color: '#B8885A' }} />
           </div>
-          <p className="font-syne text-[13px] leading-snug max-w-[220px]" style={{ color: '#B0ACA7' }}>
-            {t('drawer.commuteView.empty')}
-          </p>
+          <div>
+            <p className="font-syne text-[14px] font-semibold mb-1" style={{ color: '#F7F6F4' }}>Cap trayecte recurrent</p>
+            <p className="font-mono text-[11px] leading-relaxed max-w-[240px] mx-auto mt-2" style={{ color: '#8C8884' }}>
+              Guarda un trayecte recurrent (com anar a la feina) i t'avisarem de quina és la millor hora per sortir i si hi ha incidències.
+            </p>
+          </div>
+          <button
+            onClick={() => { setEditTarget(null); setShowForm(true) }}
+            className="mt-4 px-4 py-2.5 rounded-lg font-syne text-[12px] font-bold transition-all"
+            style={{ background: '#B8885A', color: '#fff', border: '1px solid #B8885A' }}
+            onMouseEnter={e => { e.currentTarget.style.filter = 'brightness(1.1)' }}
+            onMouseLeave={e => { e.currentTarget.style.filter = 'none' }}
+          >
+            + Crear el meu primer trayecte
+          </button>
         </div>
       )}
 

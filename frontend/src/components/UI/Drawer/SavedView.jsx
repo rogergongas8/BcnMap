@@ -13,13 +13,26 @@ import CommuteView from './CommuteView'
 
 const TAB = { favs: 'favs', routes: 'routes', commutes: 'commutes' }
 
-function EmptyState({ icon: Icon, text }) {
+function EmptyState({ icon: Icon, title, description, highlightIcon: HighlightIcon }) {
   return (
-    <div className="px-6 py-12 flex flex-col items-center text-center gap-2">
-      <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: '#211F1B', color: '#8C8884' }}>
-        <Icon size={15} />
+    <div className="px-6 py-12 flex flex-col items-center text-center gap-3">
+      <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(184,136,90,0.1)', border: '1px solid rgba(184,136,90,0.2)' }}>
+        <Icon size={20} style={{ color: '#B8885A' }} />
       </div>
-      <p className="font-syne text-[13px] leading-snug max-w-[200px]" style={{ color: '#B0ACA7' }}>{text}</p>
+      <div>
+        <p className="font-syne text-[14px] font-semibold mb-1" style={{ color: '#F7F6F4' }}>{title}</p>
+        {description && (
+          <p className="font-mono text-[11px] leading-relaxed max-w-[240px] mx-auto mt-2" style={{ color: '#8C8884' }}>
+            {description}
+          </p>
+        )}
+      </div>
+      {HighlightIcon && (
+        <div className="mt-4 px-3 py-1.5 rounded-lg flex items-center gap-2" style={{ background: '#1C1A17', border: '1px solid #2C2926' }}>
+          <HighlightIcon size={12} style={{ color: '#8C8884' }} />
+          <span className="font-mono text-[9px] uppercase tracking-[0.05em]" style={{ color: '#B0ACA7' }}>Prem el botó Guardar</span>
+        </div>
+      )}
     </div>
   )
 }
@@ -141,7 +154,7 @@ export default function SavedView() {
   }
 
   if (!isLogged) {
-    return <EmptyState icon={Icons.user} text={t('drawer.savedView.loginHint')} />
+    return <EmptyState icon={Icons.user} title="Inicia sessió" description={t('drawer.savedView.loginHint')} />
   }
 
   return (
@@ -178,13 +191,13 @@ export default function SavedView() {
 
         {!loading && tab === TAB.favs && (
           favs.length === 0
-            ? <EmptyState icon={Icons.pin} text={t('drawer.savedView.empty')} />
+            ? <EmptyState icon={Icons.pin} title="Cap lloc guardat" description="Busca un lloc al mapa o prem qualsevol icona i fes clic a 'Guardar' per tenir-lo sempre a mà." highlightIcon={Icons.pin} />
             : <ul>{favs.map(f => <FavRow key={f.id} fav={f} onDelete={handleDeleteFav} onSelect={handleSelectFav} />)}</ul>
         )}
 
         {!loading && tab === TAB.routes && (
           routes.length === 0
-            ? <EmptyState icon={Icons.search} text={t('drawer.savedView.emptyRoutes')} />
+            ? <EmptyState icon={Icons.search} title="Cap ruta guardada" description="Cerca una ruta i prem el botó de guardar per afegir-la aquí." highlightIcon={Icons.bookmark} />
             : <ul>{routes.map(r => <RouteRow key={r.id} route={r} onDelete={handleDeleteRoute} onLoad={handleLoadRoute} />)}</ul>
         )}
 
