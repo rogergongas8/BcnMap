@@ -63,24 +63,23 @@ export default function UserLocationLayer() {
   }, [mapInstance, isLoaded, styleKey])
 
   useEffect(() => {
-    if (!navigator.geolocation) return
+    // FAKE LOCATION FOR DEMO (Plaça Catalunya)
+    const demoLocation = { lat: 41.3874, lng: 2.1695 }
 
     const onSuccess = (pos) => {
-      const location = { lat: pos.coords.latitude, lng: pos.coords.longitude }
-      useMapStore.getState().setUserLocation(location)
+      useMapStore.getState().setUserLocation(pos)
       const src = useMapStore.getState().mapInstance?.getSource(SRC)
-      src?.setData(buildGeojson(location))
+      src?.setData(buildGeojson(pos))
     }
 
-    watchIdRef.current = navigator.geolocation.watchPosition(onSuccess, null, {
-      enableHighAccuracy: true,
-      timeout: 10000,
-    })
+    // Set it immediately
+    onSuccess(demoLocation)
+
+    // Optional: we can simulate movement here later if needed,
+    // but a static location is perfect for most demos.
 
     return () => {
-      if (watchIdRef.current != null) {
-        navigator.geolocation.clearWatch(watchIdRef.current)
-      }
+      // Nothing to clean up for fake location
     }
   }, [])
 

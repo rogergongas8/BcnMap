@@ -254,16 +254,27 @@ class BeachService
     }
 
     /**
-     * Temperatura del agua sin boya — offset estacional sobre el aire.
+     * Temperatura del agua sin boya — valores base por mes en Barcelona
+     * con una ligerísima variación según la temperatura del aire actual.
      */
     private function estimateWaterTemp(?float $airTemp): ?float
     {
-        if ($airTemp === null) return null;
+        $month = (int) Carbon::now('Europe/Madrid')->format('n');
+        
+        // Temperaturas medias históricas del mar en Barcelona
+        $baseTemps = [
+            1 => 13.5, 2 => 13.0, 3 => 14.0, 4 => 15.5,
+            5 => 18.0, 6 => 22.0, 7 => 25.0, 8 => 26.5,
+            9 => 25.0, 10 => 22.5, 11 => 18.5, 12 => 15.0,
+        ];
+        
+        $waterTemp = $baseTemps[$month] ?? 20.0;
 
-        $month   = (int) Carbon::now('Europe/Madrid')->format('n');
-        $isWarm  = $month >= 6 && $month <= 9;
-        $offset  = $isWarm ? 1.5 : -2.0;
+        // Añadimos una pequeña inercia térmica basada en el aire actual
+        if ($airTemp !== null) {
+            $waterTemp += ($airTemp - $waterTemp) * 0.15;
+        }
 
-        return round($airTemp + $offset, 1);
+        return round($waterTemp, 1);
     }
 }

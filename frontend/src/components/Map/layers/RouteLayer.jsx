@@ -14,29 +14,6 @@ const LYR_WAYPOINT_OUTER  = 'route-waypoint-outer'
 const LYR_WAYPOINT_INNER  = 'route-waypoint-inner'
 const LYR_WAYPOINT_LABEL  = 'route-waypoint-label'
 
-function clearSegments(map, segIds) {
-  for (const id of [...segIds]) {
-    try { map.removeLayer(id + '-glow') } catch (_) {}
-    try { map.removeLayer(id + '-line') } catch (_) {}
-    try { map.removeSource(id) } catch (_) {}
-  }
-  segIds.length = 0
-}
-
-function clearEndpoints(map) {
-  for (const id of [LYR_ORIGIN_HALO, LYR_ORIGIN_DOT, LYR_DEST_HALO, LYR_DEST_PIN]) {
-    try { map.removeLayer(id) } catch (_) {}
-  }
-  try { map.removeSource(SRC_ENDPOINTS) } catch (_) {}
-}
-
-function clearWaypoints(map) {
-  for (const id of [LYR_WAYPOINT_LABEL, LYR_WAYPOINT_INNER, LYR_WAYPOINT_OUTER, LYR_WAYPOINT_HALO]) {
-    try { map.removeLayer(id) } catch (_) {}
-  }
-  try { map.removeSource(SRC_WAYPOINTS) } catch (_) {}
-}
-
 /** Extrae waypoints intermedios (estaciones) de los segmentos. */
 function extractWaypoints(segments) {
   const features = []
@@ -103,10 +80,9 @@ function extractWaypoints(segments) {
 /** Decide el color real de un segmento (usa el color de la línea de metro si está). */
 function segmentColor(seg) {
   if ((seg.type === 'metro' || seg.type === 'bus') && Array.isArray(seg.meta?.lines) && seg.meta.lines.length) {
-    // El servicio actual sólo envía nombres de líneas, no colores reales.
-    // Si más adelante el backend incluye seg.meta.lineColor lo usamos directamente.
-    if (seg.meta.lineColor) {
-      const c = String(seg.meta.lineColor)
+    const primary = seg.meta.lines[0];
+    if (seg.meta.line_colors && seg.meta.line_colors[primary]) {
+      const c = String(seg.meta.line_colors[primary])
       return c.startsWith('#') ? c : '#' + c
     }
   }
@@ -116,17 +92,36 @@ function segmentColor(seg) {
 export default function RouteLayer() {
   const { mapInstance, isLoaded, styleKey } = useMapStore()
   const { route, origin, destination } = useRouteStore()
-  const segIds = useRef([])
+  const activeIds = useRef({ layers: [], sources: [] })
+  const renderId = useRef(0)
 
   useEffect(() => {
     if (!mapInstance || !isLoaded) return
 
-    clearSegments(mapInstance, segIds.current)
-    clearEndpoints(mapInstance)
-    clearWaypoints(mapInstance)
+    activeIds.current.layers.forEach(id => { try { mapInstance.removeLayer(id) } catch (_) {} })
+    activeIds.current.sources.forEach(id => { try { mapInstance.removeSource(id) } catch (_) {} })
+    activeIds.current = { layers: [], sources: [] }
 
     const segments = route?.segments
     if (!segments?.length) return
+
+    const rid = ++renderId.current;
+    const addSource = (id, options) => {
+      const uid = id + '-' + rid;
+      mapInstance.addSource(uid, options);
+      activeIds.current.sources.push(uid);
+      return uid;
+    };
+    const addLayer = (layer) => {
+      const uid = layer.id + '-' + rid;
+      if (layer.source && typeof layer.source === 'string') {
+        layer.source = layer.source + '-' + rid;
+      }
+      layer.id = uid;
+      mapInstance.addLayer(layer);
+      activeIds.current.layers.push(uid);
+      return uid;
+    };
 
     // ───────────── Segmentos ─────────────
     for (let i = 0; i < segments.length; i++) {
@@ -135,15 +130,9 @@ export default function RouteLayer() {
 
       const srcId = `${SRC_PREFIX}-${i}`
 
-      // Defensively ensure no stale source/layer with this ID exists
-      try { mapInstance.removeLayer(srcId + '-glow') } catch (_) {}
-      try { mapInstance.removeLayer(srcId + '-line') } catch (_) {}
-      try { mapInstance.removeSource(srcId) } catch (_) {}
-
       try {
-        segIds.current.push(srcId)
 
-        mapInstance.addSource(srcId, {
+        addSource(srcId, {
           type: 'geojson',
           data: { type: 'Feature', geometry: seg.geometry, properties: {} },
         })
@@ -164,7 +153,7 @@ export default function RouteLayer() {
         if (isMetro || isBus)  { glowWidth = 18; glowOpacity = 0.28; glowBlur = 7 }
         if (isCar)             { glowWidth = 16; glowOpacity = 0.22; glowBlur = 6 }
 
-        mapInstance.addLayer({
+        addLayer({
           id: srcId + '-glow',
           type: 'line',
           source: srcId,
@@ -197,7 +186,7 @@ export default function RouteLayer() {
           opacity = 0.95
         }
 
-        mapInstance.addLayer({
+        addLayer({
           id: srcId + '-line',
           type: 'line',
           source: srcId,
@@ -215,8 +204,8 @@ export default function RouteLayer() {
     }
 
     // Ensure buildings render below route lines (fill-extrusion can occlude 2D layers in pitched views)
-    if (segIds.current.length > 0 && mapInstance.getLayer('buildings-3d')) {
-      try { mapInstance.moveLayer('buildings-3d', segIds.current[0] + '-glow') } catch (_) {}
+    if (activeIds.current.layers.length > 0 && mapInstance.getLayer('buildings-3d')) {
+      try { mapInstance.moveLayer('buildings-3d', activeIds.current.layers[0]) } catch (_) {}
     }
 
     // ───────────── Marcadores origen / destino ─────────────
@@ -230,7 +219,7 @@ export default function RouteLayer() {
     else if (allCoords.length) destCoord = allCoords[allCoords.length - 1]
 
     if (originCoord && destCoord) {
-      mapInstance.addSource(SRC_ENDPOINTS, {
+      addSource(SRC_ENDPOINTS, {
         type: 'geojson',
         data: {
           type: 'FeatureCollection',
@@ -242,7 +231,7 @@ export default function RouteLayer() {
       })
 
       // Origen — halo azul + punto blanco
-      mapInstance.addLayer({
+      addLayer({
         id: LYR_ORIGIN_HALO,
         type: 'circle',
         source: SRC_ENDPOINTS,
@@ -254,7 +243,7 @@ export default function RouteLayer() {
           'circle-blur':    0.4,
         },
       })
-      mapInstance.addLayer({
+      addLayer({
         id: LYR_ORIGIN_DOT,
         type: 'circle',
         source: SRC_ENDPOINTS,
@@ -269,7 +258,7 @@ export default function RouteLayer() {
       })
 
       // Destino — pin (halo naranja + círculo grande)
-      mapInstance.addLayer({
+      addLayer({
         id: LYR_DEST_HALO,
         type: 'circle',
         source: SRC_ENDPOINTS,
@@ -281,7 +270,7 @@ export default function RouteLayer() {
           'circle-blur':    0.5,
         },
       })
-      mapInstance.addLayer({
+      addLayer({
         id: LYR_DEST_PIN,
         type: 'circle',
         source: SRC_ENDPOINTS,
@@ -299,13 +288,13 @@ export default function RouteLayer() {
     // ───────────── Waypoints (estaciones intermedias) ─────────────
     const waypointFeatures = extractWaypoints(segments)
     if (waypointFeatures.length) {
-      mapInstance.addSource(SRC_WAYPOINTS, {
+      addSource(SRC_WAYPOINTS, {
         type: 'geojson',
         data: { type: 'FeatureCollection', features: waypointFeatures },
       })
 
       // Halo glow exterior
-      mapInstance.addLayer({
+      addLayer({
         id: LYR_WAYPOINT_HALO,
         type: 'circle',
         source: SRC_WAYPOINTS,
@@ -318,7 +307,7 @@ export default function RouteLayer() {
       })
 
       // Círculo exterior con color del modo
-      mapInstance.addLayer({
+      addLayer({
         id: LYR_WAYPOINT_OUTER,
         type: 'circle',
         source: SRC_WAYPOINTS,
@@ -332,7 +321,7 @@ export default function RouteLayer() {
       })
 
       // Centro blanco
-      mapInstance.addLayer({
+      addLayer({
         id: LYR_WAYPOINT_INNER,
         type: 'circle',
         source: SRC_WAYPOINTS,
@@ -345,7 +334,7 @@ export default function RouteLayer() {
 
       // Etiqueta (count bicis / nombre línea) — silent fail si no hay glyphs
       try {
-        mapInstance.addLayer({
+        addLayer({
           id: LYR_WAYPOINT_LABEL,
           type: 'symbol',
           source: SRC_WAYPOINTS,

@@ -11,7 +11,10 @@ export const useChatStore = create((set) => ({
   toggleChat:  () => set((s) => ({ isOpen: !s.isOpen, hasUnread: false })),
   openChat:    () => set({ isOpen: true, hasUnread: false }),
   setLoading:  (val) => set({ isLoading: val }),
-  clearChat:   () => set({ messages: [] }),
+  clearChat: () => {
+    set({ messages: [] })
+    import('./nearbyStore').then(m => m.useNearbyStore.getState().setPois([]))
+  },
   clearPendingPrompt: () => set({ pendingPrompt: null }),
 
   // Normal: opens chat and queues a prompt, AI can move the map

@@ -224,7 +224,7 @@ class BusRouter
         array $fromStop,
         float $destLat,
         float $destLng,
-        float $maxWalkToExit = 700.0
+        float $maxWalkToExit = 1200.0
     ): ?array {
         $srcId = $fromStop['stop_id'];
         if (!isset($this->stopMap[$srcId])) return null;
@@ -233,8 +233,8 @@ class BusRouter
             (float)$fromStop['lat'], (float)$fromStop['lng'],
             $destLat, $destLng
         );
-        // Budget: 4× direct bus time + 10 min. Capped at 50 min.
-        $maxGCost = min(($straightDist / self::BUS_SPEED_MS) * 4.0 + 600, 3000.0);
+        // Budget: 4× direct bus time + 15 min. Capped at 90 min.
+        $maxGCost = min(($straightDist / self::BUS_SPEED_MS) * 4.0 + 900, 5400.0);
 
         $INF = PHP_FLOAT_MAX;
         $cost = [];

@@ -221,9 +221,9 @@ export default function CommuteView() {
             <Icons.route size={20} style={{ color: '#B8885A' }} />
           </div>
           <div>
-            <p className="font-syne text-[14px] font-semibold mb-1" style={{ color: '#F7F6F4' }}>Cap trayecte recurrent</p>
+            <p className="font-syne text-[14px] font-semibold mb-1" style={{ color: '#F7F6F4' }}>{t('drawer.commuteView.emptyTitle')}</p>
             <p className="font-mono text-[11px] leading-relaxed max-w-[240px] mx-auto mt-2" style={{ color: '#8C8884' }}>
-              Guarda un trayecte recurrent (com anar a la feina) i t'avisarem de quina és la millor hora per sortir i si hi ha incidències.
+              {t('drawer.commuteView.emptyDesc')}
             </p>
           </div>
           <button
@@ -233,7 +233,7 @@ export default function CommuteView() {
             onMouseEnter={e => { e.currentTarget.style.filter = 'brightness(1.1)' }}
             onMouseLeave={e => { e.currentTarget.style.filter = 'none' }}
           >
-            + Crear el meu primer trayecte
+            {t('drawer.commuteView.createFirst')}
           </button>
         </div>
       )}

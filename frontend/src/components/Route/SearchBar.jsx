@@ -182,12 +182,15 @@ function useDebouncedSuggestions(query, delay = 300) {
   useEffect(() => {
     if (!query || query.length < 2) { setResults([]); setLoading(false); return }
     setLoading(true)
+    let active = true
     const t = setTimeout(async () => {
       const r = await geocodeSearch(query)
-      setResults(r)
-      setLoading(false)
+      if (active) {
+        setResults(r)
+        setLoading(false)
+      }
     }, delay)
-    return () => clearTimeout(t)
+    return () => { active = false; clearTimeout(t) }
   }, [query, delay])
   return { results, loading }
 }
@@ -284,8 +287,10 @@ function SegmentSequence({ segments, metroLines }) {
             <span className="inline-flex items-center gap-1 text-[10px] font-mono" style={{ color: seg.color }}>
               {SegIcon && <SegIcon />}
               {isTransit && lineNames.length > 0 && lineNames.slice(0, 2).map((ln, k) => {
-                const lineRec = lineLookup(ln)
-                return <MetroLineBadge key={k} name={ln} color={lineRec?.color} />
+                const isBus = seg.type === 'bus'
+                const lineRec = !isBus ? lineLookup(ln) : null
+                const color = isBus ? (seg.meta?.line_colors?.[ln] ?? '#00b4ff') : lineRec?.color
+                return <MetroLineBadge key={k} name={ln} color={color} />
               })}
               <span>{fmtTime(seg.duration)}</span>
             </span>
@@ -1079,6 +1084,13 @@ function PointField({ value, onChange, onPickSuggestion, onMyLocation, placehold
           placeholder={placeholder}
           value={value}
           onChange={e => onChange(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter' && results.length > 0) {
+              e.preventDefault()
+              onPickSuggestion(results[0])
+              e.target.blur()
+            }
+          }}
           onFocus={() => { setFocused(true); if (onFocus) onFocus(); }}
           onBlur={() => setTimeout(() => setFocused(false), 180)}
         />
@@ -1348,9 +1360,13 @@ export default function SearchBar({ embedded = false }) {
     if (phase !== 'options' || !route) return
     const activePreview = previews[mode]
     if (activePreview?.data && activePreview.data !== route) {
-      setRoute(activePreview.data)
-      setLoading(false)
-      setError(null)
+      // Do not overwrite if the user manually selected one of the alternatives
+      const isAlternative = activePreview.data.alternatives?.some(alt => alt === route)
+      if (!isAlternative) {
+        setRoute(activePreview.data)
+        setLoading(false)
+        setError(null)
+      }
     }
   }, [previews, mode, phase, route, setRoute, setLoading, setError])
 

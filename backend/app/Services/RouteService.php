@@ -44,6 +44,7 @@ class RouteService
         $walkDist = $options['foot']['distance'] ?? 0;
         $isVeryClose = $walkDist > 0 && $walkDist <= 600;
         $isClose     = $walkDist > 0 && $walkDist <= 1200;
+        $hateHeat    = $constraint && preg_match('/calor/i', $constraint);
 
         foreach ($options as $mode => &$route) {
             if (!$route) continue;
@@ -54,8 +55,15 @@ class RouteService
                 $route['inefficient'] = true;
                 $route['inefficient_reason'] = 'El trajecte és molt curt, anar a peu és més ràpid i eficient.';
             } elseif ($isClose && in_array($mode, ['metro', 'bus', 'car'])) {
+                if (!$hateHeat) {
+                    $route['inefficient'] = true;
+                    $route['inefficient_reason'] = 'El trajecte és curt, anar a peu o en bicing és més eficient.';
+                }
+            }
+            
+            if ($hateHeat && in_array($mode, ['foot', 'bicing']) && !$isVeryClose) {
                 $route['inefficient'] = true;
-                $route['inefficient_reason'] = 'El trajecte és curt, anar a peu o en bicing és més eficient.';
+                $route['inefficient_reason'] = 'Fa calor, millor evitar aquest mode pel trajecte.';
             }
         }
         unset($route);
@@ -92,6 +100,7 @@ class RouteService
         $noBus      = $constraint && preg_match('/sin bus|no bus|sense bus/i', $constraint);
         $noCoche    = $constraint && preg_match('/sin coche|no coche|sense cotxe|a pie|a peu/i', $constraint);
         $hurry      = $constraint && preg_match('/prisa|ràpid|rapido|urgent/i', $constraint);
+        $hateHeat   = $constraint && preg_match('/calor/i', $constraint);
 
         // Walking distance = baseline for proximity thresholds
         $walkDist    = (float)(($options['foot']['distance'] ?? 0));
@@ -116,27 +125,27 @@ class RouteService
                 case 'bicing':
                     if ($isRainy)          $score *= 3.0;
                     if ($isStormy)         $score  = PHP_INT_MAX;
-                    if ($isHot)            $score *= 1.4;
+                    if ($isHot || $hateHeat) $score *= 1.4;
                     if ($strongWind)       $score *= 1.5;
                     if ($noBici)           $score  = PHP_INT_MAX;
                     break;
                 case 'foot':
                     if ($isVeryClose)      $score *= 0.25; // strong preference when very close
-                    elseif ($isClose)      $score *= 0.6;
+                    elseif ($isClose)      $score *= $hateHeat ? 2.0 : 0.6;
                     elseif ($distance > 3000) $score *= 1.8;
                     if ($isRainy)          $score *= 1.25;
                     if ($isStormy)         $score *= 1.8;
-                    if ($isHot && !$isClose) $score *= 1.3;
+                    if (($isHot || $hateHeat) && !$isClose) $score *= 1.8;
                     break;
                 case 'metro':
                     if ($isVeryClose)      $score  = PHP_INT_MAX; // pointless for <600m
-                    elseif ($isClose)      $score *= 2.5;
+                    elseif ($isClose && !$hateHeat) $score *= 2.5;
                     elseif (!$noMetro)     $score  *= 0.92;
                     if ($noMetro)          $score  = PHP_INT_MAX;
                     break;
                 case 'bus':
                     if ($isVeryClose)      $score  = PHP_INT_MAX;
-                    elseif ($isClose)      $score *= 2.5;
+                    elseif ($isClose && !$hateHeat) $score *= 2.5;
                     if ($noBus)            $score  = PHP_INT_MAX;
                     if (!$isClose && $congestion > 40) $score *= 1.0 + max(0, ($congestion - 40) / 150);
                     break;
@@ -371,7 +380,7 @@ class RouteService
 
         // Wider search to catch more line variety (direct routes)
         $originCandidates = $router->nearestStops($fromLat, $fromLng, 12, 1200.0);
-        $destCandidates   = $router->nearestStops($toLat,   $toLng,    5,  900.0);
+        $destCandidates   = $router->nearestStops($toLat,   $toLng,    5,  1200.0);
 
         if (empty($originCandidates) || empty($destCandidates)) {
             // Trigger a graph rebuild in case it's stale, then return warming signal
@@ -379,18 +388,34 @@ class RouteService
             return ['error' => 'bus_warming', 'mode' => 'bus', 'bus_graph_warming' => true];
         }
 
-        // Collect up to 4 unique-line-combo routes
+        // Collect top candidates from all valid origin stops
         $candidates = [];
         foreach ($originCandidates as $orig) {
             $result = $router->route($orig, $toLat, $toLng);
             if (!$result) continue;
+            
             $lineNames = array_map(fn($l) => $l['line_name'] ?? $l['line'], $result['legs']);
             $fullSig   = implode('+', $lineNames);
-            if (!isset($candidates[$fullSig])) {
-                $candidates[$fullSig] = ['result' => $result, 'origin' => $orig];
+            
+            $walkToOrig = $this->haversine($fromLat, $fromLng, (float)$orig['lat'], (float)$orig['lng']);
+            $walkToDest = $this->haversine((float)$result['alight_stop']['lat'], (float)$result['alight_stop']['lng'], $toLat, $toLng);
+            
+            $dist = 0.0;
+            foreach ($result['legs'] as $leg) {
+                $dist += $router->legDistance($leg['from_stop'], $leg['to_stop'], $leg['rec_key'] ?? '');
             }
-            if (count($candidates) >= 4) break;
+            
+            $transfers = count($result['legs']) - 1;
+            // rough heuristic time in seconds: walks + bus ride + wait penalty
+            $roughScore = ($walkToOrig / 1.25) + ($dist / BusRouter::BUS_SPEED_MS) + ($transfers * 480) + ($walkToDest / 1.25);
+            
+            if (!isset($candidates[$fullSig]) || $roughScore < $candidates[$fullSig]['rough_score']) {
+                $candidates[$fullSig] = ['result' => $result, 'origin' => $orig, 'rough_score' => $roughScore];
+            }
         }
+        
+        uasort($candidates, fn($a, $b) => $a['rough_score'] <=> $b['rough_score']);
+        $candidates = array_slice(array_values($candidates), 0, 8);
 
         if (empty($candidates)) {
             // Graph might be stale — trigger rebuild and tell client to retry
@@ -576,7 +601,7 @@ class RouteService
         );
         $transferStations = array_slice($xferPool, 0, 5);
 
-        $originStops = $busRouter->nearestStops($fromLat, $fromLng, 4, 700.0);
+        $originStops = $busRouter->nearestStops($fromLat, $fromLng, 8, 1000.0);
         if (empty($originStops)) return [];
 
         $seen = []; $rawCandidates = [];
@@ -728,10 +753,15 @@ class RouteService
                 $otherDur = $other['duration'];
                 $otherXfer = $other['transfers'];
                 
-                // Si la otra ruta es estrictamente mejor (o igual de rápida y menos transbordos, o más rápida e igual/menos transbordos)
-                if (($otherDur < $candDur && $otherXfer <= $candXfer) || ($otherDur <= $candDur && $otherXfer < $candXfer)) {
-                    $isDominated = true;
-                    break;
+                // Relaxed pareto: allow slightly slower routes if they are different lines.
+                if ($otherXfer < $candXfer) {
+                    if ($otherDur <= $candDur + 120) { // Fewer transfers, and not significantly slower
+                        $isDominated = true; break;
+                    }
+                } elseif ($otherXfer === $candXfer) {
+                    if ($otherDur < $candDur - 300) { // Same transfers, but 5+ mins faster
+                        $isDominated = true; break;
+                    }
                 }
             }
             if (!$isDominated) {
@@ -741,7 +771,7 @@ class RouteService
 
         usort($nonDominated, fn($a, $b) => $a['duration'] <=> $b['duration']);
 
-        return array_values(array_slice($nonDominated, 0, 3));
+        return array_values(array_slice($nonDominated, 0, 5));
     }
 
     private function transitRoute(float $fromLat, float $fromLng, float $toLat, float $toLng): array
@@ -1053,8 +1083,8 @@ class RouteService
 
         return [
             'locations'          => $locations,
-            'costing'            => 'auto',
-            'costing_options'    => ['auto' => ['use_highways' => 0.3, 'use_tolls' => 0.0]],
+            'costing'            => 'bus',
+            'costing_options'    => ['bus' => []],
             'directions_options' => ['units' => 'kilometers'],
         ];
     }

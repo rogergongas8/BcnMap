@@ -24,7 +24,8 @@ function buildLabelParts(r) {
 
   // Street address with house number: "Carrer de la Pau, 12 · Gràcia"
   if (a.house_number && a.road) {
-    return { main: `${a.road}, ${a.house_number}`, sub: area }
+    const cleanNumber = a.house_number.split(/[,\-]/)[0].trim()
+    return { main: `${a.road}, ${cleanNumber}`, sub: area }
   }
 
   const rawName = r.namedetails?.name || r.display_name?.split(',')[0]?.trim() || ''

@@ -6,7 +6,7 @@ import { useContextMenuStore } from '../../store/contextMenuStore'
 import { reverseGeocode } from '../../utils/reverseGeocode'
 
 const INTERACTIVE_LAYER_PATTERNS = [
-  /^bicing/, /^metro/, /^bus/, /^route/, /^user-location/, /^nearby-pois/, /^events/,
+  /^bicing/, /^metro/, /^bus/, /^route/, /^user-location/, /^nearby-pois/, /^events/, /^beach/,
 ]
 
 export default function MapClickHandler() {

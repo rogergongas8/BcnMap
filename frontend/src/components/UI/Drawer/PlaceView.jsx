@@ -598,7 +598,7 @@ function RutaTab({ place, onRoute, plan, planLoading, planError, onRefetch }) {
                 {hasRoute ? (
                   <span className="font-syne text-[14px] font-bold tabular-nums"
                     style={{ color: isActive ? m.color : isEfficient ? '#B0ACA7' : '#4C4A46' }}>
-                    {fmtDur(route.duration)}
+                    {Math.round(route.duration / 60)} min
                   </span>
                 ) : (
                   <span className="font-mono text-[9px]" style={{ color: '#3C3A36' }}>—</span>
@@ -609,9 +609,9 @@ function RutaTab({ place, onRoute, plan, planLoading, planError, onRefetch }) {
                     Recomanat
                   </span>
                 )}
-                {hasRoute && fmtKm(route.distance) && isEfficient && (
-                  <span className="font-mono text-[9px]" style={{ color: '#4C4A46' }}>
-                    {fmtKm(route.distance)}
+                {hasRoute && isEfficient && route.transfers != null && (
+                  <span className="font-mono text-[9px]" style={{ color: isActive ? m.color + 'aa' : '#5C5A56' }}>
+                    {route.transfers === 0 ? 'Directe' : `${route.transfers} transbord${route.transfers > 1 ? 's' : ''}`}
                   </span>
                 )}
               </div>
@@ -619,55 +619,78 @@ function RutaTab({ place, onRoute, plan, planLoading, planError, onRefetch }) {
           )
         })}
 
-        {/* Transit alternatives — metro and bus */}
+        {/* Transit Alternatives (if any) */}
         {transitAlts.length > 1 && (
-          <div className="mt-0.5 px-1">
-            <p className="font-mono text-[8px] uppercase tracking-[0.14em] mb-1.5 px-1" style={{ color: '#5C5A56' }}>
-              {transitAlts.length} alternatives disponibles
+          <div className="px-3 pb-3">
+            <p className="font-mono text-[9px] uppercase tracking-[0.14em] px-1 mb-2" style={{ color: '#5C5A56' }}>
+              Rutes alternatives
             </p>
-            <div className="flex flex-col gap-1">
-              {transitAlts.slice(0, 3).map((alt, i) => {
+            <div className="flex flex-col gap-1.5">
+              {transitAlts.map((alt, i) => {
+                const isAlt = selectedAlt === i
                 const mColor = activeMode?.color ?? '#B0ACA7'
-                const isAlt  = selectedAlt === i
+
+                // Extract line colors from segments to color the badges
+                const lineToColor = {}
+                if (alt.segments) {
+                  alt.segments.forEach(seg => {
+                    if (seg.meta?.lines && seg.meta?.line_colors) {
+                      seg.meta.lines.forEach(l => {
+                        if (seg.meta.line_colors[l]) lineToColor[l] = seg.meta.line_colors[l]
+                      })
+                    }
+                  })
+                }
+
                 return (
                   <button
                     key={i}
                     onClick={() => setSelectedAlt(i)}
-                    className="flex items-center gap-2.5 px-3 py-2.5 text-left transition-all active:scale-[0.99]"
+                    className="flex items-center justify-between px-3 py-2 text-left transition-all active:scale-[0.98]"
                     style={{
-                      borderRadius: 8,
-                      border: `1px solid ${isAlt ? mColor + '55' : '#252320'}`,
-                      background: isAlt ? mColor + '0d' : '#171512',
+                      borderRadius: 6,
+                      background: isAlt ? mColor + '12' : '#1C1A17',
+                      border: `1px solid ${isAlt ? mColor + '40' : '#252320'}`,
                     }}
                   >
-                    {/* Line badge(s) */}
-                    <span className="flex items-center gap-0.5 flex-shrink-0">
-                      {(alt.lines_label ?? '').split(' → ').slice(0, 3).map((line, li) => (
-                        <span key={li} className="inline-flex items-center">
-                          {li > 0 && <span className="text-[8px] mx-0.5" style={{ color: '#5C5A56' }}>→</span>}
-                          <span className="font-mono text-[9px] font-bold px-1.5 py-0.5 rounded"
-                            style={{ background: isAlt ? mColor + '25' : '#2C2926', color: isAlt ? mColor : '#8C8884' }}>
-                            {line}
-                          </span>
-                        </span>
-                      ))}
+                    <div className="flex flex-col gap-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                        {(alt.lines_label ?? '').split(' → ').slice(0, 3).map((line, li) => {
+                          const lName = line.trim();
+                          let badgeColor = mColor;
+                          let textColor = '#8C8884';
+                          let bgAlpha = '#2C2926';
+
+                          if (lineToColor[lName]) {
+                            const raw = String(lineToColor[lName]);
+                            const hex = raw.startsWith('#') ? raw : '#' + raw;
+                            badgeColor = hex;
+                            textColor = '#ffffff';
+                            bgAlpha = hex;
+                          } else if (isAlt) {
+                            textColor = mColor;
+                            bgAlpha = mColor + '25';
+                          }
+
+                          return (
+                            <span key={li} className="inline-flex items-center">
+                              {li > 0 && <span className="text-[8px] mx-0.5" style={{ color: '#5C5A56' }}>→</span>}
+                              <span className="font-mono text-[9px] font-bold px-1.5 py-0.5 rounded"
+                                style={{ background: bgAlpha, color: textColor, boxShadow: lineToColor[lName] ? `0 0 6px ${badgeColor}66` : 'none' }}>
+                                {lName}
+                              </span>
+                            </span>
+                          )
+                        })}
+                      </div>
+                      <p className="font-mono text-[9px] text-white/40">
+                        {alt.transfers === 0 ? 'Sense transbords' : `${alt.transfers} transbord${alt.transfers > 1 ? 's' : ''}`}
+                      </p>
+                    </div>
+                    <span className="font-syne text-[13px] font-bold tabular-nums ml-3 flex-shrink-0"
+                      style={{ color: isAlt ? mColor : '#8C8884' }}>
+                      {Math.round(alt.duration / 60)} min
                     </span>
-
-                    <span className="flex-1 min-w-0" />
-
-                    {/* Time */}
-                    <span className="font-syne text-[13px] font-bold tabular-nums flex-shrink-0"
-                      style={{ color: isAlt ? mColor : '#B0ACA7' }}>
-                      {fmtDur(alt.duration)}
-                    </span>
-
-                    {/* Transfers badge */}
-                    {alt.transfers != null && alt.transfers > 0 && (
-                      <span className="font-mono text-[8px] px-1.5 py-0.5 rounded-full flex-shrink-0"
-                        style={{ background: '#211F1B', border: '1px solid #2C2926', color: '#5C5A56' }}>
-                        {alt.transfers}t
-                      </span>
-                    )}
                   </button>
                 )
               })}
@@ -853,7 +876,7 @@ export default function PlaceView() {
   const accent = POI_CATEGORY_COLORS[catId] ?? '#8b5cf6'
 
   const subtitle = place.kind === 'beach'
-    ? [place.meta?.district, place.meta?.length_m ? `${place.meta.length_m}m` : null].filter(Boolean).join(' · ')
+    ? ['Platja', place.meta?.district ? `Districte de ${place.meta.district}` : null, place.meta?.length_m ? `${place.meta.length_m}m` : null].filter(Boolean).join(' · ')
     : place.kind === 'poi' ? (place.address ?? null)
     : place.address ?? `${place.lat.toFixed(5)}, ${place.lng.toFixed(5)}`
 

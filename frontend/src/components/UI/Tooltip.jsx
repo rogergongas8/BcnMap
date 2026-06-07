@@ -1,4 +1,5 @@
 import React from 'react'
+import { useTranslation } from 'react-i18next'
 
 const C = {
   orange: '#B8885A',
@@ -42,18 +43,19 @@ function ArrivalPill({ mins }) {
 }
 
 function BusTooltip({ object }) {
+  const { t } = useTranslation()
   const buses = object.buses ?? []
   return (
     <Card accent={C.orange}>
-      <Label>Parada de bus</Label>
+      <Label>{t('tooltip.busStop')}</Label>
       <p className="font-syne text-[13px] font-medium truncate mb-2" style={{ color: '#EBEBEB' }}>{object.stop_name}</p>
       {object.address && (
         <p className="font-mono text-[10px] truncate mb-2" style={{ color: '#555' }}>{object.address}</p>
       )}
       {object.loading ? (
-        <p className="font-mono text-[10px]" style={{ color: '#555' }}>Carregant...</p>
+        <p className="font-mono text-[10px]" style={{ color: '#555' }}>{t('tooltip.loading')}</p>
       ) : buses.length === 0 ? (
-        <p className="font-mono text-[10px]" style={{ color: '#555' }}>Sense dades en temps real</p>
+        <p className="font-mono text-[10px]" style={{ color: '#555' }}>{t('tooltip.noRealtime')}</p>
       ) : (
         <div className="flex flex-col gap-1.5">
           {buses.slice(0, 5).map((b, i) => (
@@ -80,6 +82,7 @@ function BusTooltip({ object }) {
 }
 
 function MetroTooltip({ object }) {
+  const { t } = useTranslation()
   const lines  = object.lines  ?? []
   const trains = object.trains ?? []
   const primaryColor = lines[0]?.color ? `#${lines[0].color.replace(/^#/, '')}` : C.purple
@@ -101,14 +104,14 @@ function MetroTooltip({ object }) {
             {l.name}
           </span>
         ))}
-        <span className="font-mono text-[8px] uppercase tracking-[0.12em]" style={{ color: '#555' }}>Operatiu</span>
+        <span className="font-mono text-[8px] uppercase tracking-[0.12em]" style={{ color: '#555' }}>{t('tooltip.operational')}</span>
       </div>
       <p className="font-syne text-[13px] font-medium truncate mb-2" style={{ color: '#EBEBEB' }}>{object.station_name}</p>
 
       {object.loading ? (
-        <p className="font-mono text-[10px]" style={{ color: '#555' }}>Carregant...</p>
+        <p className="font-mono text-[10px]" style={{ color: '#555' }}>{t('tooltip.loading')}</p>
       ) : trains.length === 0 ? (
-        <p className="font-mono text-[10px]" style={{ color: '#555' }}>Sense dades en temps real</p>
+        <p className="font-mono text-[10px]" style={{ color: '#555' }}>{t('tooltip.noRealtime')}</p>
       ) : (
         <div className="flex flex-col gap-2.5">
           {lines.map((l, li) => {
@@ -122,14 +125,14 @@ function MetroTooltip({ object }) {
                   <div className="flex-1 h-px" style={{ background: '#1A1A1A' }} />
                 </div>
                 {lineTrains.length === 0 ? (
-                  <p className="font-mono text-[9px]" style={{ color: '#444' }}>Sense dades</p>
+                  <p className="font-mono text-[9px]" style={{ color: '#444' }}>{t('tooltip.noData')}</p>
                 ) : (
                   <div className="flex flex-col gap-1">
-                    {lineTrains.slice(0, 2).map((t, i) => (
+                    {lineTrains.slice(0, 2).map((tr, i) => (
                       <div key={i} className="flex items-center gap-2">
-                        <span className="font-mono text-[10px] truncate flex-1" style={{ color: '#888' }}>{t.dest}</span>
+                        <span className="font-mono text-[10px] truncate flex-1" style={{ color: '#888' }}>{tr.dest}</span>
                         <div className="flex items-center gap-1.5 flex-shrink-0">
-                          {(t.arrivals ?? []).slice(0, 2).map((mins, j) => (
+                          {(tr.arrivals ?? []).slice(0, 2).map((mins, j) => (
                             <React.Fragment key={j}>
                               {j > 0 && <span style={{ color: '#6B6865' }}>·</span>}
                               <ArrivalPill mins={mins} />
@@ -150,6 +153,7 @@ function MetroTooltip({ object }) {
 }
 
 function BicingTooltip({ object }) {
+  const { t } = useTranslation()
   const bikes  = object.bikes  ?? 0
   const ebikes = object.ebikes ?? 0
   const docks  = object.docks  ?? 0
@@ -160,61 +164,48 @@ function BicingTooltip({ object }) {
   return (
     <Card accent={isActive ? C.orange : '#555'}>
       <div className="flex items-center justify-between mb-1">
-        <Label>Estació Bicing</Label>
+        <Label>{t('tooltip.bicingStation')}</Label>
         <span className="font-mono text-[8px] uppercase tracking-[0.1em] px-1.5 py-0.5 rounded"
           style={{ background: isActive ? '#B8885A18' : '#1C1C1C', color: isActive ? C.orange : '#555', border: `1px solid ${isActive ? '#B8885A44' : '#262626'}` }}>
-          {isActive ? 'Activa' : 'Inactiva'}
+          {isActive ? t('tooltip.active') : t('tooltip.inactive')}
         </span>
       </div>
       <p className="font-syne text-[13px] font-medium truncate mb-2.5" style={{ color: '#EBEBEB' }}>{object.name}</p>
       <div className="flex gap-4">
         <div>
-          <p className="font-mono text-[9px] uppercase tracking-[0.1em] mb-0.5" style={{ color: '#555' }}>Mecàniques</p>
+          <p className="font-mono text-[9px] uppercase tracking-[0.1em] mb-0.5" style={{ color: '#555' }}>{t('tooltip.mechanical')}</p>
           <p className="font-mono text-[16px] font-semibold leading-none" style={{ color: C.orange }}>{bikes}</p>
         </div>
         {ebikes > 0 && (
           <div>
-            <p className="font-mono text-[9px] uppercase tracking-[0.1em] mb-0.5" style={{ color: '#555' }}>Elèctriques</p>
+            <p className="font-mono text-[9px] uppercase tracking-[0.1em] mb-0.5" style={{ color: '#555' }}>{t('tooltip.ebikes')}</p>
             <p className="font-mono text-[16px] font-semibold leading-none" style={{ color: C.green }}>{ebikes}</p>
           </div>
         )}
         <div>
-          <p className="font-mono text-[9px] uppercase tracking-[0.1em] mb-0.5" style={{ color: '#555' }}>Ancorats</p>
+          <p className="font-mono text-[9px] uppercase tracking-[0.1em] mb-0.5" style={{ color: '#555' }}>{t('tooltip.docks')}</p>
           <p className="font-mono text-[16px] font-semibold leading-none" style={{ color: '#888' }}>{docks}</p>
         </div>
       </div>
       <MiniBar pct={pct} color={C.orange} />
-      <p className="font-mono text-[9px] mt-1" style={{ color: '#555' }}>{bikes + ebikes} / {total} disponibles</p>
+      <p className="font-mono text-[9px] mt-1" style={{ color: '#555' }}>{t('tooltip.available', { n: bikes + ebikes, total })}</p>
     </Card>
   )
 }
 
-const EVENT_COLORS = {
-  musica:      '#C98E2E',
-  esport:      '#3CB887',
-  cultura:     '#8B6AD4',
-  gastronomia: '#B8885A',
-  familia:     '#4D84D4',
-  altres:      '#6B6055',
-}
-
-const EVENT_CAT_LABELS = {
-  musica: 'Música', esport: 'Esport', cultura: 'Cultura',
-  gastronomia: 'Gastronomia', familia: 'Família', altres: 'Altres',
-}
-
 function EventTooltip({ object }) {
+  const { t, i18n } = useTranslation()
   const color    = EVENT_COLORS[object.category] ?? EVENT_COLORS.altres
-  const catLabel = EVENT_CAT_LABELS[object.category] ?? object.category
+  const catLabel = t(`tooltip.events.${object.category}`, { defaultValue: object.category })
 
   const formatDate = (iso) => {
     if (!iso) return null
     const d = new Date(iso + 'T00:00:00')
     const today = new Date(); today.setHours(0,0,0,0)
     const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1)
-    if (d.getTime() === today.getTime())    return 'Avui'
-    if (d.getTime() === tomorrow.getTime()) return 'Demà'
-    return d.toLocaleDateString('ca', { day: 'numeric', month: 'short' })
+    if (d.getTime() === today.getTime())    return t('tooltip.today')
+    if (d.getTime() === tomorrow.getTime()) return t('tooltip.tomorrow')
+    return d.toLocaleDateString(i18n.language || 'ca', { day: 'numeric', month: 'short' })
   }
 
   const dateStr = object.start
@@ -252,21 +243,30 @@ function EventTooltip({ object }) {
       )}
 
       <p className="font-mono text-[8px] mt-2" style={{ color: '#3A3530' }}>
-        Clica per veure detalls
+        {t('tooltip.clickDetails')}
       </p>
     </Card>
   )
 }
 
+const EVENT_COLORS = {
+  musica:      '#C98E2E',
+  esport:      '#3CB887',
+  cultura:     '#8B6AD4',
+  gastronomia: '#B8885A',
+  familia:     '#4D84D4',
+  altres:      '#6B6055',
+}
+
 function TrafficTooltip({ object }) {
+  const { t } = useTranslation()
   const estado = object.estado ?? ''
   const color  = estado === 'fluido' ? C.green : estado === 'lento' ? C.amber : estado === 'congestionado' ? C.red : '#D45555'
-  const labelMap = { fluido: 'Fluït', lento: 'Lent', congestionado: 'Congestionat', cortado: 'Tallat' }
-  const label = labelMap[estado] ?? estado.toUpperCase()
+  const label = t(`tooltip.traffic.${estado}`, { defaultValue: estado.toUpperCase() })
 
   return (
     <Card accent={color}>
-      <Label>Incident de trànsit</Label>
+      <Label>{t('tooltip.trafficIncident')}</Label>
       <p className="font-syne text-[13px] font-medium truncate mb-1.5" style={{ color: '#EBEBEB' }}>{object.name}</p>
       <span className="font-mono text-[9px] uppercase tracking-[0.1em] px-1.5 py-0.5 rounded"
         style={{ background: color + '18', color, border: `1px solid ${color}44` }}>
@@ -274,7 +274,7 @@ function TrafficTooltip({ object }) {
       </span>
       {object.velocidad != null && (
         <p className="font-mono text-[10px] mt-2" style={{ color: '#555' }}>
-          Velocitat actual: <span style={{ color: '#EBEBEB' }}>{object.velocidad} km/h</span>
+          {t('tooltip.speed')}<span style={{ color: '#EBEBEB' }}>{object.velocidad} km/h</span>
         </p>
       )}
     </Card>

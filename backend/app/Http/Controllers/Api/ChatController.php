@@ -176,7 +176,13 @@ class ChatController extends Controller
             }
         }
         
-        // Try to match keyword + a known location
+        // 1. Try to match keyword + street address (e.g. "carrer sant antoni maria claret 57")
+        $patternStreet = '/\b(' . $keywordsStr . ')\b.*?\b((?:carrer|calle|passeig|paseo|avinguda|avenida|rambla|ronda|plaça|plaza|via)(?:\s+[a-zàáèéíòóúüñç\']+){1,5}(?:\s+\d+[a-z]?)?)/iu';
+        if (preg_match($patternStreet, $fullText, $m)) {
+            return ['query' => $m[1], 'location' => $m[2], 'has_location' => true];
+        }
+
+        // 2. Try to match keyword + a known location
         $patternLoc = '/\b(' . $keywordsStr . ')\b.*?\b(' . $barrios . ')\b/iu';
         if (preg_match($patternLoc, $fullText, $m)) {
             return ['query' => $m[1], 'location' => $m[2], 'has_location' => true];
